@@ -1,0 +1,6 @@
+.pi/
+node_modules/
+dist/
+.kapy/
+*.tsbuildinfo
+bun.lock
