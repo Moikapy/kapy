@@ -1,0 +1,15 @@
+{
+	"version": 1,
+	"skills": {
+		"opentui": {
+			"source": "msmps/opentui-skill",
+			"sourceType": "github",
+			"computedHash": "2915038bb3297e759f740f9e6bfa885ed80a4a7fe945825f5874b48db9ce0fd2"
+		},
+		"test-driven-development": {
+			"source": "obra/superpowers",
+			"sourceType": "github",
+			"computedHash": "126f1ebf6ccd414f42544f6e83d8cc5adb089e1108eaffb7c400701e37eecd9f"
+		}
+	}
+}

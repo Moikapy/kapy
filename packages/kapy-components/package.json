@@ -1,0 +1,35 @@
+{
+	"name": "kapy-components",
+	"version": "0.1.0",
+	"type": "module",
+	"description": "UI components for kapy TUI — built on @opentui/core",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": "./dist/index.js"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"dev": "bun run --watch src/index.ts",
+		"build": "bun build src/index.ts --outdir dist --target bun",
+		"test": "bun test",
+		"lint": "biome check src/",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@opentui/core": "^0.1.97"
+	},
+	"devDependencies": {
+		"typescript": "^5.7.0",
+		"@types/bun": "^1.2.0"
+	},
+	"keywords": [
+		"tui",
+		"components",
+		"opentui",
+		"cli"
+	],
+	"license": "MIT"
+}
