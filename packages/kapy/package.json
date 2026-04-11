@@ -23,6 +23,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@opentui/core": "^0.1.97",
 		"kapy-components": "workspace:*",
 		"picocolors": "^1.1.0"
 	},

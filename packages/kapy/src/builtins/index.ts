@@ -6,5 +6,6 @@ export { createInspectCommand } from "./inspect.js";
 export { installCommand } from "./install.js";
 export { listCommand } from "./list.js";
 export { removeCommand } from "./remove.js";
+export { searchCommand } from "./search.js";
 export { updateCommand } from "./update.js";
 export { upgradeCommand } from "./upgrade.js";

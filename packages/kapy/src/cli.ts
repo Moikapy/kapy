@@ -8,6 +8,7 @@ import {
 	installCommand,
 	listCommand,
 	removeCommand,
+	searchCommand,
 	updateCommand,
 	upgradeCommand,
 } from "./builtins/index.js";
@@ -146,6 +147,14 @@ async function runCLI(
 		name: "remove",
 		options: { description: "Uninstall an extension", args: [{ name: "name", required: true }] },
 		handler: removeCommand,
+	});
+	registry.register({
+		name: "search",
+		options: {
+			description: "Search for extensions (coming soon)",
+			args: [{ name: "query", description: "Search query" }],
+		},
+		handler: searchCommand,
 	});
 	registry.register({
 		name: "upgrade",

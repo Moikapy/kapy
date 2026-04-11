@@ -6,10 +6,12 @@ import { join } from "node:path";
 
 export interface ScaffoldOptions {
 	template?: boolean;
+	/** Directory to scaffold in (defaults to process.cwd()) */
+	cwd?: string;
 }
 
 export async function scaffold(name: string, options: ScaffoldOptions = {}): Promise<void> {
-	const dir = join(process.cwd(), name);
+	const dir = join(options.cwd ?? process.cwd(), name);
 
 	// Create directory structure
 	await mkdir(join(dir, ".kapy"), { recursive: true });

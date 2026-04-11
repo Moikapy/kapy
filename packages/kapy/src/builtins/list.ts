@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CommandContext } from "../command/context.js";
+import type { ExtensionMeta } from "../extension/types.js";
 
 interface ExtensionEntry {
 	version: string;
@@ -11,7 +12,21 @@ interface ExtensionEntry {
 	installedAt: string;
 }
 
+/** Try to load extension metadata for a source */
+async function loadExtMeta(source: string): Promise<ExtensionMeta | null> {
+	const extensionsDir = join(homedir(), ".kapy", "extensions");
+	try {
+		const { resolveExtensionSource } = await import("../extension/loader.js");
+		const resolvedPath = await resolveExtensionSource(source, extensionsDir);
+		const mod = await import(resolvedPath);
+		return mod.meta ?? mod.default?.meta ?? null;
+	} catch {
+		return null;
+	}
+}
+
 export const listCommand = async (ctx: CommandContext): Promise<void> => {
+	const showPermissions = ctx.args["show-permissions"] as boolean;
 	const manifestPath = join(homedir(), ".kapy", "extensions.json");
 
 	let manifest: Record<string, ExtensionEntry> = {};
@@ -25,7 +40,17 @@ export const listCommand = async (ctx: CommandContext): Promise<void> => {
 	const entries = Object.entries(manifest);
 
 	if (ctx.json) {
-		console.log(JSON.stringify({ extensions: entries.map(([name, info]) => ({ name, ...info })) }));
+		const extensions = await Promise.all(
+			entries.map(async ([name, info]) => {
+				const entry: Record<string, unknown> = { name, ...info };
+				if (showPermissions) {
+					const meta = await loadExtMeta(info.source);
+					entry.permissions = meta?.permissions ?? [];
+				}
+				return entry;
+			}),
+		);
+		console.log(JSON.stringify({ extensions }));
 		return;
 	}
 
@@ -38,5 +63,14 @@ export const listCommand = async (ctx: CommandContext): Promise<void> => {
 	ctx.log("Installed extensions:");
 	for (const [name, info] of entries) {
 		ctx.log(`  ${name.padEnd(30)} ${info.version.padEnd(10)} ${info.source}`);
+
+		if (showPermissions) {
+			const meta = await loadExtMeta(info.source);
+			if (meta?.permissions?.length) {
+				ctx.log(`    ⚠️  Permissions: ${meta.permissions.join(", ")} (documentation only)`);
+			} else {
+				ctx.log(`    Permissions: none declared`);
+			}
+		}
 	}
 };

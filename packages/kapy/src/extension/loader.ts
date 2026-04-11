@@ -143,6 +143,13 @@ export class ExtensionLoader {
 				return null;
 			}
 
+			// Warn about declared permissions (documentation-only for MVP)
+			if (meta.permissions?.length) {
+				console.warn(
+					`[kapy] Extension "${meta.name}" declares permissions: ${meta.permissions.join(", ")} (documentation only — not enforced at runtime)`,
+				);
+			}
+
 			const api = new ExtensionAPI({
 				registry: this.registry,
 				hooks: this.hooks,
@@ -248,3 +255,4 @@ function deriveName(source: string): string {
 }
 
 export type { LoadedExtension };
+export { resolveExtensionSource };
