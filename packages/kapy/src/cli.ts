@@ -31,7 +31,7 @@ import type { CommandHandler, CommandOptions } from "./command/parser.js";
 import { loadConfig } from "./config/index.js";
 import type { ProjectConfig } from "./config/schema.js";
 import { ExtensionLoader } from "./extension/index.js";
-import { errorHandler } from "./middleware/error-handler.js";
+import { errorHandler, KapyError } from "./middleware/error-handler.js";
 import type { Middleware } from "./middleware/pipeline.js";
 import { composeMiddleware } from "./middleware/pipeline.js";
 import { launchTUI } from "./tui/index.js";
@@ -293,7 +293,25 @@ async function runCLI(
 	}
 }
 
+/** Handle KapyError at the top level — exit with appropriate code */
+function handleKapyError(err: unknown, jsonMode: boolean): never {
+	if (err instanceof KapyError) {
+		if (jsonMode && err.jsonOutput) {
+			console.log(JSON.stringify(err.jsonOutput));
+			process.exit(err.exitCode);
+		}
+		console.error(err.message);
+		process.exit(err.exitCode);
+	}
+
+	// Unexpected errors
+	console.error(err instanceof Error ? err.message : String(err));
+	process.exit(1);
+}
+
 // Run CLI if this is the main entry point
 if (import.meta.main) {
-	kapy().run();
+	kapy()
+		.run()
+		.catch((err) => handleKapyError(err, process.argv.includes("--json")));
 }

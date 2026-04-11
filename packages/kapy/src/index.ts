@@ -4,6 +4,8 @@
  * Public API: kapy() builder, defineConfig, types, and re-exports.
  */
 
+// Re-export kapy-components so extensions can import from either path
+export * from "kapy-components";
 // Built-in commands
 export {
 	configCommand,
@@ -46,6 +48,3 @@ export { ExtensionEmitter } from "./hooks/index.js";
 export type { Middleware } from "./middleware/index.js";
 // Middleware
 export { composeMiddleware, EXIT_CODES, errorHandler, logging, timing } from "./middleware/index.js";
-
-// Re-export kapy-components (will resolve once package is built)
-// export * from "kapy-components";

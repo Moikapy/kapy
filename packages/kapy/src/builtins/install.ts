@@ -1,9 +1,37 @@
 /** kapy install — install an extension from npm, git, or local path */
-import { execSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CommandContext } from "../command/context.js";
+
+/** Run a command safely without shell injection */
+async function runCommand(
+	command: string,
+	args: string[],
+	options?: { cwd?: string; stdio?: "pipe" | "inherit" },
+): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+	return new Promise((resolve) => {
+		const proc = spawn(command, args, {
+			cwd: options?.cwd,
+			stdio: options?.stdio ?? "pipe",
+		});
+		let stdout = "";
+		let stderr = "";
+		proc.stdout?.on("data", (data: Buffer) => {
+			stdout += data.toString();
+		});
+		proc.stderr?.on("data", (data: Buffer) => {
+			stderr += data.toString();
+		});
+		proc.on("close", (code) => {
+			resolve({ stdout, stderr, exitCode: code });
+		});
+		proc.on("error", (err) => {
+			resolve({ stdout, stderr: stderr + err.message, exitCode: 1 });
+		});
+	});
+}
 
 export const installCommand = async (ctx: CommandContext): Promise<void> => {
 	const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
@@ -26,27 +54,36 @@ export const installCommand = async (ctx: CommandContext): Promise<void> => {
 		// Ensure ~/.kapy exists
 		await mkdir(kapyDir, { recursive: true });
 
-		// Parse source type
+		// Parse source type and derive package name
 		let pkgName: string;
-		let installCmd: string;
+		let installResult: { stdout: string; stderr: string; exitCode: number | null };
 
 		if (source.startsWith("npm:")) {
-			pkgName = source.slice(4).split("@")[0] || source.slice(4);
+			// npm package: e.g., "npm:@foo/kapy-ext@1.2.3" or "npm:@foo/kapy-ext"
 			const fullPkg = source.slice(4);
-			installCmd = `bun add -g ${fullPkg}`;
+			pkgName = fullPkg.split("@")[0] || fullPkg;
+			installResult = await runCommand("bun", ["add", "-g", fullPkg], {
+				stdio: ctx.json ? "pipe" : "inherit",
+			});
 		} else if (source.startsWith("git:")) {
+			// git repo: e.g., "git:github.com/user/repo" or "git:github.com/user/repo@v2"
 			const gitUrl = source.slice(4);
 			const repoName = gitUrl.split("/").pop()?.replace(".git", "") ?? gitUrl;
 			pkgName = repoName;
 			const extDir = join(kapyDir, "extensions", repoName);
-			installCmd = `git clone ${gitUrl} ${extDir}`;
+			installResult = await runCommand("git", ["clone", gitUrl, extDir], {
+				stdio: ctx.json ? "pipe" : "inherit",
+			});
 		} else if (source.startsWith("./") || source.startsWith("../") || source.startsWith("/")) {
+			// Local path — no install needed, just validate it exists
 			pkgName = source.split("/").pop()?.replace(".ts", "").replace(".js", "") ?? source;
-			installCmd = ""; // local — no install needed
+			installResult = { stdout: "", stderr: "", exitCode: 0 };
 		} else {
-			// Treat as npm package name
+			// Bare package name — treat as npm package
 			pkgName = source;
-			installCmd = `bun add -g ${source}`;
+			installResult = await runCommand("bun", ["add", "-g", source], {
+				stdio: ctx.json ? "pipe" : "inherit",
+			});
 		}
 
 		// Trust prompt
@@ -62,14 +99,11 @@ export const installCommand = async (ctx: CommandContext): Promise<void> => {
 			spinner.start();
 		}
 
-		// Run install
-		if (installCmd) {
-			try {
-				execSync(installCmd, { stdio: ctx.json ? "pipe" : "inherit" });
-			} catch (err) {
-				spinner.fail(`Failed to install: ${source}`);
-				throw err;
-			}
+		// Check install result
+		if (installResult.exitCode !== 0 && installResult.exitCode !== null) {
+			spinner.fail(`Failed to install: ${source}`);
+			ctx.error(installResult.stderr || `Install failed with exit code ${installResult.exitCode}`);
+			ctx.abort(1);
 		}
 
 		// Update extensions manifest

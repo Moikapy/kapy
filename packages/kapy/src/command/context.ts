@@ -4,6 +4,8 @@
  * Every command handler receives a `ctx` object with parsed args,
  * merged config, logging utilities, and interaction helpers.
  */
+
+import { createInterface } from "node:readline";
 import pc from "picocolors";
 
 /** Command context passed to every handler */
@@ -82,8 +84,7 @@ export class CommandContext {
 		process.stdout.write(pc.cyan(`${msg}: `));
 
 		return new Promise<string>((resolve) => {
-			const readline = require("node:readline");
-			const rl = readline.createInterface({
+			const rl = createInterface({
 				input: process.stdin,
 				output: process.stdout,
 			});
