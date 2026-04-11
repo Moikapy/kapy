@@ -86,19 +86,17 @@ export function parseArgs(argv: string[], flagDefs?: Record<string, FlagDefiniti
 				// --flag value (or --flag for boolean)
 				const key = token.slice(2);
 				const flagDef = flagDefs?.[key];
-				if (flagDef?.type === "boolean" || !flagDef) {
-					// No flagDef means assume boolean if no next arg or next starts with -
-					const nextToken = argv[i + 1];
-					if (nextToken && !nextToken.startsWith("-") && flagDef?.type !== "boolean") {
-						args[key] = nextToken;
-						i++;
-					} else {
-						args[key] = true;
-					}
-				} else {
+				if (flagDef?.type === "boolean") {
+					// Explicitly boolean flag
+					args[key] = true;
+				} else if (flagDef) {
+					// Known flag with a type — consume next arg as value
 					const nextToken = argv[i + 1];
 					args[key] = nextToken ?? flagDef.default;
 					if (nextToken) i++;
+				} else {
+					// Unknown flag — treat as boolean
+					args[key] = true;
 				}
 			}
 		} else if (token.startsWith("-") && token.length === 2) {

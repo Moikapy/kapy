@@ -1,5 +1,6 @@
 export { defaults, getDefaultConfig, DEFAULT_ENV_PREFIX } from "./defaults.js";
-export { loadConfig, parseEnvConfig, deepMergeConfigs } from "./loader.js";
+export { loadConfig, parseEnvConfig } from "./loader.js";
+export { deepMergeConfigs } from "./loader-merge.js";
 export type {
 	ConfigField,
 	ConfigSchema,

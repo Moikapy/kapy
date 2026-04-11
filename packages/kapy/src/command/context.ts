@@ -4,13 +4,14 @@
  * Every command handler receives a `ctx` object with parsed args,
  * merged config, logging utilities, and interaction helpers.
  */
+import pc from "picocolors";
 
 /** Command context passed to every handler */
 export class CommandContext {
-	/** Parsed arguments and flags */
+	/** Parsed arguments and flags (including `rest` for positional args) */
 	args: Record<string, unknown>;
 
-	/** Merged configuration (all sources) */
+	/** Merged configuration (all sources, namespaced) */
 	config: Record<string, Record<string, unknown>>;
 
 	/** The command name being executed */
@@ -30,6 +31,7 @@ export class CommandContext {
 
 	private _startTime: number;
 	private _exitCode: number;
+	private _spinner: Spinner | null = null;
 
 	constructor(options: {
 		args?: Record<string, unknown>;
@@ -49,35 +51,57 @@ export class CommandContext {
 		this._exitCode = 0;
 	}
 
-	/** Styled success output (green) */
+	/** Styled success output */
 	log(msg: string): void {
-		if (this.json) return; // JSON mode suppresses styled output
-		console.log(msg);
+		if (this.json) return;
+		console.log(pc.green(msg));
 	}
 
-	/** Styled warning output (yellow) */
+	/** Styled warning output */
 	warn(msg: string): void {
 		if (this.json) return;
-		console.warn(msg);
+		console.warn(pc.yellow(msg));
 	}
 
-	/** Styled error output (red) */
+	/** Styled error output */
 	error(msg: string): void {
-		console.error(msg);
+		console.error(pc.red(msg));
 	}
 
 	/** Returns a progress spinner instance */
 	spinner(text: string): Spinner {
-		return new Spinner(text);
+		const s = new Spinner(text, this.json);
+		this._spinner = s;
+		return s;
 	}
 
-	/** Interactive prompt — returns user input */
+	/** Interactive prompt — reads from stdin */
 	async prompt(msg: string): Promise<string> {
 		if (this.noInput) {
 			throw new Error(`Prompt blocked by --no-input: ${msg}`);
 		}
-		// TODO: implement interactive prompt via kapy-components
-		return "";
+
+		process.stdout.write(pc.cyan(`${msg}: `));
+
+		return new Promise<string>((resolve) => {
+			const readline = require("readline");
+			const rl = readline.createInterface({
+				input: process.stdin,
+				output: process.stdout,
+			});
+			rl.question("", (answer: string) => {
+				rl.close();
+				resolve(answer.trim());
+			});
+		});
+	}
+
+	/** Confirm prompt — yes/no */
+	async confirm(msg: string, defaultYes = true): Promise<boolean> {
+		const hint = defaultYes ? "[Y/n]" : "[y/N]";
+		const answer = await this.prompt(`${msg} ${hint}`);
+		if (!answer) return defaultYes;
+		return answer.toLowerCase().startsWith("y");
 	}
 
 	/** Cancel execution with optional exit code */
@@ -93,23 +117,60 @@ export class CommandContext {
 	}
 }
 
-/** Spinner placeholder — will be replaced by kapy-components integration */
+/** Spinner with actual terminal output */
 export class Spinner {
-	constructor(private text: string) {}
+	private _text: string;
+	private _interval: ReturnType<typeof setInterval> | null = null;
+	private _frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+	private _frame = 0;
+	private _silent: boolean;
+
+	constructor(text: string, silent = false) {
+		this._text = text;
+		this._silent = silent;
+	}
+
+	get text(): string {
+		return this._text;
+	}
+
 	start(): this {
+		if (this._silent || !process.stdout.isTTY) return this;
+		this._interval = setInterval(() => {
+			const frame = this._frames[this._frame % this._frames.length];
+			process.stdout.write(`\r${frame} ${this._text}`);
+			this._frame++;
+		}, 80);
 		return this;
 	}
+
 	stop(): this {
+		if (this._interval) {
+			clearInterval(this._interval);
+			this._interval = null;
+			if (process.stdout.isTTY) process.stdout.write("\r\x1b[K");
+		}
 		return this;
 	}
+
 	update(text: string): this {
-		this.text = text;
+		this._text = text;
 		return this;
 	}
+
 	succeed(msg?: string): this {
+		this.stop();
+		if (!this._silent) {
+			console.log(pc.green(`✓ ${msg ?? this._text}`));
+		}
 		return this;
 	}
+
 	fail(msg?: string): this {
+		this.stop();
+		if (!this._silent) {
+			console.error(pc.red(`✗ ${msg ?? this._text}`));
+		}
 		return this;
 	}
 }

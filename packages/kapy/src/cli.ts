@@ -56,7 +56,7 @@ export function defineConfig(config: ProjectConfig): ProjectConfig {
 export function kapy(): KapyBuilder {
 	const registry = new CommandRegistry();
 	const userMiddlewares: Middleware[] = [];
-	const config: ProjectConfig = {};
+	const projectConfig: ProjectConfig = {};
 
 	const builder: KapyBuilder = {
 		command(name: string, options: CommandOptions, handler: CommandHandler): KapyBuilder {
@@ -70,7 +70,7 @@ export function kapy(): KapyBuilder {
 		},
 
 		async run(): Promise<void> {
-			await runCLI(registry, userMiddlewares, config);
+			await runCLI(registry, userMiddlewares, projectConfig);
 		},
 	};
 
@@ -100,34 +100,52 @@ async function runCLI(
 
 	// Set up extension system
 	const extensionLoader = new ExtensionLoader(registry);
-	// TODO: load extensions from config
 
-	// Register built-in commands (need registry/extension refs for some)
+	// Load extensions from project config
+	if (projectConfig.extensions?.length) {
+		await extensionLoader.loadFromConfig(projectConfig);
+	}
+
+	// Load extensions from global config (mergedConfig has extension settings)
+	const globalExtensions = (mergedConfig as Record<string, unknown>)._extensions as string[] | undefined;
+	if (globalExtensions?.length) {
+		await extensionLoader.loadFromConfig({ extensions: globalExtensions });
+	}
+
+	// Add extension middleware to pipeline
+	for (const mw of extensionLoader.getMiddlewares()) {
+		userMiddlewares.push(mw);
+	}
+
+	// Register built-in commands
 	registry.register({ name: "init", options: { description: "Scaffold a new kapy-powered CLI project", args: [{ name: "name", required: true }], flags: { template: { type: "boolean", alias: "t", description: "Include example commands and extension" } } }, handler: initCommand });
-	registry.register({ name: "install", options: { description: "Install an extension", args: [{ name: "source", required: true }], flags: { trust: { type: "boolean", description: "Skip trust prompt" } } }, handler: installCommand });
+	registry.register({ name: "install", options: { description: "Install an extension (npm:, git:, or local path)", args: [{ name: "source", required: true }], flags: { trust: { type: "boolean", description: "Skip trust prompt" } } }, handler: installCommand });
 	registry.register({ name: "list", options: { description: "Show installed extensions" }, handler: listCommand });
 	registry.register({ name: "update", options: { description: "Update all or a specific extension", args: [{ name: "name" }] }, handler: updateCommand });
 	registry.register({ name: "remove", options: { description: "Uninstall an extension", args: [{ name: "name", required: true }] }, handler: removeCommand });
 	registry.register({ name: "upgrade", options: { description: "Upgrade kapy itself to the latest version" }, handler: upgradeCommand });
-	registry.register({ name: "config", options: { description: "View/edit configuration", args: [{ name: "key" }, { name: "value" }] }, handler: configCommand });
+	registry.register({ name: "config", options: { description: "View/edit configuration", args: [{ name: "key" }, { name: "value" }], flags: { global: { type: "boolean", alias: "g", description: "Edit global config" } } }, handler: configCommand });
 	registry.register({ name: "dev", options: { description: "Run CLI in dev mode with hot reload", flags: { debug: { type: "boolean", alias: "d", description: "Verbose logging" } } }, handler: devCommand });
 	registry.register({ name: "commands", options: { description: "List all registered commands", flags: { json: { type: "boolean", description: "Output as JSON" } } }, handler: createCommandsCommand(registry) });
 	registry.register({ name: "inspect", options: { description: "Dump full state (extensions, config, hooks, middleware)", flags: { json: { type: "boolean", description: "Output as JSON" } } }, handler: createInspectCommand(registry, userMiddlewares, extensionLoader.getHooks()) });
 	registry.register({ name: "tui", options: { description: "Launch interactive terminal UI", flags: { screen: { type: "string", alias: "s", description: "Open directly to a specific screen" } } }, handler: async (ctx) => { await launchTUI({ screens: extensionLoader.getScreens(), initialScreen: ctx.args.screen as string }, ctx); } });
 
-	// Load user commands (from project config)
+	// Load user commands (from project config middleware)
 	if (projectConfig.middleware) {
 		for (const mw of projectConfig.middleware) {
 			userMiddlewares.push(mw);
 		}
 	}
 
+	// Register user commands from builder
+	// (already registered via .command() calls)
+
 	// Resolve command from argv
 	const resolved = registry.resolve(commandParts);
-	if (!resolved) {
+	if (!resolved || commandParts.length === 0) {
 		// No matching command — show help
 		if (jsonMode) {
-			console.log(JSON.stringify({ status: "error", message: "Unknown command", commands: registry.visible().map((c) => c.name) }));
+			console.log(JSON.stringify({ status: "error", message: "No command specified", commands: registry.visible().map((c) => c.name) }));
 		} else {
 			console.log("Usage: kapy <command> [flags]");
 			console.log("");
@@ -139,16 +157,22 @@ async function runCLI(
 		process.exit(jsonMode ? 0 : 2);
 	}
 
+	// Parse command-specific flags
+	const { args: cmdArgs, rest: cmdPositional } = parseArgs(commandParts.slice(1), resolved.command.options.flags);
+
+	// Merge global args with command args, positional args in rest
+	const mergedArgs = { ...globalArgs, ...cmdArgs, rest: cmdPositional };
+
 	// Build command context
 	const ctx = new CommandContext({
-		args: globalArgs,
+		args: mergedArgs,
 		config: mergedConfig,
 		command: resolved.command.name,
 		json: jsonMode,
 		noInput: noInput,
 	});
 
-	// Compose middleware chain
+	// Compose middleware chain (error handler first, then user + extension middleware)
 	const allMiddlewares = [errorHandler, ...userMiddlewares];
 	const pipeline = composeMiddleware(allMiddlewares);
 
@@ -186,7 +210,7 @@ async function runCLI(
 
 	ctx._tick();
 
-	// JSON output for successful commands that hadn't output yet
+	// JSON output for successful commands
 	if (jsonMode && !ctx.aborted) {
 		console.log(JSON.stringify({ status: "success", command: ctx.command, duration: ctx.duration }));
 	}
