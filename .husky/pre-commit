@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# kapy pre-commit hook — lint, typecheck, test
+set -e
+
+echo "🐹 Running pre-commit checks..."
+
+echo "→ Biome lint..."
+biome check . 2>&1
+
+echo "→ TypeScript check..."
+bun run typecheck 2>&1
+
+echo "→ Running tests..."
+bun test packages/kapy/test/index.test.ts packages/kapy/test/integration/ 2>&1
+
+echo "✅ All checks passed!"

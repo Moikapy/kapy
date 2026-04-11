@@ -1,4 +1,5 @@
 {
+	"$schema": "https://biomejs.dev/schemas/2.4.11/schema.json",
 	"name": "kapy-monorepo",
 	"private": true,
 	"type": "module",
@@ -8,12 +9,15 @@
 	"scripts": {
 		"dev": "bun run --filter './packages/*' dev",
 		"build": "bun run --filter './packages/*' build",
-		"test": "bun run --filter './packages/*' test",
+		"test": "bun test packages/kapy/test/index.test.ts packages/kapy/test/integration/",
 		"lint": "biome check .",
-		"check": "biome check . && tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"check": "biome check . && tsc --noEmit && bun test packages/kapy/test/index.test.ts packages/kapy/test/integration/",
+		"prepare": "husky"
 	},
 	"devDependencies": {
 		"typescript": "^5.7.0",
-		"@biomejs/biome": "^2.0.0"
+		"@biomejs/biome": "^2.0.0",
+		"husky": "^9.1.7"
 	}
 }
