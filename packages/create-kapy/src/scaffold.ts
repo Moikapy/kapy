@@ -1,15 +1,17 @@
 /**
  * Scaffold — creates a new kapy-powered CLI project.
  */
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export interface ScaffoldOptions {
 	template?: boolean;
+	/** Directory to scaffold in (defaults to process.cwd()) */
+	cwd?: string;
 }
 
 export async function scaffold(name: string, options: ScaffoldOptions = {}): Promise<void> {
-	const dir = join(process.cwd(), name);
+	const dir = join(options.cwd ?? process.cwd(), name);
 
 	// Create directory structure
 	await mkdir(join(dir, ".kapy"), { recursive: true });
@@ -33,11 +35,11 @@ export async function scaffold(name: string, options: ScaffoldOptions = {}): Pro
 	}
 
 	// Write .kapy/config.json
-	await Bun.write(join(dir, ".kapy", "config.json"), `${JSON.stringify({ extensions: {} }, null, 2)}\n`);
+	await writeFile(join(dir, ".kapy", "config.json"), `${JSON.stringify({ extensions: {} }, null, 2)}\n`);
 }
 
 async function writeConfigJson(dir: string): Promise<void> {
-	await Bun.write(join(dir, ".kapy", "config.json"), `${JSON.stringify({ extensions: {} }, null, 2)}\n`);
+	await writeFile(join(dir, ".kapy", "config.json"), `${JSON.stringify({ extensions: {} }, null, 2)}\n`);
 }
 
 async function writePackageJson(dir: string, name: string): Promise<void> {
@@ -61,7 +63,7 @@ async function writePackageJson(dir: string, name: string): Promise<void> {
 			"@types/bun": "^1.2.0",
 		},
 	};
-	await Bun.write(join(dir, "package.json"), `${JSON.stringify(pkg, null, 2)}\n`);
+	await writeFile(join(dir, "package.json"), `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
 async function writeKapyConfig(dir: string, name: string): Promise<void> {
@@ -73,7 +75,7 @@ export default defineConfig({
   middleware: [],
 });
 `;
-	await Bun.write(join(dir, "kapy.config.ts"), config);
+	await writeFile(join(dir, "kapy.config.ts"), config);
 }
 
 async function writeTsConfig(dir: string): Promise<void> {
@@ -85,11 +87,11 @@ async function writeTsConfig(dir: string): Promise<void> {
 		},
 		include: ["src"],
 	};
-	await Bun.write(join(dir, "tsconfig.json"), `${JSON.stringify(tsconfig, null, 2)}\n`);
+	await writeFile(join(dir, "tsconfig.json"), `${JSON.stringify(tsconfig, null, 2)}\n`);
 }
 
 async function writeGitignore(dir: string): Promise<void> {
-	await Bun.write(
+	await writeFile(
 		join(dir, ".gitignore"),
 		`node_modules/
 dist/
@@ -111,7 +113,7 @@ kapy()
   })
   .run();
 `;
-	await Bun.write(join(dir, "src", "index.ts"), index);
+	await writeFile(join(dir, "src", "index.ts"), index);
 }
 
 async function writeDeployCommand(dir: string): Promise<void> {
@@ -125,7 +127,7 @@ export const deployCommand: CommandHandler = async (ctx) => {
   ctx.log("✓ Deployment complete!");
 };
 `;
-	await Bun.write(join(dir, "src", "commands", "deploy.ts"), deploy);
+	await writeFile(join(dir, "src", "commands", "deploy.ts"), deploy);
 }
 
 async function writeExtension(dir: string, name: string): Promise<void> {
@@ -149,5 +151,5 @@ export const meta = {
   dependencies: [],
 };
 `;
-	await Bun.write(join(dir, "src", "extensions", "index.ts"), ext);
+	await writeFile(join(dir, "src", "extensions", "index.ts"), ext);
 }

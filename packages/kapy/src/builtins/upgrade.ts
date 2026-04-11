@@ -1,43 +1,68 @@
 /** kapy upgrade — upgrade kapy itself to the latest version */
-import { execSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import type { CommandContext } from "../command/context.js";
+
+/** Run a command safely without shell injection */
+async function runCommand(
+	command: string,
+	args: string[],
+	options?: { stdio?: "pipe" | "inherit" },
+): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+	return new Promise((resolve) => {
+		const proc = spawn(command, args, { stdio: options?.stdio ?? "pipe" });
+		let stdout = "";
+		let stderr = "";
+		proc.stdout?.on("data", (data: Buffer) => {
+			stdout += data.toString();
+		});
+		proc.stderr?.on("data", (data: Buffer) => {
+			stderr += data.toString();
+		});
+		proc.on("close", (code) => {
+			resolve({ stdout, stderr, exitCode: code });
+		});
+		proc.on("error", (err) => {
+			resolve({ stdout, stderr: stderr + err.message, exitCode: 1 });
+		});
+	});
+}
 
 export const upgradeCommand = async (ctx: CommandContext): Promise<void> => {
 	const spinner = ctx.spinner("Checking for kapy updates...");
 	spinner.start();
 
+	// Try bun first, then npm
+	let upgraded = false;
+
 	try {
-		// Try bun first, then npm
-		let currentVersion = "unknown";
-		try {
-			currentVersion = execSync("bun pm ls -g kapy 2>/dev/null || npm ls -g kapy --depth=0 --json 2>/dev/null", {
-				encoding: "utf-8",
-				stdio: ["pipe", "pipe", "pipe"],
-			}).trim();
-		} catch {
-			// Version detection failed
-		}
-
-		spinner.update("Upgrading kapy...");
-
-		try {
-			execSync("bun add -g kapy@latest", { stdio: ctx.json ? "pipe" : "inherit" });
+		const result = await runCommand("bun", ["add", "-g", "kapy@latest"], {
+			stdio: ctx.json ? "pipe" : "inherit",
+		});
+		if (result.exitCode === 0) {
 			spinner.succeed("kapy upgraded to latest version");
-		} catch {
-			// Fall back to npm
-			try {
-				execSync("npm install -g kapy@latest", { stdio: ctx.json ? "pipe" : "inherit" });
+			upgraded = true;
+		}
+	} catch {
+		// bun failed, try npm
+	}
+
+	if (!upgraded) {
+		try {
+			const result = await runCommand("npm", ["install", "-g", "kapy@latest"], {
+				stdio: ctx.json ? "pipe" : "inherit",
+			});
+			if (result.exitCode === 0) {
 				spinner.succeed("kapy upgraded to latest version");
-			} catch {
+				upgraded = true;
+			} else {
 				spinner.fail("Failed to upgrade kapy. Try running: bun add -g kapy@latest");
 			}
+		} catch {
+			spinner.fail("Failed to upgrade kapy. Try running: bun add -g kapy@latest");
 		}
+	}
 
-		if (ctx.json) {
-			console.log(JSON.stringify({ status: "success", previousVersion: currentVersion }));
-		}
-	} catch (err) {
-		spinner.fail("Upgrade failed");
-		throw err;
+	if (ctx.json) {
+		console.log(JSON.stringify({ status: upgraded ? "success" : "error" }));
 	}
 };

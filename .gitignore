@@ -28,3 +28,6 @@ coverage/
 # IDE
 .vscode/
 .idea/
+
+# Secrets (never commit)
+.env.pi/

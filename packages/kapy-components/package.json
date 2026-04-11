@@ -18,13 +18,12 @@
 		"lint": "biome check src/",
 		"typecheck": "tsc --noEmit"
 	},
-	"peerDependencies": {
-		"@opentui/core": ">=0.1.0"
+	"dependencies": {
+		"@opentui/core": "^0.1.97"
 	},
 	"devDependencies": {
 		"typescript": "^5.7.0",
-		"@types/bun": "^1.2.0",
-		"@opentui/core": "^0.1.0"
+		"@types/bun": "^1.2.0"
 	},
 	"keywords": [
 		"tui",

@@ -1,10 +1,19 @@
 /**
- * TUI shell — kapy tui command. Launches interactive terminal UI.
+ * TUI shell — kapy tui command. Launches interactive terminal UI using OpenTUI.
  *
- * Uses OpenTUI when available, falls back to text-mode TUI.
+ * Uses @opentui/core for rendering. Falls back gracefully if TTY is unavailable.
+ * IMPORTANT: Uses renderer.destroy() for cleanup, never process.exit().
  */
-import { createInterface } from "node:readline";
-import pc from "picocolors";
+import {
+	ASCIIFontRenderable,
+	BoxRenderable,
+	type CliRenderer,
+	createCliRenderer,
+	type Renderable,
+	RGBA,
+	ScrollBoxRenderable,
+	TextRenderable,
+} from "@opentui/core";
 import type { CommandContext } from "../command/context.js";
 import type { ScreenDefinition } from "../extension/types.js";
 
@@ -13,25 +22,27 @@ export interface TUIOptions {
 	initialScreen?: string;
 }
 
-/** Capybara ASCII art for the home screen */
-const CAPYBARA = `
-   ┌─────┐
-   │ ◕ ◕ │   🐹 kapy
-   │  ∪  │   the pi.dev for CLI
-   └─┬──┘
-     ╰─╯
-`;
-
 /** Built-in screens */
-export const homeScreen: ScreenDefinition = {
+const homeScreenDef: ScreenDefinition = {
 	name: "home",
 	label: "Home",
 	icon: "🐹",
-	render: () => CAPYBARA,
+	render: () =>
+		[
+			"",
+			"  🐹 kapy — the pi.dev for CLI",
+			"",
+			"  An extensible CLI framework with first-class support for",
+			"  extensions, hooks, middleware, and a built-in TUI.",
+			"",
+			"  Navigate with ↑↓ arrows and press Enter to select.",
+			"  Press q to quit, Esc to go back.",
+			"",
+		].join("\n"),
 	keyBindings: { q: "quit" },
 };
 
-export const extensionsScreen: ScreenDefinition = {
+const extensionsScreenDef: ScreenDefinition = {
 	name: "extensions",
 	label: "Extensions",
 	icon: "📦",
@@ -39,7 +50,7 @@ export const extensionsScreen: ScreenDefinition = {
 	keyBindings: { q: "quit" },
 };
 
-export const configScreen: ScreenDefinition = {
+const configScreenDef: ScreenDefinition = {
 	name: "config",
 	label: "Config",
 	icon: "🔧",
@@ -47,7 +58,7 @@ export const configScreen: ScreenDefinition = {
 	keyBindings: { q: "quit" },
 };
 
-export const terminalScreen: ScreenDefinition = {
+const terminalScreenDef: ScreenDefinition = {
 	name: "terminal",
 	label: "Terminal",
 	icon: "⚡",
@@ -55,116 +66,189 @@ export const terminalScreen: ScreenDefinition = {
 	keyBindings: { q: "quit" },
 };
 
-/** Render the sidebar */
-function renderSidebar(screens: ScreenDefinition[], activeIndex: number): string {
-	const lines: string[] = [];
-	lines.push(pc.bold(pc.cyan("  🐹 kapy")));
-	lines.push(pc.dim("  ────────────────────"));
+/** Build the sidebar */
+function buildSidebar(renderer: CliRenderer, screens: ScreenDefinition[], activeIndex: number): BoxRenderable {
+	const sidebar = new BoxRenderable(renderer, {
+		id: "sidebar",
+		width: 24,
+		flexDirection: "column",
+		padding: 1,
+		border: true,
+		borderStyle: "single",
+		borderColor: RGBA.fromHex("#444466"),
+		backgroundColor: RGBA.fromHex("#1a1a2e"),
+	} as never);
+
+	// Title
+	const title = new ASCIIFontRenderable(renderer, {
+		id: "sidebar-title",
+		text: "KAPY",
+		font: "tiny",
+		color: RGBA.fromHex("#00AAFF"),
+	});
+	sidebar.add(title as never);
+
+	// Separator
+	const sep = new TextRenderable(renderer, {
+		id: "sidebar-sep",
+		content: "────────────────",
+		fg: RGBA.fromHex("#444466"),
+	});
+	sidebar.add(sep as never);
+
+	// Nav items
 	for (let i = 0; i < screens.length; i++) {
 		const screen = screens[i];
-		const prefix = i === activeIndex ? pc.cyan("▸") : " ";
-		const label = i === activeIndex ? pc.cyan(pc.bold(screen.label)) : screen.label;
-		lines.push(`${prefix} ${screen.icon ?? " "} ${label}`);
+		const isActive = i === activeIndex;
+		const prefix = isActive ? " ▸ " : "   ";
+		const label = `${prefix}${screen.icon ?? " "} ${screen.label}`;
+		const item = new TextRenderable(renderer, {
+			id: `nav-${screen.name}`,
+			content: label,
+			fg: isActive ? RGBA.fromHex("#00AAFF") : RGBA.fromHex("#888888"),
+		});
+		sidebar.add(item as never);
 	}
-	lines.push(pc.dim("  ────────────────────"));
-	lines.push(pc.dim("  q: quit  ↑↓: nav  ↵: select"));
-	return lines.join("\n");
+
+	return sidebar;
 }
 
-/** Render a screen */
-function renderScreen(screen: ScreenDefinition): string {
-	const lines: string[] = [];
-	lines.push(pc.bold(`  ${screen.icon ?? "▸"} ${screen.label}`));
-	lines.push(pc.dim("  ────────────────────────────────────"));
+/** Build the main content area */
+function buildMainContent(
+	renderer: CliRenderer,
+	screen: ScreenDefinition,
+	width: number,
+	height: number,
+): BoxRenderable {
 	const content = screen.render({});
-	if (typeof content === "string") {
-		lines.push(content);
-	}
-	lines.push("");
-	lines.push(pc.dim("  q: quit  Esc: back"));
-	return lines.join("\n");
+	const text = typeof content === "string" ? content : String(content);
+
+	const scrollbox = new ScrollBoxRenderable(renderer, {
+		id: `screen-${screen.name}`,
+		width,
+		height,
+		showScrollbar: true,
+	} as never);
+
+	const contentText = new TextRenderable(renderer, {
+		id: `content-${screen.name}`,
+		content: text,
+		fg: RGBA.fromHex("#c0caf5"),
+		selectable: true,
+	});
+	scrollbox.add(contentText as never);
+
+	const panel = new BoxRenderable(renderer, {
+		id: "main-panel",
+		flexDirection: "column",
+		padding: 1,
+		border: true,
+		borderStyle: "rounded",
+		borderColor: RGBA.fromHex("#444466"),
+		backgroundColor: RGBA.fromHex("#16161e"),
+	} as never);
+	panel.add(scrollbox as never);
+	return panel;
+}
+
+/** Build the status bar */
+function buildStatusBar(renderer: CliRenderer, width: number): BoxRenderable {
+	const bar = new BoxRenderable(renderer, {
+		id: "statusbar",
+		width,
+		padding: 1,
+		backgroundColor: RGBA.fromHex("#222233"),
+	} as never);
+	const text = new TextRenderable(renderer, {
+		id: "statusbar-text",
+		content: "q: quit  ↑↓: navigate  ↵: select  Esc: back",
+		fg: RGBA.fromHex("#888888"),
+	});
+	bar.add(text as never);
+	return bar;
 }
 
 /** Launch the TUI shell */
 export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promise<void> {
 	if (ctx.noInput || ctx.json) {
 		ctx.error("TUI requires an interactive terminal. Use commands without --json or --no-input.");
-		process.exit(2);
+		return;
 	}
 
 	if (!process.stdout.isTTY) {
 		ctx.error("TUI requires an interactive terminal (TTY).");
-		process.exit(2);
+		return;
 	}
 
-	const allScreens = [homeScreen, extensionsScreen, configScreen, terminalScreen, ...options.screens];
+	const allScreens: ScreenDefinition[] = [
+		homeScreenDef,
+		extensionsScreenDef,
+		configScreenDef,
+		terminalScreenDef,
+		...options.screens,
+	];
 	let activeIndex = allScreens.findIndex((s) => s.name === options.initialScreen);
 	if (activeIndex === -1) activeIndex = 0;
-	let currentView: "sidebar" | "screen" = options.initialScreen ? "screen" : "sidebar";
+	let inScreen = !!options.initialScreen;
 
-	const rl = createInterface({
-		input: process.stdin,
-		output: process.stdout,
-	});
+	// Initialize OpenTUI renderer
+	const renderer = await createCliRenderer({ exitOnCtrlC: false });
 
-	const clearScreen = (): void => {
-		process.stdout.write("\x1b[2J\x1b[H");
-	};
-
-	const draw = (): void => {
-		clearScreen();
-		if (currentView === "sidebar") {
-			process.stdout.write(renderSidebar(allScreens, activeIndex));
-		} else {
-			process.stdout.write(renderScreen(allScreens[activeIndex]));
+	function rebuild(): void {
+		// Clear existing tree
+		while (renderer.root.children.length > 0) {
+			renderer.root.remove(renderer.root.children[0] as Renderable);
 		}
-	};
 
-	draw();
+		// Rebuild layout
+		const _sidebar = buildSidebar(renderer, allScreens, activeIndex);
+		const statusBar = buildStatusBar(renderer, renderer.width);
 
-	return new Promise<void>((resolve) => {
-		rl.on("line", (input) => {
-			const key = input.trim().toLowerCase();
+		if (inScreen) {
+			const mainContent = buildMainContent(renderer, allScreens[activeIndex], renderer.width - 26, renderer.height - 4);
+			renderer.root.add(mainContent as never);
+		} else {
+			// Show sidebar with overview text
+			const overview = buildMainContent(renderer, allScreens[activeIndex], renderer.width - 26, renderer.height - 4);
+			renderer.root.add(overview as never);
+		}
 
-			if (key === "q" || key === "quit" || key === "exit") {
-				clearScreen();
-				console.log(pc.dim("Goodbye! 🐹"));
-				rl.close();
-				resolve();
-				return;
+		renderer.root.add(statusBar as never);
+		renderer.requestRender();
+	}
+
+	// Build initial layout
+	rebuild();
+
+	// Handle keyboard navigation
+	renderer.keyInput.on("keypress", (key: { name: string; ctrl?: boolean }) => {
+		if (key.name === "q" || (key.ctrl && key.name === "c")) {
+			renderer.destroy();
+			return;
+		}
+
+		if (!inScreen) {
+			if (key.name === "up" || key.name === "k") {
+				activeIndex = Math.max(0, activeIndex - 1);
+				rebuild();
+			} else if (key.name === "down" || key.name === "j") {
+				activeIndex = Math.min(allScreens.length - 1, activeIndex + 1);
+				rebuild();
+			} else if (key.name === "return" || key.name === "enter") {
+				inScreen = true;
+				rebuild();
 			}
-
-			if (currentView === "sidebar") {
-				if (key === "up" || key === "k") {
-					activeIndex = Math.max(0, activeIndex - 1);
-				} else if (key === "down" || key === "j") {
-					activeIndex = Math.min(allScreens.length - 1, activeIndex + 1);
-				} else if (key === "" || key === "enter") {
-					currentView = "screen";
-				} else {
-					const num = Number.parseInt(key, 10);
-					if (!Number.isNaN(num) && num >= 1 && num <= allScreens.length) {
-						activeIndex = num - 1;
-						currentView = "screen";
-					} else {
-						const match = allScreens.findIndex((s) => s.name === key);
-						if (match !== -1) {
-							activeIndex = match;
-							currentView = "screen";
-						}
-					}
-				}
-			} else {
-				if (key === "escape" || key === "esc" || key === "back") {
-					currentView = "sidebar";
-				}
+		} else {
+			if (key.name === "escape") {
+				inScreen = false;
+				rebuild();
 			}
-
-			draw();
-		});
-
-		rl.on("close", () => {
-			resolve();
-		});
+		}
 	});
 }
+
+/** Exported screen definitions for direct use */
+export const homeScreen = homeScreenDef;
+export const extensionsScreen = extensionsScreenDef;
+export const configScreen = configScreenDef;
+export const terminalScreen = terminalScreenDef;

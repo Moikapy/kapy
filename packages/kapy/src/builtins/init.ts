@@ -1,7 +1,37 @@
 /** kapy init — scaffold a new kapy-powered CLI project */
-import { execSync } from "node:child_process";
+
+import { spawn } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { CommandContext } from "../command/context.js";
+
+/** Run a command safely */
+async function runCommand(
+	command: string,
+	args: string[],
+	options?: { cwd?: string; stdio?: "pipe" | "inherit" },
+): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+	return new Promise((resolve) => {
+		const proc = spawn(command, args, {
+			cwd: options?.cwd,
+			stdio: options?.stdio ?? "pipe",
+		});
+		let stdout = "";
+		let stderr = "";
+		proc.stdout?.on("data", (data: Buffer) => {
+			stdout += data.toString();
+		});
+		proc.stderr?.on("data", (data: Buffer) => {
+			stderr += data.toString();
+		});
+		proc.on("close", (code) => {
+			resolve({ stdout, stderr, exitCode: code });
+		});
+		proc.on("error", (err) => {
+			resolve({ stdout, stderr: stderr + err.message, exitCode: 1 });
+		});
+	});
+}
 
 export const initCommand = async (ctx: CommandContext): Promise<void> => {
 	const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
@@ -25,14 +55,18 @@ export const initCommand = async (ctx: CommandContext): Promise<void> => {
 
 	try {
 		// Try using create-kapy if available
-		const cmd = template ? `bun create kapy ${projectName} --template` : `bun create kapy ${projectName}`;
+		const cmd = template ? ["create", "kapy", projectName, "--template"] : ["create", "kapy", projectName];
 
-		try {
-			execSync(cmd, { cwd: process.cwd(), stdio: ctx.json ? "pipe" : "inherit" });
+		const result = await runCommand("bunx", cmd, {
+			cwd: process.cwd(),
+			stdio: ctx.json ? "pipe" : "inherit",
+		});
+
+		if (result.exitCode === 0) {
 			spinner.succeed(`Created ${projectName}`);
-		} catch {
+		} else {
 			// create-kapy not available — scaffold manually
-			spinner.update(`create-kapy not found, scaffolding manually...`);
+			spinner.update("create-kapy not found, scaffolding manually...");
 			await scaffoldManual(projectName, cwd, template);
 			spinner.succeed(`Created ${projectName}`);
 		}
@@ -47,9 +81,6 @@ export const initCommand = async (ctx: CommandContext): Promise<void> => {
 };
 
 async function scaffoldManual(name: string, dir: string, _template: boolean): Promise<void> {
-	const { mkdir, writeFile } = await import("node:fs/promises");
-	const { join } = await import("node:path");
-
 	await mkdir(join(dir, ".kapy"), { recursive: true });
 	await mkdir(join(dir, ".kapy", "extensions"), { recursive: true });
 	await mkdir(join(dir, "src"), { recursive: true });
@@ -57,7 +88,7 @@ async function scaffoldManual(name: string, dir: string, _template: boolean): Pr
 
 	await writeFile(
 		join(dir, "package.json"),
-		JSON.stringify(
+		`${JSON.stringify(
 			{
 				name,
 				version: "0.1.0",
@@ -69,16 +100,32 @@ async function scaffoldManual(name: string, dir: string, _template: boolean): Pr
 			},
 			null,
 			2,
-		),
+		)}\n`,
 	);
 
 	await writeFile(
 		join(dir, "kapy.config.ts"),
-		`import { defineConfig } from "kapy";\n\nexport default defineConfig({\n  name: "${name}",\n  extensions: [],\n});\n`,
+		`import { defineConfig } from "kapy";
+
+export default defineConfig({
+  name: "${name}",
+  extensions: [],
+});
+`,
 	);
 
 	await writeFile(
 		join(dir, "src", "index.ts"),
-		`import { kapy } from "kapy";\n\nkapy()\n  .command("hello", {\n    description: "Say hello",\n    args: [{ name: "name", description: "Who to greet", default: "world" }],\n  }, async (ctx) => {\n    ctx.log(\`Hello, \${ctx.args.name}! 👋\`);\n  })\n  .run();\n`,
+		`import { kapy } from "kapy";
+
+kapy()
+  .command("hello", {
+    description: "Say hello from ${name}",
+    args: [{ name: "name", description: "Who to greet", default: "world" }],
+  }, async (ctx) => {
+    ctx.log(\`Hello, \${ctx.args.name}! 👋\`);
+  })
+  .run();
+`,
 	);
 }

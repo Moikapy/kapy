@@ -13,16 +13,7 @@
 	},
 	"assist": { "actions": { "source": { "organizeImports": "on" } } },
 	"files": {
-		"includes": [
-			"**",
-			"!**/dist/",
-			"!**/.kapy/",
-			"!**/.pi/",
-			"!**/node_modules/",
-			"!**/*.d.ts",
-			"!**/*.md",
-			"!**/assets/"
-		]
+		"includes": ["**/*.ts", "**/*.js", "**/*.yml", "**/*.yaml"]
 	},
 	"javascript": {
 		"formatter": {

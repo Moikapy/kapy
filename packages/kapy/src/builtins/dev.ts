@@ -13,21 +13,20 @@ export const devCommand = async (ctx: CommandContext): Promise<void> => {
 	ctx.log(`Watching: ${configPath}`);
 
 	let child: ReturnType<typeof spawn> | null = null;
-	let restarting = false;
 
 	function startProcess(): void {
-		if (restarting) return;
-		restarting = true;
-
 		if (child) {
 			child.kill("SIGTERM");
 			child = null;
 		}
 
+		// Get the CLI path relative to this module
+		const cliPath = resolve(import.meta.dir, "..", "cli.js");
+
 		// Re-spawn the kapy process with all args after "dev"
 		const argv = process.argv.slice(2).filter((a) => a !== "dev" && a !== "--debug" && a !== "-d");
 
-		child = spawn("bun", ["run", require.resolve("../cli.js"), ...argv], {
+		child = spawn("bun", ["run", cliPath, ...argv], {
 			stdio: "inherit",
 			env: {
 				...process.env,
@@ -37,12 +36,10 @@ export const devCommand = async (ctx: CommandContext): Promise<void> => {
 		});
 
 		child.on("exit", (code) => {
-			if (code !== null && code !== 0 && !restarting) {
+			if (code !== null && code !== 0 && !child) {
 				if (debug) ctx.warn(`Process exited with code ${code}`);
 			}
 		});
-
-		restarting = false;
 	}
 
 	// Start initial process
