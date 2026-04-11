@@ -1,0 +1,198 @@
+#!/usr/bin/env bun
+/**
+ * kapy — Extensible CLI framework.
+ *
+ * Usage:
+ *   kapy                    Show help
+ *   kapy <command>          Run a command
+ *   kapy tui                Launch interactive TUI
+ *   kapy init <name>        Scaffold a new project
+ *   kapy install <pkg>      Install an extension
+ *   kapy list               Show installed extensions
+ *   kapy upgrade            Upgrade kapy itself
+ *   kapy commands [--json]  List all commands
+ *   kapy inspect [--json]   Dump full state
+ */
+import { CommandRegistry, parseArgs } from "./command/index.js";
+import { CommandContext } from "./command/context.js";
+import { composeMiddleware } from "./middleware/pipeline.js";
+import { errorHandler } from "./middleware/error-handler.js";
+import { loadConfig } from "./config/index.js";
+import { ExtensionLoader } from "./extension/index.js";
+import { launchTUI } from "./tui/index.js";
+import {
+	initCommand,
+	installCommand,
+	listCommand,
+	updateCommand,
+	removeCommand,
+	upgradeCommand,
+	configCommand,
+	devCommand,
+	createCommandsCommand,
+	createInspectCommand,
+} from "./builtins/index.js";
+import type { CommandDefinition, CommandOptions, CommandHandler } from "./command/parser.js";
+import type { Middleware } from "./middleware/pipeline.js";
+import type { ProjectConfig } from "./config/schema.js";
+
+// ─── Builder API ───────────────────────────────────────────────
+
+export interface KapyBuilder {
+	/** Register a command */
+	command(name: string, options: CommandOptions, handler: CommandHandler): KapyBuilder;
+	/** Add middleware */
+	use(middleware: Middleware): KapyBuilder;
+	/** Run the CLI */
+	run(): Promise<void>;
+}
+
+/** Define project config (for kapy.config.ts) */
+export function defineConfig(config: ProjectConfig): ProjectConfig {
+	return config;
+}
+
+/** Create a kapy CLI instance */
+export function kapy(): KapyBuilder {
+	const registry = new CommandRegistry();
+	const userMiddlewares: Middleware[] = [];
+	const config: ProjectConfig = {};
+
+	const builder: KapyBuilder = {
+		command(name: string, options: CommandOptions, handler: CommandHandler): KapyBuilder {
+			registry.register({ name, options, handler });
+			return builder;
+		},
+
+		use(middleware: Middleware): KapyBuilder {
+			userMiddlewares.push(middleware);
+			return builder;
+		},
+
+		async run(): Promise<void> {
+			await runCLI(registry, userMiddlewares, config);
+		},
+	};
+
+	return builder;
+}
+
+// ─── CLI Runner ────────────────────────────────────────────────
+
+async function runCLI(
+	registry: CommandRegistry,
+	userMiddlewares: Middleware[],
+	projectConfig: ProjectConfig,
+): Promise<void> {
+	const argv = process.argv.slice(2);
+
+	// Parse global flags
+	const { args: globalArgs, rest: commandParts } = parseArgs(argv);
+	const jsonMode = globalArgs.json === true;
+	const noInput = globalArgs["no-input"] === true;
+
+	// Load config
+	const { config: mergedConfig } = await loadConfig({
+		projectDir: process.cwd(),
+		envPrefix: projectConfig.envPrefix,
+		cliFlags: globalArgs as Record<string, unknown>,
+	});
+
+	// Set up extension system
+	const extensionLoader = new ExtensionLoader(registry);
+	// TODO: load extensions from config
+
+	// Register built-in commands (need registry/extension refs for some)
+	registry.register({ name: "init", options: { description: "Scaffold a new kapy-powered CLI project", args: [{ name: "name", required: true }], flags: { template: { type: "boolean", alias: "t", description: "Include example commands and extension" } } }, handler: initCommand });
+	registry.register({ name: "install", options: { description: "Install an extension", args: [{ name: "source", required: true }], flags: { trust: { type: "boolean", description: "Skip trust prompt" } } }, handler: installCommand });
+	registry.register({ name: "list", options: { description: "Show installed extensions" }, handler: listCommand });
+	registry.register({ name: "update", options: { description: "Update all or a specific extension", args: [{ name: "name" }] }, handler: updateCommand });
+	registry.register({ name: "remove", options: { description: "Uninstall an extension", args: [{ name: "name", required: true }] }, handler: removeCommand });
+	registry.register({ name: "upgrade", options: { description: "Upgrade kapy itself to the latest version" }, handler: upgradeCommand });
+	registry.register({ name: "config", options: { description: "View/edit configuration", args: [{ name: "key" }, { name: "value" }] }, handler: configCommand });
+	registry.register({ name: "dev", options: { description: "Run CLI in dev mode with hot reload", flags: { debug: { type: "boolean", alias: "d", description: "Verbose logging" } } }, handler: devCommand });
+	registry.register({ name: "commands", options: { description: "List all registered commands", flags: { json: { type: "boolean", description: "Output as JSON" } } }, handler: createCommandsCommand(registry) });
+	registry.register({ name: "inspect", options: { description: "Dump full state (extensions, config, hooks, middleware)", flags: { json: { type: "boolean", description: "Output as JSON" } } }, handler: createInspectCommand(registry, userMiddlewares, extensionLoader.getHooks()) });
+	registry.register({ name: "tui", options: { description: "Launch interactive terminal UI", flags: { screen: { type: "string", alias: "s", description: "Open directly to a specific screen" } } }, handler: async (ctx) => { await launchTUI({ screens: extensionLoader.getScreens(), initialScreen: ctx.args.screen as string }, ctx); } });
+
+	// Load user commands (from project config)
+	if (projectConfig.middleware) {
+		for (const mw of projectConfig.middleware) {
+			userMiddlewares.push(mw);
+		}
+	}
+
+	// Resolve command from argv
+	const resolved = registry.resolve(commandParts);
+	if (!resolved) {
+		// No matching command — show help
+		if (jsonMode) {
+			console.log(JSON.stringify({ status: "error", message: "Unknown command", commands: registry.visible().map((c) => c.name) }));
+		} else {
+			console.log("Usage: kapy <command> [flags]");
+			console.log("");
+			console.log("Available commands:");
+			for (const cmd of registry.visible()) {
+				console.log(`  ${cmd.name.padEnd(20)} ${cmd.options.description}`);
+			}
+		}
+		process.exit(jsonMode ? 0 : 2);
+	}
+
+	// Build command context
+	const ctx = new CommandContext({
+		args: globalArgs,
+		config: mergedConfig,
+		command: resolved.command.name,
+		json: jsonMode,
+		noInput: noInput,
+	});
+
+	// Compose middleware chain
+	const allMiddlewares = [errorHandler, ...userMiddlewares];
+	const pipeline = composeMiddleware(allMiddlewares);
+
+	// Execute middleware → hooks → command
+	await pipeline(ctx, async () => {
+		// Execute before:command hooks
+		const beforeHooks = extensionLoader.getHooks().get("before:command") ?? [];
+		for (const hook of beforeHooks) {
+			await hook(ctx);
+			if (ctx.aborted) return;
+		}
+
+		// Execute before:<name> hooks
+		const nameHooks = extensionLoader.getHooks().get(`before:${resolved.command.name}`) ?? [];
+		for (const hook of nameHooks) {
+			await hook(ctx);
+			if (ctx.aborted) return;
+		}
+
+		// Execute command handler
+		await resolved.command.handler(ctx);
+
+		// Execute after:<name> hooks
+		const afterNameHooks = extensionLoader.getHooks().get(`after:${resolved.command.name}`) ?? [];
+		for (const hook of afterNameHooks) {
+			await hook(ctx);
+		}
+
+		// Execute after:command hooks
+		const afterHooks = extensionLoader.getHooks().get("after:command") ?? [];
+		for (const hook of afterHooks) {
+			await hook(ctx);
+		}
+	});
+
+	ctx._tick();
+
+	// JSON output for successful commands that hadn't output yet
+	if (jsonMode && !ctx.aborted) {
+		console.log(JSON.stringify({ status: "success", command: ctx.command, duration: ctx.duration }));
+	}
+}
+
+// Run CLI if this is the main entry point
+if (import.meta.main) {
+	kapy().run();
+}

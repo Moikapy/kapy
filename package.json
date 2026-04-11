@@ -1,0 +1,19 @@
+{
+  "name": "kapy-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter './packages/*' dev",
+    "build": "bun run --filter './packages/*' build",
+    "test": "bun run --filter './packages/*' test",
+    "lint": "biome check .",
+    "check": "biome check . && tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@biomejs/biome": "^2.0.0"
+  }
+}

@@ -1,6 +1,30 @@
-.pi/
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-.kapy/
+
+# TypeScript
 *.tsbuildinfo
+
+# Kapy
+.kapy/
+
+# Pi agent
+.pi/
+
+# Bun
 bun.lock
+
+# OS
+.DS_Store
+
+# Package artifacts
+*.tgz
+
+# Test coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/

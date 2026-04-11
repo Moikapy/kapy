@@ -1,0 +1,21 @@
+{
+  "name": "create-kapy",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Scaffolding template for kapy-powered CLI projects",
+  "bin": {
+    "create-kapy": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "lint": "biome check src/"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/bun": "^1.2.0"
+  },
+  "keywords": ["kapy", "scaffold", "create", "cli"],
+  "license": "MIT"
+}
