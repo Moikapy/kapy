@@ -27,6 +27,9 @@ export type { DiffProps } from "./components/Diff.js";
 export { Spinner } from "./components/Spinner.js";
 export type { SpinnerProps } from "./components/Spinner.js";
 
+export { Banner, CAPYBARA_COMPACT, CAPYBARA_FULL } from "./components/Banner.js";
+export type { BannerProps } from "./components/Banner.js";
+
 // Hooks
 export { useInput } from "./hooks/useInput.js";
 export type { UseInputOptions, InputHandler } from "./hooks/useInput.js";

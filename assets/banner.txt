@@ -1,0 +1,8 @@
+  ╭──╮
+ ┏┤  ├┓
+ ┃◕  ◕┃  kapy — the pi.dev for CLI
+ ┃ ╰╯ ┃  extensible · hooks · middleware · TUI
+ ╰━┯━╯
+  ╰─╯
+ /│││\   🐗
+  │││

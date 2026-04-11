@@ -1,8 +1,7 @@
 /**
  * TUI shell — kapy tui command. Launches interactive terminal UI.
  *
- * When @opentui/core is available, renders full UI with sidebar and screens.
- * Falls back to a text-mode interactive UI when OpenTUI is not available.
+ * Uses OpenTUI when available, falls back to text-mode TUI.
  */
 import { createInterface } from "node:readline";
 import { CommandContext } from "../command/context.js";
@@ -14,12 +13,21 @@ export interface TUIOptions {
 	initialScreen?: string;
 }
 
+/** Capybara ASCII art for the home screen */
+const CAPYBARA = `
+   ┌─────┐
+   │ ◕ ◕ │   🐹 kapy
+   │  ∪  │   the pi.dev for CLI
+   └─┬──┘
+     ╰─╯
+`;
+
 /** Built-in screens */
 export const homeScreen: ScreenDefinition = {
 	name: "home",
 	label: "Home",
-	icon: "📊",
-	render: () => "Welcome to kapy — the extensible CLI framework",
+	icon: "🐹",
+	render: () => CAPYBARA,
 	keyBindings: { q: "quit" },
 };
 
@@ -50,16 +58,16 @@ export const terminalScreen: ScreenDefinition = {
 /** Render the sidebar */
 function renderSidebar(screens: ScreenDefinition[], activeIndex: number): string {
 	const lines: string[] = [];
-	lines.push(pc.bold("kapy"));
-	lines.push(pc.dim("─".repeat(20)));
+	lines.push(pc.bold(pc.cyan("  🐹 kapy")));
+	lines.push(pc.dim("  ────────────────────"));
 	for (let i = 0; i < screens.length; i++) {
 		const screen = screens[i];
 		const prefix = i === activeIndex ? pc.cyan("▸") : " ";
 		const label = i === activeIndex ? pc.cyan(pc.bold(screen.label)) : screen.label;
 		lines.push(`${prefix} ${screen.icon ?? " "} ${label}`);
 	}
-	lines.push(pc.dim("─".repeat(20)));
-	lines.push(pc.dim(" q: quit  ↑↓: navigate  ↵: select"));
+	lines.push(pc.dim("  ────────────────────"));
+	lines.push(pc.dim("  q: quit  ↑↓: nav  ↵: select"));
 	return lines.join("\n");
 }
 
@@ -67,13 +75,13 @@ function renderSidebar(screens: ScreenDefinition[], activeIndex: number): string
 function renderScreen(screen: ScreenDefinition): string {
 	const lines: string[] = [];
 	lines.push(pc.bold(`  ${screen.icon ?? "▸"} ${screen.label}`));
-	lines.push(pc.dim("─".repeat(60)));
+	lines.push(pc.dim("  ────────────────────────────────────"));
 	const content = screen.render({});
 	if (typeof content === "string") {
 		lines.push(content);
 	}
 	lines.push("");
-	lines.push(pc.dim(" q: quit  Esc: back to sidebar"));
+	lines.push(pc.dim("  q: quit  Esc: back"));
 	return lines.join("\n");
 }
 
@@ -92,7 +100,7 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 	const allScreens = [homeScreen, extensionsScreen, configScreen, terminalScreen, ...options.screens];
 	let activeIndex = allScreens.findIndex((s) => s.name === options.initialScreen);
 	if (activeIndex === -1) activeIndex = 0;
-	let currentView: "sidebar" | "screen" = "sidebar";
+	let currentView: "sidebar" | "screen" = options.initialScreen ? "screen" : "sidebar";
 
 	const rl = createInterface({
 		input: process.stdin,
@@ -120,7 +128,7 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 
 			if (key === "q" || key === "quit" || key === "exit") {
 				clearScreen();
-				console.log(pc.dim("Goodbye! 🐉"));
+				console.log(pc.dim("Goodbye! 🐹"));
 				rl.close();
 				resolve();
 				return;
@@ -134,7 +142,6 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 				} else if (key === "" || key === "enter") {
 					currentView = "screen";
 				} else {
-					// Try to match screen number or name
 					const num = Number.parseInt(key);
 					if (!Number.isNaN(num) && num >= 1 && num <= allScreens.length) {
 						activeIndex = num - 1;
@@ -148,7 +155,6 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 					}
 				}
 			} else {
-				// Screen view
 				if (key === "escape" || key === "esc" || key === "back") {
 					currentView = "sidebar";
 				}

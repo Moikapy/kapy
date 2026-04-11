@@ -147,12 +147,17 @@ async function runCLI(
 		if (jsonMode) {
 			console.log(JSON.stringify({ status: "error", message: "No command specified", commands: registry.visible().map((c) => c.name) }));
 		} else {
+			console.log("");
+			console.log("  🐹 kapy — the pi.dev for CLI");
+			console.log("");
 			console.log("Usage: kapy <command> [flags]");
 			console.log("");
 			console.log("Available commands:");
 			for (const cmd of registry.visible()) {
 				console.log(`  ${cmd.name.padEnd(20)} ${cmd.options.description}`);
 			}
+			console.log("");
+			console.log("Use 'kapy <command> --help' for more information about a command.");
 		}
 		process.exit(jsonMode ? 0 : 2);
 	}
