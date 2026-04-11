@@ -1,8 +1,8 @@
 /** kapy install — install an extension from npm, git, or local path */
 import { execSync } from "node:child_process";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import type { CommandContext } from "../command/context.js";
 
 export const installCommand = async (ctx: CommandContext): Promise<void> => {

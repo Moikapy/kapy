@@ -2,13 +2,14 @@
  * Extension API — the surface extensions use to register commands, hooks,
  * middleware, screens, and config.
  */
-import type { KapyExtensionAPI, ScreenDefinition, ExtensionMeta } from "./types.js";
-import type { CommandDefinition, CommandOptions, CommandHandler } from "../command/parser.js";
+
+import type { CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
 import type { CommandRegistry } from "../command/registry.js";
-import type { Middleware } from "../middleware/pipeline.js";
+import type { ConfigSchema } from "../config/schema.js";
+import type { ExtensionEmitter } from "../hooks/emitter.js";
 import type { HookHandler } from "../hooks/types.js";
-import type { ConfigSchema, MergedConfig } from "../config/schema.js";
-import { ExtensionEmitter } from "../hooks/emitter.js";
+import type { Middleware } from "../middleware/pipeline.js";
+import type { KapyExtensionAPI, ScreenDefinition } from "./types.js";
 
 export class ExtensionAPI implements KapyExtensionAPI {
 	private registry: CommandRegistry;
@@ -52,7 +53,7 @@ export class ExtensionAPI implements KapyExtensionAPI {
 		if (!this.hooks.has(event)) {
 			this.hooks.set(event, []);
 		}
-		this.hooks.get(event)!.push(handler);
+		this.hooks.get(event)?.push(handler);
 	}
 
 	addMiddleware(middleware: Middleware): void {

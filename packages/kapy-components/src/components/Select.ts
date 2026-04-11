@@ -36,7 +36,7 @@ export interface SelectProps<T = string> {
 }
 
 /** Render a selection list */
-export const Select: Component<SelectProps> = <T,>(props: SelectProps<T>) => {
+export const Select: Component<SelectProps> = <T>(props: SelectProps<T>) => {
 	return {
 		type: "Select",
 		props: {

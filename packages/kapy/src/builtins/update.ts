@@ -1,8 +1,8 @@
 /** kapy update — update all or a specific extension */
 import { execSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import type { CommandContext } from "../command/context.js";
 
 interface ExtensionEntry {

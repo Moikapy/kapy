@@ -1,33 +1,42 @@
 {
-  "name": "kapy",
-  "version": "0.1.0",
-  "type": "module",
-  "description": "The pi.dev for CLI — extensible CLI framework with extensions, hooks, middleware, and TUI",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "kapy": "./dist/cli.js"
-  },
-  "exports": {
-    ".": "./dist/index.js",
-    "./middleware/*": "./dist/middleware/*.js"
-  },
-  "files": ["dist"],
-  "scripts": {
-    "dev": "bun run --watch src/cli.ts",
-    "build": "bun build src/index.ts src/cli.ts --outdir dist --target bun",
-    "test": "bun test",
-    "lint": "biome check src/",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "kapy-components": "workspace:*",
-    "picocolors": "^1.1.0"
-  },
-  "devDependencies": {
-    "typescript": "^5.7.0",
-    "@types/bun": "^1.2.0"
-  },
-  "keywords": ["cli", "framework", "extensible", "extensions", "tui", "opentui"],
-  "license": "MIT"
+	"name": "kapy",
+	"version": "0.1.0",
+	"type": "module",
+	"description": "The pi.dev for CLI — extensible CLI framework with extensions, hooks, middleware, and TUI",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"bin": {
+		"kapy": "./dist/cli.js"
+	},
+	"exports": {
+		".": "./dist/index.js",
+		"./middleware/*": "./dist/middleware/*.js"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"dev": "bun run --watch src/cli.ts",
+		"build": "bun build src/index.ts src/cli.ts --outdir dist --target bun",
+		"test": "bun test",
+		"lint": "biome check src/",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"kapy-components": "workspace:*",
+		"picocolors": "^1.1.0"
+	},
+	"devDependencies": {
+		"typescript": "^5.7.0",
+		"@types/bun": "^1.2.0"
+	},
+	"keywords": [
+		"cli",
+		"framework",
+		"extensible",
+		"extensions",
+		"tui",
+		"opentui"
+	],
+	"license": "MIT"
 }

@@ -1,10 +1,10 @@
 /**
  * Extension types — meta, register, and API surface.
  */
-import type { CommandDefinition, CommandHandler, CommandOptions, AgentHints } from "../command/parser.js";
-import type { Middleware } from "../middleware/pipeline.js";
-import type { HookHandler } from "../hooks/types.js";
+import type { AgentHints, CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
 import type { ConfigSchema } from "../config/schema.js";
+import type { HookHandler } from "../hooks/types.js";
+import type { Middleware } from "../middleware/pipeline.js";
 
 /** Extension metadata */
 export interface ExtensionMeta {
@@ -15,7 +15,7 @@ export interface ExtensionMeta {
 }
 
 /** Extension register function */
-export type ExtensionRegister = (api: KapyExtensionAPI) => Promise<void | (() => void)>;
+export type ExtensionRegister = (api: KapyExtensionAPI) => Promise<undefined | (() => void)>;
 
 /** Screen definition for TUI */
 export interface ScreenDefinition {

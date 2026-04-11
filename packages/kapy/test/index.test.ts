@@ -1,11 +1,11 @@
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
+import { AbortError, CommandContext } from "../src/command/context.js";
 import { CommandRegistry, parseArgs } from "../src/command/index.js";
-import { CommandContext, AbortError } from "../src/command/context.js";
-import { composeMiddleware } from "../src/middleware/pipeline.js";
-import { deepMergeConfigs } from "../src/config/loader-merge.js";
 import { parseEnvConfig } from "../src/config/loader.js";
+import { deepMergeConfigs } from "../src/config/loader-merge.js";
 import { ExtensionEmitter } from "../src/hooks/emitter.js";
 import { HookPhase, parseHookEvent } from "../src/hooks/types.js";
+import { composeMiddleware } from "../src/middleware/pipeline.js";
 
 // ─── Command Registry ──────────────────────────────────────────
 describe("CommandRegistry", () => {
@@ -19,8 +19,8 @@ describe("CommandRegistry", () => {
 
 		const cmd = registry.get("hello");
 		expect(cmd).toBeDefined();
-		expect(cmd!.name).toBe("hello");
-		expect(cmd!.options.description).toBe("Say hello");
+		expect(cmd?.name).toBe("hello");
+		expect(cmd?.options.description).toBe("Say hello");
 	});
 
 	it("lists visible commands", () => {
@@ -40,12 +40,12 @@ describe("CommandRegistry", () => {
 
 		const result = registry.resolve(["deploy", "aws"]);
 		expect(result).not.toBeNull();
-		expect(result!.command.name).toBe("deploy:aws");
-		expect(result!.remaining).toEqual([]);
+		expect(result?.command.name).toBe("deploy:aws");
+		expect(result?.remaining).toEqual([]);
 
 		const baseResult = registry.resolve(["deploy"]);
 		expect(baseResult).not.toBeNull();
-		expect(baseResult!.command.name).toBe("deploy");
+		expect(baseResult?.command.name).toBe("deploy");
 	});
 
 	it("finds subcommands", () => {
@@ -65,7 +65,7 @@ describe("CommandRegistry", () => {
 		registry.register({ name: "test", options: { description: "Second" }, handler: async () => {} });
 
 		const cmd = registry.get("test");
-		expect(cmd!.options.description).toBe("Second");
+		expect(cmd?.options.description).toBe("Second");
 	});
 
 	it("returns null for unknown command", () => {
@@ -183,7 +183,9 @@ describe("composeMiddleware", () => {
 
 		const pipeline = composeMiddleware([blocker]);
 		const ctx = new CommandContext({ command: "test" });
-		await pipeline(ctx, async () => { order.push("should not reach"); });
+		await pipeline(ctx, async () => {
+			order.push("should not reach");
+		});
 
 		expect(order).toEqual(["blocked"]);
 	});
@@ -191,12 +193,18 @@ describe("composeMiddleware", () => {
 	it("catches errors from handler", async () => {
 		const errors: string[] = [];
 		const catcher = async (_ctx: CommandContext, next: () => Promise<void>) => {
-			try { await next(); } catch { errors.push("caught"); }
+			try {
+				await next();
+			} catch {
+				errors.push("caught");
+			}
 		};
 
 		const pipeline = composeMiddleware([catcher]);
 		const ctx = new CommandContext({ command: "test" });
-		await pipeline(ctx, async () => { throw new Error("test error"); });
+		await pipeline(ctx, async () => {
+			throw new Error("test error");
+		});
 
 		expect(errors).toEqual(["caught"]);
 	});
@@ -244,7 +252,9 @@ describe("ExtensionEmitter", () => {
 	it("emits events to listeners", async () => {
 		const emitter = new ExtensionEmitter();
 		const received: unknown[] = [];
-		emitter.on("test:event", async (data) => { received.push(data); });
+		emitter.on("test:event", async (data) => {
+			received.push(data);
+		});
 		await emitter.emit("test:event", { msg: "hello" });
 		expect(received).toEqual([{ msg: "hello" }]);
 	});
@@ -252,8 +262,12 @@ describe("ExtensionEmitter", () => {
 	it("supports multiple listeners", async () => {
 		const emitter = new ExtensionEmitter();
 		const calls: string[] = [];
-		emitter.on("evt", async () => { calls.push("a"); });
-		emitter.on("evt", async () => { calls.push("b"); });
+		emitter.on("evt", async () => {
+			calls.push("a");
+		});
+		emitter.on("evt", async () => {
+			calls.push("b");
+		});
 		await emitter.emit("evt");
 		expect(calls).toEqual(["a", "b"]);
 	});

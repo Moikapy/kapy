@@ -4,7 +4,14 @@
  * Commands use the `:` separator convention for nesting.
  * Extensions adding `deploy:aws` automatically register as a subcommand of `deploy`.
  */
-import type { CommandDefinition, CommandOptions, ArgDefinition, FlagDefinition, CommandHandler, AgentHints } from "./parser.js";
+import type {
+	AgentHints,
+	ArgDefinition,
+	CommandDefinition,
+	CommandHandler,
+	CommandOptions,
+	FlagDefinition,
+} from "./parser.js";
 
 export class CommandRegistry {
 	private commands = new Map<string, CommandDefinition>();
@@ -13,7 +20,9 @@ export class CommandRegistry {
 	register(definition: CommandDefinition): void {
 		const existing = this.commands.get(definition.name);
 		if (existing) {
-			console.warn(`[kapy] Command "${definition.name}" is already registered by "${existing.options.description}". Overriding.`);
+			console.warn(
+				`[kapy] Command "${definition.name}" is already registered by "${existing.options.description}". Overriding.`,
+			);
 		}
 		this.commands.set(definition.name, definition);
 	}
@@ -60,13 +69,16 @@ export class CommandRegistry {
 }
 
 /** Parse CLI args and flags from argv */
-export function parseArgs(argv: string[], flagDefs?: Record<string, FlagDefinition>): {
+export function parseArgs(
+	argv: string[],
+	flagDefs?: Record<string, FlagDefinition>,
+): {
 	args: Record<string, unknown>;
 	rest: string[];
 } {
 	const args: Record<string, unknown> = {};
 	const rest: string[] = [];
-	let argIndex = 0;
+	const _argIndex = 0;
 
 	for (let i = 0; i < argv.length; i++) {
 		const token = argv[i];
@@ -102,9 +114,7 @@ export function parseArgs(argv: string[], flagDefs?: Record<string, FlagDefiniti
 		} else if (token.startsWith("-") && token.length === 2) {
 			// -f value (short alias)
 			const alias = token.slice(1);
-			const flagDef = flagDefs
-				? Object.entries(flagDefs).find(([, def]) => def.alias === alias)
-				: undefined;
+			const flagDef = flagDefs ? Object.entries(flagDefs).find(([, def]) => def.alias === alias) : undefined;
 			if (flagDef) {
 				const [key] = flagDef;
 				if (flagDef[1].type === "boolean") {
@@ -125,4 +135,4 @@ export function parseArgs(argv: string[], flagDefs?: Record<string, FlagDefiniti
 	return { args, rest };
 }
 
-export type { CommandDefinition, CommandOptions, ArgDefinition, FlagDefinition, CommandHandler, AgentHints };
+export type { AgentHints, ArgDefinition, CommandDefinition, CommandHandler, CommandOptions, FlagDefinition };

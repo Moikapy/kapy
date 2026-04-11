@@ -5,16 +5,16 @@
  * `kapy-extension` keyword. They export a `register()` function and
  * a `meta` object.
  */
-import { resolve, join } from "node:path";
-import { readFile, stat } from "node:fs/promises";
-import type { ExtensionRegister, ExtensionMeta, KapyExtensionAPI } from "./types.js";
+
+import { stat } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import type { CommandRegistry } from "../command/registry.js";
-import type { Middleware } from "../middleware/pipeline.js";
-import type { HookHandler } from "../hooks/types.js";
-import type { ScreenDefinition } from "./types.js";
 import type { ConfigSchema } from "../config/schema.js";
-import { ExtensionAPI } from "./api.js";
 import { ExtensionEmitter } from "../hooks/emitter.js";
+import type { HookHandler } from "../hooks/types.js";
+import type { Middleware } from "../middleware/pipeline.js";
+import { ExtensionAPI } from "./api.js";
+import type { ExtensionMeta, ExtensionRegister, ScreenDefinition } from "./types.js";
 
 interface LoadedExtension {
 	meta: ExtensionMeta;
@@ -70,7 +70,9 @@ async function resolveExtensionSource(source: string, extensionsDir: string): Pr
 }
 
 /** Topological sort of extensions based on meta.dependencies */
-function resolveDependencyOrder(extensions: { name: string; source: string; meta?: ExtensionMeta }[]): { name: string; source: string }[] {
+function resolveDependencyOrder(
+	extensions: { name: string; source: string; meta?: ExtensionMeta }[],
+): { name: string; source: string }[] {
 	const sorted: { name: string; source: string }[] = [];
 	const visited = new Set<string>();
 	const visiting = new Set<string>();
@@ -130,10 +132,11 @@ export class ExtensionLoader {
 			const mod = await import(resolvedPath);
 
 			const register: ExtensionRegister = mod.register ?? mod.default?.register;
-			const meta: ExtensionMeta = mod.meta ?? mod.default?.meta ?? {
-				name,
-				version: "0.0.0",
-			};
+			const meta: ExtensionMeta = mod.meta ??
+				mod.default?.meta ?? {
+					name,
+					version: "0.0.0",
+				};
 
 			if (!register) {
 				console.warn(`[kapy] Extension "${name}" has no register() export. Skipping.`);

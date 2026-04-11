@@ -30,8 +30,6 @@ export class CommandContext {
 	noInput: boolean;
 
 	private _startTime: number;
-	private _exitCode: number;
-	private _spinner: Spinner | null = null;
 
 	constructor(options: {
 		args?: Record<string, unknown>;
@@ -84,7 +82,7 @@ export class CommandContext {
 		process.stdout.write(pc.cyan(`${msg}: `));
 
 		return new Promise<string>((resolve) => {
-			const readline = require("readline");
+			const readline = require("node:readline");
 			const rl = readline.createInterface({
 				input: process.stdin,
 				output: process.stdout,

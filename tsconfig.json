@@ -1,19 +1,19 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true
-  },
-  "files": [],
-  "references": [
-    { "path": "./packages/kapy" },
-    { "path": "./packages/kapy-components" },
-    { "path": "./packages/create-kapy" }
-  ]
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true
+	},
+	"files": [],
+	"references": [
+		{ "path": "./packages/kapy" },
+		{ "path": "./packages/kapy-components" },
+		{ "path": "./packages/create-kapy" }
+	]
 }

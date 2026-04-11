@@ -20,13 +20,7 @@ export type ConfigSchema = Record<string, ConfigField>;
 export type MergedConfig = Record<string, Record<string, unknown>>;
 
 /** Config sources in merge order (later overrides earlier) */
-export const ConfigSourcePriority = [
-	"defaults",
-	"project",
-	"global",
-	"env",
-	"flags",
-] as const;
+export const ConfigSourcePriority = ["defaults", "project", "global", "env", "flags"] as const;
 
 export type ConfigSource = (typeof ConfigSourcePriority)[number];
 

@@ -1,8 +1,8 @@
 /** kapy inspect — dump full state (extensions, config, hooks, middleware) */
 import type { CommandHandler } from "../command/parser.js";
 import type { CommandRegistry } from "../command/registry.js";
-import type { Middleware } from "../middleware/pipeline.js";
 import type { HookHandler } from "../hooks/types.js";
+import type { Middleware } from "../middleware/pipeline.js";
 
 export function createInspectCommand(
 	registry: CommandRegistry,
@@ -16,9 +16,7 @@ export function createInspectCommand(
 				description: cmd.options.description,
 			})),
 			middlewareCount: middlewares.length,
-			hooks: Object.fromEntries(
-				[...hooks.entries()].map(([event, handlers]) => [event, handlers.length]),
-			),
+			hooks: Object.fromEntries([...hooks.entries()].map(([event, handlers]) => [event, handlers.length])),
 			config: ctx.config,
 		};
 

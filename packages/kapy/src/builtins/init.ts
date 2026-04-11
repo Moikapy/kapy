@@ -25,9 +25,7 @@ export const initCommand = async (ctx: CommandContext): Promise<void> => {
 
 	try {
 		// Try using create-kapy if available
-		const cmd = template
-			? `bun create kapy ${projectName} --template`
-			: `bun create kapy ${projectName}`;
+		const cmd = template ? `bun create kapy ${projectName} --template` : `bun create kapy ${projectName}`;
 
 		try {
 			execSync(cmd, { cwd: process.cwd(), stdio: ctx.json ? "pipe" : "inherit" });
@@ -48,7 +46,7 @@ export const initCommand = async (ctx: CommandContext): Promise<void> => {
 	}
 };
 
-async function scaffoldManual(name: string, dir: string, template: boolean): Promise<void> {
+async function scaffoldManual(name: string, dir: string, _template: boolean): Promise<void> {
 	const { mkdir, writeFile } = await import("node:fs/promises");
 	const { join } = await import("node:path");
 
@@ -59,18 +57,28 @@ async function scaffoldManual(name: string, dir: string, template: boolean): Pro
 
 	await writeFile(
 		join(dir, "package.json"),
-		JSON.stringify({
-			name,
-			version: "0.1.0",
-			type: "module",
-			main: "./dist/index.js",
-			scripts: { dev: "bun run --watch src/index.ts", build: "bun build src/index.ts --outdir dist --target bun" },
-			dependencies: { kapy: "^0.1.0" },
-			devDependencies: { typescript: "^5.7.0" },
-		}, null, 2),
+		JSON.stringify(
+			{
+				name,
+				version: "0.1.0",
+				type: "module",
+				main: "./dist/index.js",
+				scripts: { dev: "bun run --watch src/index.ts", build: "bun build src/index.ts --outdir dist --target bun" },
+				dependencies: { kapy: "^0.1.0" },
+				devDependencies: { typescript: "^5.7.0" },
+			},
+			null,
+			2,
+		),
 	);
 
-	await writeFile(join(dir, "kapy.config.ts"), `import { defineConfig } from "kapy";\n\nexport default defineConfig({\n  name: "${name}",\n  extensions: [],\n});\n`);
+	await writeFile(
+		join(dir, "kapy.config.ts"),
+		`import { defineConfig } from "kapy";\n\nexport default defineConfig({\n  name: "${name}",\n  extensions: [],\n});\n`,
+	);
 
-	await writeFile(join(dir, "src", "index.ts"), `import { kapy } from "kapy";\n\nkapy()\n  .command("hello", {\n    description: "Say hello",\n    args: [{ name: "name", description: "Who to greet", default: "world" }],\n  }, async (ctx) => {\n    ctx.log(\`Hello, \${ctx.args.name}! 👋\`);\n  })\n  .run();\n`);
+	await writeFile(
+		join(dir, "src", "index.ts"),
+		`import { kapy } from "kapy";\n\nkapy()\n  .command("hello", {\n    description: "Say hello",\n    args: [{ name: "name", description: "Who to greet", default: "world" }],\n  }, async (ctx) => {\n    ctx.log(\`Hello, \${ctx.args.name}! 👋\`);\n  })\n  .run();\n`,
+	);
 }

@@ -5,7 +5,7 @@ import type { Middleware } from "./pipeline.js";
 
 /** Log command start and completion with structured output */
 export const logging: Middleware = async (ctx, next) => {
-	const startTime = Date.now();
+	const _startTime = Date.now();
 	if (ctx.json) {
 		await next();
 		ctx._tick();

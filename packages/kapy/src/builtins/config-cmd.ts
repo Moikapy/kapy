@@ -1,7 +1,7 @@
 /** kapy config — view/edit configuration */
 import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import type { CommandContext } from "../command/context.js";
 
 export const configCommand = async (ctx: CommandContext): Promise<void> => {
@@ -12,9 +12,7 @@ export const configCommand = async (ctx: CommandContext): Promise<void> => {
 
 	if (key && value) {
 		// Set a config value
-		const targetPath = global
-			? join(homedir(), ".kapy", "config.json")
-			: join(process.cwd(), ".kapy", "config.json");
+		const targetPath = global ? join(homedir(), ".kapy", "config.json") : join(process.cwd(), ".kapy", "config.json");
 
 		let config: Record<string, unknown> = {};
 		try {

@@ -1,6 +1,7 @@
 /** kapy dev — run CLI in dev mode with hot reload */
-import { watchFile, unwatchFile } from "node:fs";
+
 import { spawn } from "node:child_process";
+import { unwatchFile, watchFile } from "node:fs";
 import { resolve } from "node:path";
 import type { CommandContext } from "../command/context.js";
 

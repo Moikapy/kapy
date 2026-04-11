@@ -33,17 +33,11 @@ export async function scaffold(name: string, options: ScaffoldOptions = {}): Pro
 	}
 
 	// Write .kapy/config.json
-	await Bun.write(
-		join(dir, ".kapy", "config.json"),
-		JSON.stringify({ extensions: {} }, null, 2) + "\n",
-	);
+	await Bun.write(join(dir, ".kapy", "config.json"), `${JSON.stringify({ extensions: {} }, null, 2)}\n`);
 }
 
 async function writeConfigJson(dir: string): Promise<void> {
-	await Bun.write(
-		join(dir, ".kapy", "config.json"),
-		JSON.stringify({ extensions: {} }, null, 2) + "\n",
-	);
+	await Bun.write(join(dir, ".kapy", "config.json"), `${JSON.stringify({ extensions: {} }, null, 2)}\n`);
 }
 
 async function writePackageJson(dir: string, name: string): Promise<void> {
@@ -67,7 +61,7 @@ async function writePackageJson(dir: string, name: string): Promise<void> {
 			"@types/bun": "^1.2.0",
 		},
 	};
-	await Bun.write(join(dir, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
+	await Bun.write(join(dir, "package.json"), `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
 async function writeKapyConfig(dir: string, name: string): Promise<void> {
@@ -91,7 +85,7 @@ async function writeTsConfig(dir: string): Promise<void> {
 		},
 		include: ["src"],
 	};
-	await Bun.write(join(dir, "tsconfig.json"), JSON.stringify(tsconfig, null, 2) + "\n");
+	await Bun.write(join(dir, "tsconfig.json"), `${JSON.stringify(tsconfig, null, 2)}\n`);
 }
 
 async function writeGitignore(dir: string): Promise<void> {

@@ -1,25 +1,23 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "tab",
-    "lineWidth": 120
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true
-    }
-  },
-  "organizeImports": {
-    "enabled": true
-  },
-  "files": {
-    "ignore": ["dist/", ".kapy/", ".pi/", "node_modules/", "*.d.ts"]
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "double"
-    }
-  }
+	"$schema": "https://biomejs.dev/schemas/2.4.11/schema.json",
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 120
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true
+		}
+	},
+	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"files": {
+		"includes": ["**", "!**/dist/", "!**/.kapy/", "!**/.pi/", "!**/node_modules/", "!**/*.d.ts", "!**/*.md", "!**/assets/"]
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	}
 }

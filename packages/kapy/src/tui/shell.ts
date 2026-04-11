@@ -4,8 +4,8 @@
  * Uses OpenTUI when available, falls back to text-mode TUI.
  */
 import { createInterface } from "node:readline";
-import { CommandContext } from "../command/context.js";
 import pc from "picocolors";
+import type { CommandContext } from "../command/context.js";
 import type { ScreenDefinition } from "../extension/types.js";
 
 export interface TUIOptions {
@@ -142,7 +142,7 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 				} else if (key === "" || key === "enter") {
 					currentView = "screen";
 				} else {
-					const num = Number.parseInt(key);
+					const num = Number.parseInt(key, 10);
 					if (!Number.isNaN(num) && num >= 1 && num <= allScreens.length) {
 						activeIndex = num - 1;
 						currentView = "screen";

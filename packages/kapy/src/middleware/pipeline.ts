@@ -11,7 +11,9 @@ import type { CommandContext } from "../command/context.js";
 export type Middleware = (ctx: CommandContext, next: () => Promise<void>) => Promise<void> | void;
 
 /** Compose an array of middleware into a single function */
-export function composeMiddleware(middlewares: Middleware[]): (ctx: CommandContext, final: () => Promise<void>) => Promise<void> {
+export function composeMiddleware(
+	middlewares: Middleware[],
+): (ctx: CommandContext, final: () => Promise<void>) => Promise<void> {
 	if (middlewares.length === 0) {
 		return (_ctx, final) => final();
 	}

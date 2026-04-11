@@ -4,8 +4,9 @@
  * Catches unhandled errors in the command pipeline, formats the output,
  * and sets the appropriate exit code.
  */
-import type { Middleware } from "./pipeline.js";
+
 import { AbortError } from "../command/context.js";
+import type { Middleware } from "./pipeline.js";
 
 /** Exit codes */
 export const EXIT_CODES = {

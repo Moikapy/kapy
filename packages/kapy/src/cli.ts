@@ -1,4 +1,17 @@
 #!/usr/bin/env bun
+import {
+	configCommand,
+	createCommandsCommand,
+	createInspectCommand,
+	devCommand,
+	initCommand,
+	installCommand,
+	listCommand,
+	removeCommand,
+	updateCommand,
+	upgradeCommand,
+} from "./builtins/index.js";
+import { CommandContext } from "./command/context.js";
 /**
  * kapy — Extensible CLI framework.
  *
@@ -14,27 +27,14 @@
  *   kapy inspect [--json]   Dump full state
  */
 import { CommandRegistry, parseArgs } from "./command/index.js";
-import { CommandContext } from "./command/context.js";
-import { composeMiddleware } from "./middleware/pipeline.js";
-import { errorHandler } from "./middleware/error-handler.js";
+import type { CommandHandler, CommandOptions } from "./command/parser.js";
 import { loadConfig } from "./config/index.js";
-import { ExtensionLoader } from "./extension/index.js";
-import { launchTUI } from "./tui/index.js";
-import {
-	initCommand,
-	installCommand,
-	listCommand,
-	updateCommand,
-	removeCommand,
-	upgradeCommand,
-	configCommand,
-	devCommand,
-	createCommandsCommand,
-	createInspectCommand,
-} from "./builtins/index.js";
-import type { CommandDefinition, CommandOptions, CommandHandler } from "./command/parser.js";
-import type { Middleware } from "./middleware/pipeline.js";
 import type { ProjectConfig } from "./config/schema.js";
+import { ExtensionLoader } from "./extension/index.js";
+import { errorHandler } from "./middleware/error-handler.js";
+import type { Middleware } from "./middleware/pipeline.js";
+import { composeMiddleware } from "./middleware/pipeline.js";
+import { launchTUI } from "./tui/index.js";
 
 // ─── Builder API ───────────────────────────────────────────────
 
@@ -118,17 +118,83 @@ async function runCLI(
 	}
 
 	// Register built-in commands
-	registry.register({ name: "init", options: { description: "Scaffold a new kapy-powered CLI project", args: [{ name: "name", required: true }], flags: { template: { type: "boolean", alias: "t", description: "Include example commands and extension" } } }, handler: initCommand });
-	registry.register({ name: "install", options: { description: "Install an extension (npm:, git:, or local path)", args: [{ name: "source", required: true }], flags: { trust: { type: "boolean", description: "Skip trust prompt" } } }, handler: installCommand });
+	registry.register({
+		name: "init",
+		options: {
+			description: "Scaffold a new kapy-powered CLI project",
+			args: [{ name: "name", required: true }],
+			flags: { template: { type: "boolean", alias: "t", description: "Include example commands and extension" } },
+		},
+		handler: initCommand,
+	});
+	registry.register({
+		name: "install",
+		options: {
+			description: "Install an extension (npm:, git:, or local path)",
+			args: [{ name: "source", required: true }],
+			flags: { trust: { type: "boolean", description: "Skip trust prompt" } },
+		},
+		handler: installCommand,
+	});
 	registry.register({ name: "list", options: { description: "Show installed extensions" }, handler: listCommand });
-	registry.register({ name: "update", options: { description: "Update all or a specific extension", args: [{ name: "name" }] }, handler: updateCommand });
-	registry.register({ name: "remove", options: { description: "Uninstall an extension", args: [{ name: "name", required: true }] }, handler: removeCommand });
-	registry.register({ name: "upgrade", options: { description: "Upgrade kapy itself to the latest version" }, handler: upgradeCommand });
-	registry.register({ name: "config", options: { description: "View/edit configuration", args: [{ name: "key" }, { name: "value" }], flags: { global: { type: "boolean", alias: "g", description: "Edit global config" } } }, handler: configCommand });
-	registry.register({ name: "dev", options: { description: "Run CLI in dev mode with hot reload", flags: { debug: { type: "boolean", alias: "d", description: "Verbose logging" } } }, handler: devCommand });
-	registry.register({ name: "commands", options: { description: "List all registered commands", flags: { json: { type: "boolean", description: "Output as JSON" } } }, handler: createCommandsCommand(registry) });
-	registry.register({ name: "inspect", options: { description: "Dump full state (extensions, config, hooks, middleware)", flags: { json: { type: "boolean", description: "Output as JSON" } } }, handler: createInspectCommand(registry, userMiddlewares, extensionLoader.getHooks()) });
-	registry.register({ name: "tui", options: { description: "Launch interactive terminal UI", flags: { screen: { type: "string", alias: "s", description: "Open directly to a specific screen" } } }, handler: async (ctx) => { await launchTUI({ screens: extensionLoader.getScreens(), initialScreen: ctx.args.screen as string }, ctx); } });
+	registry.register({
+		name: "update",
+		options: { description: "Update all or a specific extension", args: [{ name: "name" }] },
+		handler: updateCommand,
+	});
+	registry.register({
+		name: "remove",
+		options: { description: "Uninstall an extension", args: [{ name: "name", required: true }] },
+		handler: removeCommand,
+	});
+	registry.register({
+		name: "upgrade",
+		options: { description: "Upgrade kapy itself to the latest version" },
+		handler: upgradeCommand,
+	});
+	registry.register({
+		name: "config",
+		options: {
+			description: "View/edit configuration",
+			args: [{ name: "key" }, { name: "value" }],
+			flags: { global: { type: "boolean", alias: "g", description: "Edit global config" } },
+		},
+		handler: configCommand,
+	});
+	registry.register({
+		name: "dev",
+		options: {
+			description: "Run CLI in dev mode with hot reload",
+			flags: { debug: { type: "boolean", alias: "d", description: "Verbose logging" } },
+		},
+		handler: devCommand,
+	});
+	registry.register({
+		name: "commands",
+		options: {
+			description: "List all registered commands",
+			flags: { json: { type: "boolean", description: "Output as JSON" } },
+		},
+		handler: createCommandsCommand(registry),
+	});
+	registry.register({
+		name: "inspect",
+		options: {
+			description: "Dump full state (extensions, config, hooks, middleware)",
+			flags: { json: { type: "boolean", description: "Output as JSON" } },
+		},
+		handler: createInspectCommand(registry, userMiddlewares, extensionLoader.getHooks()),
+	});
+	registry.register({
+		name: "tui",
+		options: {
+			description: "Launch interactive terminal UI",
+			flags: { screen: { type: "string", alias: "s", description: "Open directly to a specific screen" } },
+		},
+		handler: async (ctx) => {
+			await launchTUI({ screens: extensionLoader.getScreens(), initialScreen: ctx.args.screen as string }, ctx);
+		},
+	});
 
 	// Load user commands (from project config middleware)
 	if (projectConfig.middleware) {
@@ -145,7 +211,13 @@ async function runCLI(
 	if (!resolved || commandParts.length === 0) {
 		// No matching command — show help
 		if (jsonMode) {
-			console.log(JSON.stringify({ status: "error", message: "No command specified", commands: registry.visible().map((c) => c.name) }));
+			console.log(
+				JSON.stringify({
+					status: "error",
+					message: "No command specified",
+					commands: registry.visible().map((c) => c.name),
+				}),
+			);
 		} else {
 			console.log("");
 			console.log("  🐹 kapy — the pi.dev for CLI");

@@ -4,12 +4,11 @@
  * Hierarchy: kapy defaults → project kapy.config.ts → ~/.kapy/config.json → env vars → CLI flags
  */
 import { readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
 import { homedir } from "node:os";
-import type { MergedConfig, ProjectConfig, GlobalConfig, ConfigSource } from "./schema.js";
-import { getDefaultConfig } from "./defaults.js";
-import { DEFAULT_ENV_PREFIX } from "./defaults.js";
+import { join } from "node:path";
+import { DEFAULT_ENV_PREFIX, getDefaultConfig } from "./defaults.js";
 import { deepMergeConfigs } from "./loader-merge.js";
+import type { ConfigSource, GlobalConfig, MergedConfig, ProjectConfig } from "./schema.js";
 
 /** Load and merge all config sources */
 export async function loadConfig(options?: {
@@ -82,7 +81,15 @@ export async function loadConfig(options?: {
 		const flagsMerged: MergedConfig = {};
 		// CLI flags with __ are namespace separators (e.g., --deploy__region => deploy.region)
 		for (const [key, value] of Object.entries(options.cliFlags)) {
-			if (key === "json" || key === "no-input" || key === "debug" || key === "trust" || key === "template" || key === "screen") continue;
+			if (
+				key === "json" ||
+				key === "no-input" ||
+				key === "debug" ||
+				key === "trust" ||
+				key === "template" ||
+				key === "screen"
+			)
+				continue;
 			if (key.includes("__")) {
 				const [ns, ...fieldParts] = key.split("__");
 				if (!flagsMerged[ns]) flagsMerged[ns] = {};
@@ -153,4 +160,4 @@ export function parseEnvConfig(prefix: string): Record<string, unknown> {
 	return config;
 }
 
-export { getDefaultConfig, DEFAULT_ENV_PREFIX, deepMergeConfigs };
+export { DEFAULT_ENV_PREFIX, deepMergeConfigs, getDefaultConfig };

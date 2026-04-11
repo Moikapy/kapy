@@ -11,10 +11,12 @@ export function createCommandsCommand(registry: CommandRegistry): CommandHandler
 				name: cmd.name,
 				description: cmd.options.description,
 				args: cmd.options.args ?? [],
-				flags: cmd.options.flags ? Object.entries(cmd.options.flags).map(([key, def]) => ({
-					name: key,
-					...def,
-				})) : [],
+				flags: cmd.options.flags
+					? Object.entries(cmd.options.flags).map(([key, def]) => ({
+							name: key,
+							...def,
+						}))
+					: [],
 				hidden: cmd.options.hidden ?? false,
 				agentHints: cmd.agentHints,
 			}));

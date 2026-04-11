@@ -1,7 +1,7 @@
 /** kapy list — show installed extensions */
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import type { CommandContext } from "../command/context.js";
 
 interface ExtensionEntry {

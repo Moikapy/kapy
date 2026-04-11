@@ -1,3 +1,3 @@
-export { launchTUI, homeScreen, extensionsScreen, configScreen, terminalScreen } from "./shell.js";
+export type { ScreenContext, ScreenDefinition } from "../extension/types.js";
 export type { TUIOptions } from "./shell.js";
-export type { ScreenDefinition, ScreenContext } from "../extension/types.js";
+export { configScreen, extensionsScreen, homeScreen, launchTUI, terminalScreen } from "./shell.js";

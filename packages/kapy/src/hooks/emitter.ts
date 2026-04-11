@@ -1,9 +1,3 @@
-/**
- * Custom event emitter for extension-to-extension communication.
- */
-import type { HookHandler } from "./types.js";
-import type { CommandContext } from "../command/context.js";
-
 type EventHandler = (data?: unknown) => Promise<void> | void;
 
 export class ExtensionEmitter {
@@ -23,7 +17,7 @@ export class ExtensionEmitter {
 		if (!this.handlers.has(event)) {
 			this.handlers.set(event, new Set());
 		}
-		this.handlers.get(event)!.add(handler);
+		this.handlers.get(event)?.add(handler);
 	}
 
 	/** Remove a handler */

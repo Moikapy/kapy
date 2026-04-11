@@ -1,10 +1,10 @@
-export { CommandRegistry, parseArgs } from "./registry.js";
-export { CommandContext, Spinner, AbortError } from "./context.js";
+export { AbortError, CommandContext, Spinner } from "./context.js";
 export type {
-	CommandDefinition,
-	CommandOptions,
-	ArgDefinition,
-	FlagDefinition,
-	CommandHandler,
 	AgentHints,
+	ArgDefinition,
+	CommandDefinition,
+	CommandHandler,
+	CommandOptions,
+	FlagDefinition,
 } from "./parser.js";
+export { CommandRegistry, parseArgs } from "./registry.js";
