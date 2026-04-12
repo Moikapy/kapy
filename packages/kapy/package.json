@@ -1,6 +1,6 @@
 {
 	"name": "@moikapy/kapy",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"type": "module",
 	"description": "The pi.dev for CLI — extensible CLI framework with extensions, hooks, middleware, and TUI",
 	"main": "./dist/index.js",
@@ -49,7 +49,7 @@
 	},
 	"dependencies": {
 		"@opentui/core": "^0.1.97",
-		"@moikapy/kapy-components": "workspace:*",
+		"@moikapy/kapy-components": "^0.1.1",
 		"picocolors": "^1.1.0"
 	},
 	"devDependencies": {
