@@ -14,9 +14,8 @@ import {
 	ScrollBoxRenderable,
 	TextRenderable,
 } from "@opentui/core";
-import type { ScreenContext } from "../extension/types.js";
-import type { ScreenDefinition } from "../extension/types.js";
 import type { CommandContext } from "../command/context.js";
+import type { ScreenContext, ScreenDefinition } from "../extension/types.js";
 import { configScreen } from "./screens/config.js";
 import { extensionsScreen } from "./screens/extensions.js";
 import { homeScreen } from "./screens/home.js";

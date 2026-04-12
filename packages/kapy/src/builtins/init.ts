@@ -2,7 +2,7 @@
 
 import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import { join, resolve } from "node:path";
 import type { CommandContext } from "../command/context.js";
 
 /** Run a command safely */

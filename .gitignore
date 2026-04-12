@@ -33,3 +33,4 @@ coverage/
 .env.pi/
 .worktrees/
 .env
+docs/

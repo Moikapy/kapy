@@ -17,9 +17,7 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 								name: cmd.name,
 								description: cmd.options.description,
 								args: cmd.options.args ?? [],
-								flags: cmd.options.flags
-									? Object.entries(cmd.options.flags).map(([k, v]) => ({ name: k, ...v }))
-									: [],
+								flags: cmd.options.flags ? Object.entries(cmd.options.flags).map(([k, v]) => ({ name: k, ...v })) : [],
 								agentHints: cmd.agentHints,
 							})),
 						},

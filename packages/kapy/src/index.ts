@@ -38,11 +38,11 @@ export type { ConfigField, ConfigSchema, GlobalConfig, MergedConfig, ProjectConf
 export {
 	CACHE_DIR,
 	DEFAULT_ENV_PREFIX,
-	EXTENSIONS_DIR,
-	KAPY_HOME,
 	deepMergeConfigs,
+	EXTENSIONS_DIR,
 	ensureKapyDirs,
 	getDefaultConfig,
+	KAPY_HOME,
 	loadConfig,
 	parseEnvConfig,
 } from "./config/index.js";

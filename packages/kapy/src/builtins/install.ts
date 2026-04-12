@@ -1,12 +1,13 @@
 /** kapy install — install an extension from npm, git, or local path */
-import { createHash } from "node:crypto";
+
 import { spawn } from "node:child_process";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { CommandContext } from "../command/context.js";
-import type { ExtensionMeta } from "../extension/types.js";
 import { ensureKapyDirs } from "../config/defaults.js";
+import type { ExtensionMeta } from "../extension/types.js";
 
 /** Run a command safely without shell injection */
 async function runCommand(

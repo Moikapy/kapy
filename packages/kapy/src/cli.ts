@@ -29,7 +29,7 @@ import { CommandContext } from "./command/context.js";
  *   kapy inspect [--json]   Dump full state
  */
 import { CommandRegistry, parseArgs } from "./command/index.js";
-import type { AgentHints, CommandHandler, CommandOptions } from "./command/parser.js";
+import type { CommandHandler, CommandOptions } from "./command/parser.js";
 import { loadConfig } from "./config/index.js";
 import type { ProjectConfig } from "./config/schema.js";
 import { ExtensionLoader } from "./extension/index.js";

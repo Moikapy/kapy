@@ -16,7 +16,6 @@ import {
 	TextRenderable,
 } from "@opentui/core";
 import type { ComponentDescriptor } from "./types.js";
-import { isComponentDescriptor } from "./types.js";
 
 // ─── Types ────────────────────────────────────────────────────────
 

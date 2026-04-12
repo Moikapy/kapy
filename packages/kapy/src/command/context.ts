@@ -32,7 +32,7 @@ export class CommandContext {
 	noInput: boolean;
 
 	private _startTime: number;
-	private _exitCode: number;
+	private _exitCode: number = 0;
 	private _spinner: Spinner | null = null;
 
 	constructor(options: {
