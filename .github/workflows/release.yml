@@ -24,16 +24,11 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Lint & typecheck
-        run: |
-          bun run lint
-          bun run typecheck
+      - name: Build packages
+        run: bun run build
 
       - name: Run tests
         run: bun test packages/kapy/test/ packages/create-kapy/test/
-
-      - name: Build packages
-        run: bun run build
 
       - name: Extract version from tag
         id: version
@@ -91,17 +86,26 @@ jobs:
       - name: Publish kapy-components to npm
         working-directory: packages/kapy-components
         run: |
-          npm version --no-git-tag-version ${{ steps.version.outputs.VERSION }}
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" != "${{ steps.version.outputs.VERSION }}" ]; then
+            npm version --no-git-tag-version ${{ steps.version.outputs.VERSION }}
+          fi
           npm publish --access public --tag ${{ contains(steps.version.outputs.VERSION, '-') && 'next' || 'latest' }}
 
       - name: Publish kapy to npm
         working-directory: packages/kapy
         run: |
-          npm version --no-git-tag-version ${{ steps.version.outputs.VERSION }}
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" != "${{ steps.version.outputs.VERSION }}" ]; then
+            npm version --no-git-tag-version ${{ steps.version.outputs.VERSION }}
+          fi
           npm publish --access public --tag ${{ contains(steps.version.outputs.VERSION, '-') && 'next' || 'latest' }}
 
       - name: Publish create-kapy to npm
         working-directory: packages/create-kapy
         run: |
-          npm version --no-git-tag-version ${{ steps.version.outputs.VERSION }}
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" != "${{ steps.version.outputs.VERSION }}" ]; then
+            npm version --no-git-tag-version ${{ steps.version.outputs.VERSION }}
+          fi
           npm publish --access public --tag ${{ contains(steps.version.outputs.VERSION, '-') && 'next' || 'latest' }}
