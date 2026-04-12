@@ -2,6 +2,7 @@
 import {
 	configCommand,
 	createCommandsCommand,
+	createHelpCommand,
 	createInspectCommand,
 	devCommand,
 	initCommand,
@@ -28,7 +29,7 @@ import { CommandContext } from "./command/context.js";
  *   kapy inspect [--json]   Dump full state
  */
 import { CommandRegistry, parseArgs } from "./command/index.js";
-import type { CommandHandler, CommandOptions } from "./command/parser.js";
+import type { AgentHints, CommandHandler, CommandOptions } from "./command/parser.js";
 import { loadConfig } from "./config/index.js";
 import type { ProjectConfig } from "./config/schema.js";
 import { ExtensionLoader } from "./extension/index.js";
@@ -78,6 +79,20 @@ export function kapy(): KapyBuilder {
 	return builder;
 }
 
+// ─── Universal flags ───────────────────────────────────────────
+
+/** Auto-inject --json and --no-input flags into command options per spec §10 */
+function withUniversalFlags(options: CommandOptions): CommandOptions {
+	return {
+		...options,
+		flags: {
+			...options.flags,
+			json: { type: "boolean" as const, description: "Output structured JSON" },
+			"no-input": { type: "boolean" as const, description: "Skip interactive prompts, use defaults or fail" },
+		},
+	};
+}
+
 // ─── CLI Runner ────────────────────────────────────────────────
 
 async function runCLI(
@@ -118,90 +133,193 @@ async function runCLI(
 		userMiddlewares.push(mw);
 	}
 
-	// Register built-in commands
+	// Fire on:load hooks
+	const loadHooks = extensionLoader.getHooks().get("on:load") ?? [];
+	if (loadHooks.length > 0) {
+		const loadCtx = new CommandContext({ command: "on:load", config: mergedConfig });
+		for (const hook of loadHooks) {
+			try {
+				await hook(loadCtx);
+			} catch (e) {
+				console.warn("[kapy] on:load hook error:", e);
+			}
+		}
+	}
+
+	// Register built-in commands (with universal flags and agentHints)
 	registry.register({
 		name: "init",
-		options: {
+		options: withUniversalFlags({
 			description: "Scaffold a new kapy-powered CLI project",
 			args: [{ name: "name", required: true }],
 			flags: { template: { type: "boolean", alias: "t", description: "Include example commands and extension" } },
-		},
+		}),
 		handler: initCommand,
+		agentHints: {
+			purpose: "Scaffold a new kapy-powered CLI project",
+			when: "Starting a new kapy project",
+			output: "New project directory",
+			sideEffects: "Creates directory and files",
+		},
 	});
 	registry.register({
 		name: "install",
-		options: {
+		options: withUniversalFlags({
 			description: "Install an extension (npm:, git:, or local path)",
 			args: [{ name: "source", required: true }],
 			flags: { trust: { type: "boolean", description: "Skip trust prompt" } },
-		},
+		}),
 		handler: installCommand,
+		agentHints: {
+			purpose: "Install a kapy extension from npm, git, or local path",
+			when: "Adding new functionality to the CLI",
+			output: "Extension installed and registered",
+			sideEffects: "Modifies ~/.kapy/extensions.json and config.json",
+			requires: ["Valid source string"],
+		},
 	});
-	registry.register({ name: "list", options: { description: "Show installed extensions" }, handler: listCommand });
+	registry.register({
+		name: "list",
+		options: withUniversalFlags({ description: "Show installed extensions" }),
+		handler: listCommand,
+		agentHints: {
+			purpose: "Show all installed extensions",
+			when: "Checking what extensions are available",
+			output: "List of extension names, versions, sources",
+		},
+	});
 	registry.register({
 		name: "update",
-		options: { description: "Update all or a specific extension", args: [{ name: "name" }] },
+		options: withUniversalFlags({
+			description: "Update all or a specific extension",
+			args: [{ name: "name" }],
+		}),
 		handler: updateCommand,
+		agentHints: {
+			purpose: "Update all or a specific extension to latest version",
+			when: "Keeping extensions up to date",
+			output: "Updated extension versions",
+			sideEffects: "Modifies installed extension files",
+		},
 	});
 	registry.register({
 		name: "remove",
-		options: { description: "Uninstall an extension", args: [{ name: "name", required: true }] },
+		options: withUniversalFlags({
+			description: "Uninstall an extension",
+			args: [{ name: "name", required: true }],
+		}),
 		handler: removeCommand,
+		agentHints: {
+			purpose: "Uninstall a kapy extension",
+			when: "Removing unwanted extensions",
+			output: "Extension removed from manifest",
+			sideEffects: "Deletes extension files and updates config",
+			requires: ["Extension name"],
+		},
 	});
 	registry.register({
 		name: "search",
-		options: {
+		options: withUniversalFlags({
 			description: "Search for extensions (coming soon)",
 			args: [{ name: "query", description: "Search query" }],
-		},
+		}),
 		handler: searchCommand,
+		agentHints: {
+			purpose: "Search npm for kapy extensions (coming soon)",
+			when: "Looking for new extensions to install",
+			output: "Search results with extension names",
+		},
 	});
 	registry.register({
 		name: "upgrade",
-		options: { description: "Upgrade kapy itself to the latest version" },
+		options: withUniversalFlags({ description: "Upgrade kapy itself to the latest version" }),
 		handler: upgradeCommand,
+		agentHints: {
+			purpose: "Upgrade kapy itself to the latest version",
+			when: "Updating the kapy runtime",
+			output: "Updated kapy version",
+			sideEffects: "Modifies global kapy installation",
+		},
 	});
 	registry.register({
 		name: "config",
-		options: {
+		options: withUniversalFlags({
 			description: "View/edit configuration",
 			args: [{ name: "key" }, { name: "value" }],
 			flags: { global: { type: "boolean", alias: "g", description: "Edit global config" } },
-		},
+		}),
 		handler: configCommand,
+		agentHints: {
+			purpose: "View or edit kapy configuration",
+			when: "Reading or modifying config values",
+			output: "Config key-value pairs",
+		},
 	});
 	registry.register({
 		name: "dev",
-		options: {
+		options: withUniversalFlags({
 			description: "Run CLI in dev mode with hot reload",
 			flags: { debug: { type: "boolean", alias: "d", description: "Verbose logging" } },
-		},
+		}),
 		handler: devCommand,
+		agentHints: {
+			purpose: "Run CLI in dev mode with hot reload on file changes",
+			when: "Developing extensions locally",
+			output: "Running CLI process with auto-restart",
+			sideEffects: "Watches files and restarts process",
+		},
 	});
 	registry.register({
 		name: "commands",
-		options: {
+		options: withUniversalFlags({
 			description: "List all registered commands",
-			flags: { json: { type: "boolean", description: "Output as JSON" } },
-		},
+		}),
 		handler: createCommandsCommand(registry),
+		agentHints: {
+			purpose: "List all registered commands with metadata",
+			when: "Discovering available commands",
+			output: "Structured list of commands with args, flags, descriptions",
+		},
 	});
 	registry.register({
 		name: "inspect",
-		options: {
+		options: withUniversalFlags({
 			description: "Dump full state (extensions, config, hooks, middleware)",
-			flags: { json: { type: "boolean", description: "Output as JSON" } },
-		},
+		}),
 		handler: createInspectCommand(registry, userMiddlewares, extensionLoader.getHooks()),
+		agentHints: {
+			purpose: "Dump full kapy state including extensions, config, hooks, and middleware",
+			when: "Debugging or auditing the CLI state",
+			output: "Full state dump as JSON or styled text",
+		},
 	});
 	registry.register({
 		name: "tui",
-		options: {
+		options: withUniversalFlags({
 			description: "Launch interactive terminal UI",
 			flags: { screen: { type: "string", alias: "s", description: "Open directly to a specific screen" } },
-		},
+		}),
 		handler: async (ctx) => {
 			await launchTUI({ screens: extensionLoader.getScreens(), initialScreen: ctx.args.screen as string }, ctx);
+		},
+		agentHints: {
+			purpose: "Launch interactive terminal UI",
+			when: "Using kapy interactively",
+			output: "Interactive TUI session",
+			requires: ["Interactive terminal (TTY)"],
+		},
+	});
+	registry.register({
+		name: "help",
+		options: withUniversalFlags({
+			description: "Show help for a command",
+			args: [{ name: "command", description: "Command to get help for" }],
+		}),
+		handler: createHelpCommand(registry),
+		agentHints: {
+			purpose: "Show detailed help for a specific command",
+			when: "Learning about a command or its flags",
+			output: "Command description, args, flags, and agent hints",
 		},
 	});
 
@@ -238,7 +356,7 @@ async function runCLI(
 				console.log(`  ${cmd.name.padEnd(20)} ${cmd.options.description}`);
 			}
 			console.log("");
-			console.log("Use 'kapy <command> --help' for more information about a command.");
+			console.log("Use 'kapy help <command>' for more information about a command.");
 		}
 		process.exit(jsonMode ? 0 : 2);
 	}
@@ -263,36 +381,53 @@ async function runCLI(
 	const pipeline = composeMiddleware(allMiddlewares);
 
 	// Execute middleware → hooks → command
-	await pipeline(ctx, async () => {
-		// Execute before:command hooks
-		const beforeHooks = extensionLoader.getHooks().get("before:command") ?? [];
-		for (const hook of beforeHooks) {
-			await hook(ctx);
-			if (ctx.aborted) return;
-		}
+	try {
+		await pipeline(ctx, async () => {
+			// Execute before:command hooks
+			const beforeHooks = extensionLoader.getHooks().get("before:command") ?? [];
+			for (const hook of beforeHooks) {
+				await hook(ctx);
+				if (ctx.aborted) return;
+			}
 
-		// Execute before:<name> hooks
-		const nameHooks = extensionLoader.getHooks().get(`before:${resolved.command.name}`) ?? [];
-		for (const hook of nameHooks) {
-			await hook(ctx);
-			if (ctx.aborted) return;
-		}
+			// Execute before:<name> hooks
+			const nameHooks = extensionLoader.getHooks().get(`before:${resolved.command.name}`) ?? [];
+			for (const hook of nameHooks) {
+				await hook(ctx);
+				if (ctx.aborted) return;
+			}
 
-		// Execute command handler
-		await resolved.command.handler(ctx);
+			// Execute command handler
+			await resolved.command.handler(ctx);
 
-		// Execute after:<name> hooks
-		const afterNameHooks = extensionLoader.getHooks().get(`after:${resolved.command.name}`) ?? [];
-		for (const hook of afterNameHooks) {
-			await hook(ctx);
-		}
+			// Execute after:<name> hooks
+			const afterNameHooks = extensionLoader.getHooks().get(`after:${resolved.command.name}`) ?? [];
+			for (const hook of afterNameHooks) {
+				await hook(ctx);
+			}
 
-		// Execute after:command hooks
-		const afterHooks = extensionLoader.getHooks().get("after:command") ?? [];
-		for (const hook of afterHooks) {
-			await hook(ctx);
+			// Execute after:command hooks
+			const afterHooks = extensionLoader.getHooks().get("after:command") ?? [];
+			for (const hook of afterHooks) {
+				await hook(ctx);
+			}
+		});
+	} catch (err) {
+		// Fire on:error hooks
+		const errorHooks = extensionLoader.getHooks().get("on:error") ?? [];
+		if (errorHooks.length > 0) {
+			const errCtx = new CommandContext({ command: "on:error", config: mergedConfig });
+			(errCtx.args as Record<string, unknown>).error = err;
+			for (const hook of errorHooks) {
+				try {
+					await hook(errCtx);
+				} catch (e) {
+					console.warn("[kapy] on:error hook error:", e);
+				}
+			}
 		}
-	});
+		throw err;
+	}
 
 	ctx._tick();
 

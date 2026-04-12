@@ -9,8 +9,26 @@
 		"kapy": "./dist/cli.js"
 	},
 	"exports": {
-		".": "./dist/index.js",
-		"./middleware/*": "./dist/middleware/*.js"
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./middleware": {
+			"import": "./dist/middleware/index.js",
+			"types": "./dist/middleware/index.d.ts"
+		},
+		"./middleware/logging": {
+			"import": "./dist/middleware/logging.js",
+			"types": "./dist/middleware/logging.d.ts"
+		},
+		"./middleware/timing": {
+			"import": "./dist/middleware/timing.js",
+			"types": "./dist/middleware/timing.d.ts"
+		},
+		"./middleware/error-handler": {
+			"import": "./dist/middleware/error-handler.js",
+			"types": "./dist/middleware/error-handler.d.ts"
+		}
 	},
 	"files": [
 		"dist"

@@ -14,57 +14,18 @@ import {
 	ScrollBoxRenderable,
 	TextRenderable,
 } from "@opentui/core";
-import type { CommandContext } from "../command/context.js";
+import type { ScreenContext } from "../extension/types.js";
 import type { ScreenDefinition } from "../extension/types.js";
+import type { CommandContext } from "../command/context.js";
+import { configScreen } from "./screens/config.js";
+import { extensionsScreen } from "./screens/extensions.js";
+import { homeScreen } from "./screens/home.js";
+import { terminalScreen } from "./screens/terminal.js";
 
 export interface TUIOptions {
 	screens: ScreenDefinition[];
 	initialScreen?: string;
 }
-
-/** Built-in screens */
-const homeScreenDef: ScreenDefinition = {
-	name: "home",
-	label: "Home",
-	icon: "🐹",
-	render: () =>
-		[
-			"",
-			"  🐹 kapy — the pi.dev for CLI",
-			"",
-			"  An extensible CLI framework with first-class support for",
-			"  extensions, hooks, middleware, and a built-in TUI.",
-			"",
-			"  Navigate with ↑↓ arrows and press Enter to select.",
-			"  Press q to quit, Esc to go back.",
-			"",
-		].join("\n"),
-	keyBindings: { q: "quit" },
-};
-
-const extensionsScreenDef: ScreenDefinition = {
-	name: "extensions",
-	label: "Extensions",
-	icon: "📦",
-	render: () => "Extensions manager — use 'kapy list' to see installed extensions",
-	keyBindings: { q: "quit" },
-};
-
-const configScreenDef: ScreenDefinition = {
-	name: "config",
-	label: "Config",
-	icon: "🔧",
-	render: () => "Configuration editor — use 'kapy config' to view/edit settings",
-	keyBindings: { q: "quit" },
-};
-
-const terminalScreenDef: ScreenDefinition = {
-	name: "terminal",
-	label: "Terminal",
-	icon: "⚡",
-	render: () => "Built-in terminal — type commands to execute",
-	keyBindings: { q: "quit" },
-};
 
 /** Build the sidebar */
 function buildSidebar(renderer: CliRenderer, screens: ScreenDefinition[], activeIndex: number): BoxRenderable {
@@ -114,13 +75,18 @@ function buildSidebar(renderer: CliRenderer, screens: ScreenDefinition[], active
 }
 
 /** Build the main content area */
-function buildMainContent(
+async function buildMainContent(
 	renderer: CliRenderer,
 	screen: ScreenDefinition,
 	width: number,
 	height: number,
-): BoxRenderable {
-	const content = screen.render({});
+): Promise<BoxRenderable> {
+	const screenCtx: ScreenContext = {
+		renderer,
+		width,
+		height,
+	};
+	const content = await screen.render(screenCtx);
 	const text = typeof content === "string" ? content : String(content);
 
 	const scrollbox = new ScrollBoxRenderable(renderer, {
@@ -181,10 +147,10 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 	}
 
 	const allScreens: ScreenDefinition[] = [
-		homeScreenDef,
-		extensionsScreenDef,
-		configScreenDef,
-		terminalScreenDef,
+		homeScreen,
+		extensionsScreen,
+		configScreen,
+		terminalScreen,
 		...options.screens,
 	];
 	let activeIndex = allScreens.findIndex((s) => s.name === options.initialScreen);
@@ -194,7 +160,7 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 	// Initialize OpenTUI renderer
 	const renderer = await createCliRenderer({ exitOnCtrlC: false });
 
-	function rebuild(): void {
+	async function rebuild(): Promise<void> {
 		// Clear existing tree
 		while (renderer.root.children.length > 0) {
 			renderer.root.remove(renderer.root.children[0] as Renderable);
@@ -205,11 +171,21 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 		const statusBar = buildStatusBar(renderer, renderer.width);
 
 		if (inScreen) {
-			const mainContent = buildMainContent(renderer, allScreens[activeIndex], renderer.width - 26, renderer.height - 4);
+			const mainContent = await buildMainContent(
+				renderer,
+				allScreens[activeIndex],
+				renderer.width - 26,
+				renderer.height - 4,
+			);
 			renderer.root.add(mainContent as never);
 		} else {
 			// Show sidebar with overview text
-			const overview = buildMainContent(renderer, allScreens[activeIndex], renderer.width - 26, renderer.height - 4);
+			const overview = await buildMainContent(
+				renderer,
+				allScreens[activeIndex],
+				renderer.width - 26,
+				renderer.height - 4,
+			);
 			renderer.root.add(overview as never);
 		}
 
@@ -218,7 +194,7 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 	}
 
 	// Build initial layout
-	rebuild();
+	await rebuild();
 
 	// Handle keyboard navigation
 	renderer.keyInput.on("keypress", (key: { name: string; ctrl?: boolean }) => {
@@ -230,7 +206,7 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 		if (!inScreen) {
 			if (key.name === "up" || key.name === "k") {
 				activeIndex = Math.max(0, activeIndex - 1);
-				rebuild();
+				rebuild(); // fire-and-forget async is fine
 			} else if (key.name === "down" || key.name === "j") {
 				activeIndex = Math.min(allScreens.length - 1, activeIndex + 1);
 				rebuild();
@@ -246,9 +222,3 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 		}
 	});
 }
-
-/** Exported screen definitions for direct use */
-export const homeScreen = homeScreenDef;
-export const extensionsScreen = extensionsScreenDef;
-export const configScreen = configScreenDef;
-export const terminalScreen = terminalScreenDef;

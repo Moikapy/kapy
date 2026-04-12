@@ -15,6 +15,8 @@ import {
 	SelectRenderable,
 	TextRenderable,
 } from "@opentui/core";
+import type { ComponentDescriptor } from "./types.js";
+import { isComponentDescriptor } from "./types.js";
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -565,3 +567,70 @@ export function createStatusBar(renderer: CliRenderer, props: StatusBarProps = {
 
 	return bar;
 }
+
+// ─── Declarative Component API ───────────────────────────────────
+//
+// These return ComponentDescriptor objects that the TUI shell materializes.
+// The spec-style API: Box({ ... }, Text({ ... }), ...
+
+/** Create a Box descriptor */
+export function Box(props: Omit<BoxProps, "children">, ...children: ComponentDescriptor[]): ComponentDescriptor {
+	return { type: "Box", props, children: children.length > 0 ? children : undefined };
+}
+
+/** Create a Text descriptor */
+export function Text(props: TextProps): ComponentDescriptor {
+	return { type: "Text", props, children: undefined };
+}
+
+/** Create an Input descriptor */
+export function Input(props: InputProps = {}): ComponentDescriptor {
+	return { type: "Input", props, children: undefined };
+}
+
+/** Create a Select descriptor */
+export function Select(props: SelectProps): ComponentDescriptor {
+	return { type: "Select", props, children: undefined };
+}
+
+/** Create a ScrollBox descriptor */
+export function ScrollBox(
+	props: Omit<ScrollBoxProps, "children">,
+	...children: ComponentDescriptor[]
+): ComponentDescriptor {
+	return { type: "ScrollBox", props, children: children.length > 0 ? children : undefined };
+}
+
+/** Create a Code descriptor */
+export function Code(props: CodeProps): ComponentDescriptor {
+	return { type: "Code", props, children: undefined };
+}
+
+/** Create a Diff descriptor */
+export function Diff(props: DiffProps): ComponentDescriptor {
+	return { type: "Diff", props, children: undefined };
+}
+
+/** Create a Spinner descriptor */
+export function Spinner(props: SpinnerProps = {}): ComponentDescriptor {
+	return { type: "Spinner", props, children: undefined };
+}
+
+/** Create a Banner descriptor */
+export function Banner(props: BannerProps = {}): ComponentDescriptor {
+	return { type: "Banner", props, children: undefined };
+}
+
+/** Create a Sidebar descriptor */
+export function Sidebar(props: SidebarProps): ComponentDescriptor {
+	return { type: "Sidebar", props, children: undefined };
+}
+
+/** Create a StatusBar descriptor */
+export function StatusBar(props: StatusBarProps = {}): ComponentDescriptor {
+	return { type: "StatusBar", props, children: undefined };
+}
+
+// Re-export descriptor types
+export type { ComponentDescriptor } from "./types.js";
+export { isComponentDescriptor } from "./types.js";

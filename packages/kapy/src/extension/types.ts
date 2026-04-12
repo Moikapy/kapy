@@ -22,12 +22,18 @@ export interface ScreenDefinition {
 	name: string;
 	label: string;
 	icon?: string;
-	render: (ctx: ScreenContext) => unknown; // OpenTUI renderable
+	render: (ctx: ScreenContext) => unknown | Promise<unknown>;
 	keyBindings?: Record<string, string>;
 }
 
-/** Screen context (simplified for MVP) */
+/** Screen context passed to render() — includes the OpenTUI renderer */
 export interface ScreenContext {
+	/** The OpenTUI renderer instance */
+	renderer?: unknown;
+	/** Current terminal width */
+	width?: number;
+	/** Current terminal height */
+	height?: number;
 	[key: string]: unknown;
 }
 

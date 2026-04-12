@@ -18,3 +18,24 @@ export interface Key {
 	meta?: boolean;
 	shift?: boolean;
 }
+
+/** Descriptor for a declarative component tree — materialized by the TUI shell */
+export interface ComponentDescriptor {
+	/** Component type name (e.g. 'Box', 'Text', 'Input') */
+	type: string;
+	/** Component-specific props */
+	props: Record<string, unknown>;
+	/** Child descriptors (for container components) */
+	children?: ComponentDescriptor[];
+}
+
+/** Type guard for ComponentDescriptor */
+export function isComponentDescriptor(value: unknown): value is ComponentDescriptor {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"type" in value &&
+		"props" in value &&
+		typeof (value as ComponentDescriptor).type === "string"
+	);
+}

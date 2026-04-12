@@ -1,6 +1,7 @@
 export { createCommandsCommand } from "./commands.js";
 export { configCommand } from "./config-cmd.js";
 export { devCommand } from "./dev.js";
+export { createHelpCommand } from "./help.js";
 export { initCommand } from "./init.js";
 export { createInspectCommand } from "./inspect.js";
 export { installCommand } from "./install.js";

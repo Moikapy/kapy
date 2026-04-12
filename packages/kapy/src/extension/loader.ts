@@ -8,6 +8,7 @@
 
 import { stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { CommandContext } from "../command/context.js";
 import type { CommandRegistry } from "../command/registry.js";
 import type { ConfigSchema } from "../config/schema.js";
 import { ExtensionEmitter } from "../hooks/emitter.js";
@@ -163,6 +164,22 @@ export class ExtensionLoader {
 			const dispose = await register(api);
 			const loaded: LoadedExtension = { meta, dispose: dispose ?? undefined, source };
 			this.loaded.push(loaded);
+
+			// Fire on:extension:loaded hook
+			const extLoadedHooks = this.hooks.get("on:extension:loaded") ?? [];
+			if (extLoadedHooks.length > 0) {
+				const extCtx = new CommandContext({ command: "on:extension:loaded" });
+				(extCtx.args as Record<string, unknown>).extension = meta.name;
+				(extCtx.args as Record<string, unknown>).version = meta.version;
+				(extCtx.args as Record<string, unknown>).source = source;
+				for (const hook of extLoadedHooks) {
+					try {
+						await hook(extCtx);
+					} catch (e) {
+						console.warn("[kapy] on:extension:loaded hook error:", e);
+					}
+				}
+			}
 
 			return loaded;
 		} catch (err) {

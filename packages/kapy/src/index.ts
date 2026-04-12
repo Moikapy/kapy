@@ -9,6 +9,9 @@ export * from "kapy-components";
 // Built-in commands
 export {
 	configCommand,
+	createCommandsCommand,
+	createHelpCommand,
+	createInspectCommand,
 	devCommand,
 	initCommand,
 	installCommand,
@@ -32,7 +35,17 @@ export type {
 } from "./command/parser.js";
 export type { ConfigField, ConfigSchema, GlobalConfig, MergedConfig, ProjectConfig } from "./config/index.js";
 // Config system
-export { DEFAULT_ENV_PREFIX, deepMergeConfigs, loadConfig, parseEnvConfig } from "./config/index.js";
+export {
+	CACHE_DIR,
+	DEFAULT_ENV_PREFIX,
+	EXTENSIONS_DIR,
+	KAPY_HOME,
+	deepMergeConfigs,
+	ensureKapyDirs,
+	getDefaultConfig,
+	loadConfig,
+	parseEnvConfig,
+} from "./config/index.js";
 export type {
 	ExtensionMeta,
 	ExtensionRegister,

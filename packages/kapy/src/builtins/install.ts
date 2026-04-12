@@ -1,10 +1,12 @@
 /** kapy install — install an extension from npm, git, or local path */
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { CommandContext } from "../command/context.js";
 import type { ExtensionMeta } from "../extension/types.js";
+import { ensureKapyDirs } from "../config/defaults.js";
 
 /** Run a command safely without shell injection */
 async function runCommand(
@@ -47,6 +49,35 @@ async function inspectExtensionMeta(source: string, extensionsDir: string): Prom
 	}
 }
 
+/** Compute SHA-512 checksum of a file or directory */
+async function computeChecksum(targetPath: string): Promise<string> {
+	const { stat: statAsync, readFile: readFileAsync, readdir } = await import("node:fs/promises");
+	const hash = createHash("sha512");
+
+	try {
+		const s = await statAsync(targetPath);
+		if (s.isFile()) {
+			const content = await readFileAsync(targetPath);
+			hash.update(content);
+		} else if (s.isDirectory()) {
+			const files = await readdir(targetPath, { recursive: true, withFileTypes: true });
+			const filePaths = files
+				.filter((f) => f.isFile())
+				.map((f) => join(f.parentPath ?? (f as unknown as { path: string }).path, f.name))
+				.sort();
+			for (const fp of filePaths) {
+				const content = await readFileAsync(fp);
+				hash.update(fp.replace(targetPath, ""));
+				hash.update(content);
+			}
+		}
+	} catch {
+		return "sha512-unknown";
+	}
+
+	return `sha512-${hash.digest("hex")}`;
+}
+
 export const installCommand = async (ctx: CommandContext): Promise<void> => {
 	const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
 	const source = positionalArgs?.[0];
@@ -62,6 +93,9 @@ export const installCommand = async (ctx: CommandContext): Promise<void> => {
 		ctx.error("Cannot install in --no-input mode without --trust flag.");
 		ctx.abort(10);
 	}
+
+	// Ensure ~/.kapy directory structure exists
+	await ensureKapyDirs();
 
 	const spinner = ctx.spinner(`Installing extension: ${source}`);
 	spinner.start();
@@ -152,9 +186,31 @@ export const installCommand = async (ctx: CommandContext): Promise<void> => {
 			// First extension
 		}
 
+		// Compute checksum of installed extension
+		let checksum = "";
+		try {
+			let checkTarget: string | undefined;
+			if (source.startsWith("npm:")) {
+				try {
+					const resolved = require.resolve(pkgName, { paths: [process.cwd()] });
+					checkTarget = resolved;
+				} catch {}
+			} else if (source.startsWith("git:")) {
+				checkTarget = join(extensionsDir, pkgName);
+			} else if (source.startsWith("./") || source.startsWith("../") || source.startsWith("/")) {
+				checkTarget = resolve(process.cwd(), source);
+			}
+			if (checkTarget) {
+				checksum = await computeChecksum(checkTarget);
+			}
+		} catch {
+			// Checksum computation is best-effort
+		}
+
 		manifest[pkgName] = {
 			version: preInstallMeta?.version ?? "latest",
 			source,
+			...(checksum ? { checksum } : {}),
 			installedAt: new Date().toISOString(),
 		};
 

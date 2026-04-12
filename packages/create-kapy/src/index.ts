@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /**
  * create-kapy — scaffold a new kapy-powered CLI project.
  *
