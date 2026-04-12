@@ -1,5 +1,5 @@
 {
-	"name": "kapy-components",
+	"name": "@moikapy/kapy-components",
 	"version": "0.1.0",
 	"type": "module",
 	"description": "UI components for kapy TUI — built on @opentui/core",

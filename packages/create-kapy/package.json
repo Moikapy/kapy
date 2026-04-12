@@ -1,5 +1,5 @@
 {
-	"name": "create-kapy",
+	"name": "@moikapy/create-kapy",
 	"version": "0.1.0",
 	"type": "module",
 	"description": "Scaffolding template for kapy-powered CLI projects",

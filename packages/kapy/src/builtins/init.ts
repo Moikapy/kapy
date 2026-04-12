@@ -55,7 +55,7 @@ export const initCommand = async (ctx: CommandContext): Promise<void> => {
 
 	try {
 		// Try using create-kapy if available
-		const cmd = template ? ["create", "kapy", projectName, "--template"] : ["create", "kapy", projectName];
+		const cmd = template ? ["create", "@moikapy/kapy", projectName, "--template"] : ["create", "@moikapy/kapy", projectName];
 
 		const result = await runCommand("bunx", cmd, {
 			cwd: process.cwd(),
@@ -105,7 +105,7 @@ async function scaffoldManual(name: string, dir: string, _template: boolean): Pr
 
 	await writeFile(
 		join(dir, "kapy.config.ts"),
-		`import { defineConfig } from "kapy";
+		`import { defineConfig } from "@moikapy/kapy";
 
 export default defineConfig({
   name: "${name}",
@@ -116,7 +116,7 @@ export default defineConfig({
 
 	await writeFile(
 		join(dir, "src", "index.ts"),
-		`import { kapy } from "kapy";
+		`import { kapy } from "@moikapy/kapy";
 
 kapy()
   .command("hello", {

@@ -55,8 +55,8 @@ async function writePackageJson(dir: string, name: string): Promise<void> {
 			test: "bun test",
 		},
 		dependencies: {
-			kapy: "^0.1.0",
-			"kapy-components": "^0.1.0",
+			"@moikapy/kapy": "^0.1.0",
+			"@moikapy/kapy-components": "^0.1.0",
 		},
 		devDependencies: {
 			typescript: "^5.7.0",
@@ -67,7 +67,7 @@ async function writePackageJson(dir: string, name: string): Promise<void> {
 }
 
 async function writeKapyConfig(dir: string, name: string): Promise<void> {
-	const config = `import { defineConfig } from "kapy";
+	const config = `import { defineConfig } from "@moikapy/kapy";
 
 export default defineConfig({
   name: "${name}",
@@ -80,7 +80,7 @@ export default defineConfig({
 
 async function writeTsConfig(dir: string): Promise<void> {
 	const tsconfig = {
-		extends: "./node_modules/kapy/tsconfig.json",
+		extends: "./node_modules/@moikapy/kapy/tsconfig.json",
 		compilerOptions: {
 			outDir: "./dist",
 			rootDir: "./src",
@@ -102,7 +102,7 @@ dist/
 }
 
 async function writeSrcIndex(dir: string, name: string): Promise<void> {
-	const index = `import { kapy } from "kapy";
+	const index = `import { kapy } from "@moikapy/kapy";
 
 kapy()
   .command("hello", {
@@ -117,7 +117,7 @@ kapy()
 }
 
 async function writeDeployCommand(dir: string): Promise<void> {
-	const deploy = `import type { CommandHandler } from "kapy";
+	const deploy = `import type { CommandHandler } from "@moikapy/kapy";
 
 export const deployCommand: CommandHandler = async (ctx) => {
   const env = (ctx.args.env as string) ?? "staging";
@@ -131,7 +131,7 @@ export const deployCommand: CommandHandler = async (ctx) => {
 }
 
 async function writeExtension(dir: string, name: string): Promise<void> {
-	const ext = `import type { KapyExtensionAPI } from "kapy";
+	const ext = `import type { KapyExtensionAPI } from "@moikapy/kapy";
 
 export async function register(api: KapyExtensionAPI) {
   api.addCommand("hello:ext", {

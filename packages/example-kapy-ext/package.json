@@ -8,8 +8,8 @@
 		"kapy-extension"
 	],
 	"peerDependencies": {
-		"kapy": "^0.1.0",
-		"kapy-components": "^0.1.0"
+		"@moikapy/kapy": "^0.1.0",
+		"@moikapy/kapy-components": "^0.1.0"
 	},
 	"license": "MIT"
 }

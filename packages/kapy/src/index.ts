@@ -5,7 +5,7 @@
  */
 
 // Re-export kapy-components so extensions can import from either path
-export * from "kapy-components";
+export * from "@moikapy/kapy-components";
 // Built-in commands
 export {
 	configCommand,

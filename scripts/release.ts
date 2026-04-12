@@ -23,16 +23,23 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
 
-const PACKAGES = ["kapy-components", "kapy", "create-kapy"];
+const PACKAGES = ["@moikapy/kapy-components", "@moikapy/kapy", "@moikapy/create-kapy"];
+
+const PKG_DIRS = {"@moikapy/kapy-components": "kapy-components", "@moikapy/kapy": "kapy", "@moikapy/create-kapy": "create-kapy"};
+
+function getPkgDir(name: string): string {
+  const dir = PKG_DIRS[name as keyof typeof PKG_DIRS] ?? name;
+  return resolve(rootDir, "packages", dir);
+}
 
 function getPkgVersion(name: string): string {
-  const path = resolve(rootDir, "packages", name, "package.json");
-  const pkg = JSON.parse(readFileSync(path, "utf-8"));
+  const pkgDir = getPkgDir(name);
+  const pkg = JSON.parse(readFileSync(resolve(pkgDir, "package.json"), "utf-8"));
   return pkg.version;
 }
 
 function npmPublish(name: string, tag: string, dryRun: boolean): boolean {
-  const pkgDir = resolve(rootDir, "packages", name);
+  const pkgDir = getPkgDir(name);
   const version = getPkgVersion(name);
   const cmd = dryRun
     ? `npm publish --dry-run --access public${tag !== "latest" ? ` --tag ${tag}` : ""}`

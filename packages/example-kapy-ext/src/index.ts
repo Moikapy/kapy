@@ -3,7 +3,7 @@
  *
  * Demonstrates commands, hooks, middleware, and a TUI screen.
  */
-import type { KapyExtensionAPI } from "kapy";
+import type { KapyExtensionAPI } from "@moikapy/kapy";
 
 export async function register(api: KapyExtensionAPI): Promise<void> {
 	// ─── Commands ────────────────────────────────────────────────────

@@ -73,8 +73,8 @@ describe("scaffold", () => {
 		expect(pkg.name).toBe("test-project");
 		expect(pkg.version).toBe("0.1.0");
 		expect(pkg.type).toBe("module");
-		expect(pkg.dependencies).toHaveProperty("kapy");
-		expect(pkg.dependencies).toHaveProperty("kapy-components");
+		expect(pkg.dependencies).toHaveProperty("@moikapy/kapy");
+		expect(pkg.dependencies).toHaveProperty("@moikapy/kapy-components");
 		expect(pkg.scripts).toHaveProperty("dev");
 		expect(pkg.scripts).toHaveProperty("build");
 		expect(pkg.scripts).toHaveProperty("test");
