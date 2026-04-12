@@ -6,17 +6,27 @@
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
-		".": "./dist/index.js"
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
 	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Moikapy/kapy"
+	},
+	"homepage": "https://github.com/Moikapy/kapy#readme",
+	"author": "Moikapy",
 	"files": [
 		"dist"
 	],
 	"scripts": {
 		"dev": "bun run --watch src/index.ts",
-		"build": "bun build src/index.ts --outdir dist --target bun",
+		"build": "bun build src/index.ts --outdir dist --target bun && tsc --emitDeclarationOnly --outDir dist",
 		"test": "bun test",
 		"lint": "biome check src/",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"prepublishOnly": "bun run build"
 	},
 	"dependencies": {
 		"@opentui/core": "^0.1.97"

@@ -8,6 +8,12 @@
 	"bin": {
 		"kapy": "./dist/cli.js"
 	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Moikapy/kapy"
+	},
+	"homepage": "https://github.com/Moikapy/kapy#readme",
+	"author": "Moikapy",
 	"exports": {
 		".": {
 			"import": "./dist/index.js",
@@ -35,10 +41,11 @@
 	],
 	"scripts": {
 		"dev": "bun run --watch src/cli.ts",
-		"build": "bun build src/index.ts src/cli.ts --outdir dist --target bun",
+		"build": "bun build src/index.ts src/cli.ts --outdir dist --target bun && tsc --emitDeclarationOnly --outDir dist",
 		"test": "bun test",
 		"lint": "biome check src/",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"prepublishOnly": "bun run build && bun test"
 	},
 	"dependencies": {
 		"@opentui/core": "^0.1.97",
@@ -55,7 +62,8 @@
 		"extensible",
 		"extensions",
 		"tui",
-		"opentui"
+		"opentui",
+		"kapy-extension"
 	],
 	"license": "MIT"
 }

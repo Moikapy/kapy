@@ -8,7 +8,7 @@
 	],
 	"scripts": {
 		"dev": "bun run --filter './packages/*' dev",
-		"build": "bun run --filter './packages/*' build",
+		"build": "bun run --cwd packages/kapy-components build && bun run --cwd packages/kapy build && bun run --cwd packages/create-kapy build",
 		"test": "bun test packages/kapy/test/index.test.ts packages/kapy/test/integration/ packages/create-kapy/test/",
 		"test:all": "bun test packages/kapy/test/ packages/create-kapy/test/",
 		"lint": "biome check .",

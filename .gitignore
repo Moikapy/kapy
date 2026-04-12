@@ -31,3 +31,5 @@ coverage/
 
 # Secrets (never commit)
 .env.pi/
+.worktrees/
+.env

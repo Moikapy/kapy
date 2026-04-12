@@ -162,8 +162,8 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 
 	async function rebuild(): Promise<void> {
 		// Clear existing tree
-		while (renderer.root.children.length > 0) {
-			renderer.root.remove(renderer.root.children[0] as Renderable);
+		while ((renderer.root as unknown as { children: Renderable[] }).children.length > 0) {
+			(renderer.root as unknown as { children: Renderable[] }).children.pop();
 		}
 
 		// Rebuild layout

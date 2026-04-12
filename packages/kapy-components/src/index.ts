@@ -126,7 +126,6 @@ export interface BoxProps extends ComponentBaseOptions {
 	/** Width */
 	width?: number | string;
 	/** Height */
-	width?: number | string;
 	height?: number | string;
 	/** Whether the box can receive focus */
 	focusable?: boolean;

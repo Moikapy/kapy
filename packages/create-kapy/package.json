@@ -3,6 +3,12 @@
 	"version": "0.1.0",
 	"type": "module",
 	"description": "Scaffolding template for kapy-powered CLI projects",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Moikapy/kapy"
+	},
+	"homepage": "https://github.com/Moikapy/kapy#readme",
+	"author": "Moikapy",
 	"bin": {
 		"create-kapy": "./dist/index.js"
 	},
@@ -11,8 +17,9 @@
 	],
 	"scripts": {
 		"dev": "bun run --watch src/index.ts",
-		"build": "bun build src/index.ts --outdir dist --target bun",
-		"lint": "biome check src/"
+		"build": "bun build src/index.ts --outdir dist --target bun && tsc --emitDeclarationOnly --outDir dist",
+		"lint": "biome check src/",
+		"prepublishOnly": "bun run build"
 	},
 	"devDependencies": {
 		"typescript": "^5.7.0",
