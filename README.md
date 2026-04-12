@@ -175,9 +175,8 @@ Extensions can declare `agentHints` for machine-readable command descriptions. S
 
 | Package | Purpose |
 |---|---|
-| `kapy` | Runtime + CLI + TUI shell. Install this. |
-| `kapy-components` | UI components on @opentui/core (Box, Text, Input, etc.). Re-exported by `kapy`. |
-| `create-kapy` | Scaffolding template for `bun create`. |
+| `@moikapy/kapy` | Runtime + CLI + TUI shell. Install this. |
+| `@moikapy/kapy-components` | UI components on @opentui/core (Box, Text, Input, etc.). Re-exported by `@moikapy/kapy`. |
 
 ## Tech Stack
 

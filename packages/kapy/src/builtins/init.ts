@@ -1,37 +1,8 @@
 /** kapy init — scaffold a new kapy-powered CLI project */
 
-import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { CommandContext } from "../command/context.js";
-
-/** Run a command safely */
-async function runCommand(
-	command: string,
-	args: string[],
-	options?: { cwd?: string; stdio?: "pipe" | "inherit" },
-): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
-	return new Promise((resolve) => {
-		const proc = spawn(command, args, {
-			cwd: options?.cwd,
-			stdio: options?.stdio ?? "pipe",
-		});
-		let stdout = "";
-		let stderr = "";
-		proc.stdout?.on("data", (data: Buffer) => {
-			stdout += data.toString();
-		});
-		proc.stderr?.on("data", (data: Buffer) => {
-			stderr += data.toString();
-		});
-		proc.on("close", (code) => {
-			resolve({ stdout, stderr, exitCode: code });
-		});
-		proc.on("error", (err) => {
-			resolve({ stdout, stderr: stderr + err.message, exitCode: 1 });
-		});
-	});
-}
 
 export const initCommand = async (ctx: CommandContext): Promise<void> => {
 	const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
@@ -49,30 +20,16 @@ export const initCommand = async (ctx: CommandContext): Promise<void> => {
 		ctx.abort(2);
 	}
 
-	const cwd = resolve(process.cwd(), projectName);
+	const dir = resolve(process.cwd(), projectName);
 	const spinner = ctx.spinner(`Scaffolding project: ${projectName}`);
 	spinner.start();
 
 	try {
-		// Try using create-kapy if available
-		const cmd = template ? ["create", "@moikapy/kapy", projectName, "--template"] : ["create", "@moikapy/kapy", projectName];
-
-		const result = await runCommand("bunx", cmd, {
-			cwd: process.cwd(),
-			stdio: ctx.json ? "pipe" : "inherit",
-		});
-
-		if (result.exitCode === 0) {
-			spinner.succeed(`Created ${projectName}`);
-		} else {
-			// create-kapy not available — scaffold manually
-			spinner.update("create-kapy not found, scaffolding manually...");
-			await scaffoldManual(projectName, cwd, template);
-			spinner.succeed(`Created ${projectName}`);
-		}
+		await scaffold(projectName, dir, template);
+		spinner.succeed(`Created ${projectName}`);
 
 		if (ctx.json) {
-			console.log(JSON.stringify({ status: "success", project: projectName, path: cwd }));
+			console.log(JSON.stringify({ status: "success", project: projectName, path: dir }));
 		}
 	} catch (err) {
 		spinner.fail(`Failed to create ${projectName}`);
@@ -80,43 +37,94 @@ export const initCommand = async (ctx: CommandContext): Promise<void> => {
 	}
 };
 
-async function scaffoldManual(name: string, dir: string, _template: boolean): Promise<void> {
+async function scaffold(name: string, dir: string, template: boolean): Promise<void> {
+	// Create directory structure
 	await mkdir(join(dir, ".kapy"), { recursive: true });
 	await mkdir(join(dir, ".kapy", "extensions"), { recursive: true });
-	await mkdir(join(dir, "src"), { recursive: true });
 	await mkdir(join(dir, "src", "commands"), { recursive: true });
+	if (template) {
+		await mkdir(join(dir, "src", "extensions"), { recursive: true });
+	}
 
-	await writeFile(
-		join(dir, "package.json"),
-		`${JSON.stringify(
-			{
-				name,
-				version: "0.1.0",
-				type: "module",
-				main: "./dist/index.js",
-				scripts: { dev: "bun run --watch src/index.ts", build: "bun build src/index.ts --outdir dist --target bun" },
-				dependencies: { kapy: "^0.1.0" },
-				devDependencies: { typescript: "^5.7.0" },
-			},
-			null,
-			2,
-		)}\n`,
-	);
+	// Write all project files
+	await writeKapyConfig(dir);
+	await writePackageJson(dir, name);
+	await writeKapyConfigTs(dir, name);
+	await writeTsConfig(dir);
+	await writeGitignore(dir);
+	await writeSrcIndex(dir, name);
+	await writeDeployCommand(dir);
 
-	await writeFile(
-		join(dir, "kapy.config.ts"),
-		`import { defineConfig } from "@moikapy/kapy";
+	if (template) {
+		await writeExtension(dir, name);
+	}
+}
+
+async function writeKapyConfig(dir: string): Promise<void> {
+	await writeFile(join(dir, ".kapy", "config.json"), `${JSON.stringify({ extensions: {} }, null, 2)}\n`);
+}
+
+async function writePackageJson(dir: string, name: string): Promise<void> {
+	const pkg = {
+		name,
+		version: "0.1.0",
+		type: "module",
+		main: "./dist/index.js",
+		bin: { [name]: "./dist/index.js" },
+		scripts: {
+			dev: "bun run --watch src/index.ts",
+			build: "bun build src/index.ts --outdir dist --target bun",
+			test: "bun test",
+		},
+		dependencies: {
+			"@moikapy/kapy": "^0.1.0",
+			"@moikapy/kapy-components": "^0.1.0",
+		},
+		devDependencies: {
+			typescript: "^5.7.0",
+			"@types/bun": "^1.2.0",
+		},
+	};
+	await writeFile(join(dir, "package.json"), `${JSON.stringify(pkg, null, 2)}\n`);
+}
+
+async function writeKapyConfigTs(dir: string, name: string): Promise<void> {
+	const config = `import { defineConfig } from "@moikapy/kapy";
 
 export default defineConfig({
   name: "${name}",
   extensions: [],
+  middleware: [],
 });
+`;
+	await writeFile(join(dir, "kapy.config.ts"), config);
+}
+
+async function writeTsConfig(dir: string): Promise<void> {
+	const tsconfig = {
+		extends: "./node_modules/@moikapy/kapy/tsconfig.json",
+		compilerOptions: {
+			outDir: "./dist",
+			rootDir: "./src",
+		},
+		include: ["src"],
+	};
+	await writeFile(join(dir, "tsconfig.json"), `${JSON.stringify(tsconfig, null, 2)}\n`);
+}
+
+async function writeGitignore(dir: string): Promise<void> {
+	await writeFile(
+		join(dir, ".gitignore"),
+		`node_modules/
+dist/
+.kapy/
+*.tsbuildinfo
 `,
 	);
+}
 
-	await writeFile(
-		join(dir, "src", "index.ts"),
-		`import { kapy } from "@moikapy/kapy";
+async function writeSrcIndex(dir: string, name: string): Promise<void> {
+	const index = `import { kapy } from "@moikapy/kapy";
 
 kapy()
   .command("hello", {
@@ -126,6 +134,44 @@ kapy()
     ctx.log(\`Hello, \${ctx.args.name}! 👋\`);
   })
   .run();
-`,
-	);
+`;
+	await writeFile(join(dir, "src", "index.ts"), index);
+}
+
+async function writeDeployCommand(dir: string): Promise<void> {
+	const deploy = `import type { CommandHandler } from "@moikapy/kapy";
+
+export const deployCommand: CommandHandler = async (ctx) => {
+  const env = (ctx.args.env as string) ?? "staging";
+  ctx.log(\`Deploying to \${env}...\`);
+
+  // Your deployment logic here
+  ctx.log("✓ Deployment complete!");
+};
+`;
+	await writeFile(join(dir, "src", "commands", "deploy.ts"), deploy);
+}
+
+async function writeExtension(dir: string, name: string): Promise<void> {
+	const ext = `import type { KapyExtensionAPI } from "@moikapy/kapy";
+
+export async function register(api: KapyExtensionAPI) {
+  api.addCommand("hello:ext", {
+    description: "Hello from the ${name} extension",
+  }, async (ctx) => {
+    ctx.log("Hello from extension! 🎉");
+  });
+
+  api.addHook("before:hello", async (ctx) => {
+    ctx.log("Hook: About to say hello...");
+  });
+}
+
+export const meta = {
+  name: "${name}-extension",
+  version: "0.1.0",
+  dependencies: [],
+};
+`;
+	await writeFile(join(dir, "src", "extensions", "index.ts"), ext);
 }

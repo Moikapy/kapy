@@ -28,7 +28,7 @@ jobs:
         run: bun run build
 
       - name: Run tests
-        run: bun test packages/kapy/test/ packages/create-kapy/test/
+        run: bun test packages/kapy/test/
 
       - name: Extract version from tag
         id: version
@@ -58,20 +58,19 @@ jobs:
             ${{ steps.changelog.outputs.CHANGES }}
 
             ### Packages
-            - `kapy@${{ steps.version.outputs.VERSION }}` — CLI framework
-            - `kapy-components@${{ steps.version.outputs.VERSION }}` — TUI components
-            - `create-kapy@${{ steps.version.outputs.VERSION }}` — Project scaffolding
+            - `@moikapy/kapy@${{ steps.version.outputs.VERSION }}` — CLI framework
+            - `@moikapy/kapy-components@${{ steps.version.outputs.VERSION }}` — TUI components
 
             ### Install
             ```bash
-            bun add -g kapy
-            # or
-            npm install -g kapy
+            bun add @moikapy/kapy
+            # or globally
+            bun add -g @moikapy/kapy
             ```
 
             ### Quick Start
             ```bash
-            bunx create-kapy my-cli
+            npx @moikapy/kapy init my-cli
             cd my-cli
             bun dev
             ```
@@ -83,7 +82,7 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish kapy-components to npm
+      - name: Publish @moikapy/kapy-components to npm
         working-directory: packages/kapy-components
         run: |
           CURRENT=$(node -p "require('./package.json').version")
@@ -92,17 +91,8 @@ jobs:
           fi
           npm publish --access public --tag ${{ contains(steps.version.outputs.VERSION, '-') && 'next' || 'latest' }}
 
-      - name: Publish kapy to npm
+      - name: Publish @moikapy/kapy to npm
         working-directory: packages/kapy
-        run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          if [ "$CURRENT" != "${{ steps.version.outputs.VERSION }}" ]; then
-            npm version --no-git-tag-version ${{ steps.version.outputs.VERSION }}
-          fi
-          npm publish --access public --tag ${{ contains(steps.version.outputs.VERSION, '-') && 'next' || 'latest' }}
-
-      - name: Publish create-kapy to npm
-        working-directory: packages/create-kapy
         run: |
           CURRENT=$(node -p "require('./package.json').version")
           if [ "$CURRENT" != "${{ steps.version.outputs.VERSION }}" ]; then

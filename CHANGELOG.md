@@ -60,8 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Composable middleware pipeline with `next()` pattern
 
 **Scaffolding**
-- `create-kapy` / `bun create kapy` project template
-- Generates `kapy.config.ts`, `.kapy/`, `src/index.ts`, example command
+- `kapy init <name>` — built-in project scaffold (replaces create-kapy)
+- Generates `kapy.config.ts`, `.kapy/`, `src/index.ts`, example command, `.gitignore`, `tsconfig.json`
+- `--template` flag for extension template
 
 **Documentation**
 - README with quickstart guide
@@ -70,5 +71,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Infrastructure
 - `~/.kapy/cache/` directory support with `ensureKapyDirs()`
 - `KAPY_HOME`, `EXTENSIONS_DIR`, `CACHE_DIR` exported constants
-- Type declarations generated for all 3 packages
-- Build system: `bun build` + `tsc --emitDeclarationOnly`
+- Type declarations generated for both packages
+- Build system: `bun build` + `tsc --emitDeclarationOnly` for kapy and kapy-components

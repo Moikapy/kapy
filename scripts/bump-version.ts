@@ -22,7 +22,6 @@ const rootDir = resolve(__dirname, "..");
 const PACKAGES = {
 	"@moikapy/kapy-components": "kapy-components",
 	"@moikapy/kapy": "kapy",
-	"@moikapy/create-kapy": "create-kapy",
 };
 
 function readPkg(pkgDir: string) {

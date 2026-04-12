@@ -11,13 +11,11 @@ Monorepo with three packages:
 ```
 packages/
 ├── kapy/                  # Runtime + CLI bin + TUI shell
-├── kapy-components/       # UI components on @opentui/core
-└── create-kapy/           # Scaffolding template (bun create)
+└── kapy-components/       # UI components on @opentui/core
 ```
 
-- **kapy**: CLI entry point, command registry, hooks, middleware, extension loader, config, TUI shell
+- **kapy**: CLI entry point, command registry, hooks, middleware, extension loader, config, TUI shell, scaffolding (`kapy init`)
 - **kapy-components**: Reusable UI components (Box, Text, Input, Select, ScrollBox, Code, Diff, Spinner)
-- **create-kapy**: Project scaffolding only, not a runtime dependency
 
 Dependency flow: `kapy → kapy-components → @opentui/core`. Kapy re-exports kapy-components.
 

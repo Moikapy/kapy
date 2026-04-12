@@ -11,8 +11,8 @@
  *   - Must be logged in: npm whoami
  *   - Build must pass: bun run build && bun test
  *
- * Publish order: kapy-components → kapy → create-kapy
- *   (kapy depends on kapy-components, create-kapy depends on kapy)
+ * Publish order: kapy-components → kapy
+ *   (kapy depends on kapy-components)
  */
 
 import { execSync } from "node:child_process";
@@ -23,9 +23,9 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
 
-const PACKAGES = ["@moikapy/kapy-components", "@moikapy/kapy", "@moikapy/create-kapy"];
+const PACKAGES = ["@moikapy/kapy-components", "@moikapy/kapy"];
 
-const PKG_DIRS = {"@moikapy/kapy-components": "kapy-components", "@moikapy/kapy": "kapy", "@moikapy/create-kapy": "create-kapy"};
+const PKG_DIRS = {"@moikapy/kapy-components": "kapy-components", "@moikapy/kapy": "kapy"};
 
 function getPkgDir(name: string): string {
   const dir = PKG_DIRS[name as keyof typeof PKG_DIRS] ?? name;
@@ -102,7 +102,7 @@ function main() {
   // Verify tests pass
   console.log(`\n🧪 Running tests...`);
   try {
-    execSync("bun test packages/kapy/test/ packages/create-kapy/test/", { cwd: rootDir, stdio: "inherit" });
+    execSync("bun test packages/kapy/test/", { cwd: rootDir, stdio: "inherit" });
   } catch {
     console.error("❌ Tests failed. Fix failures before publishing.");
     process.exit(1);
