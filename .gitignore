@@ -10,6 +10,9 @@ dist/
 # Kapy
 .kapy/
 
+# Codebase wiki
+.codebase-wiki/
+
 # Pi agent
 .pi/
 
@@ -34,3 +37,4 @@ coverage/
 .worktrees/
 .env
 docs/
+.wiki/
