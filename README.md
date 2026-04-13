@@ -173,6 +173,45 @@ Extensions declare `agentHints` — structured metadata that AI agents can parse
 
 Compose extensions into agent toolchains. Hooks and middleware let you inject auth, rate-limiting, logging, and retries without touching command logic.
 
+## Command Context API
+
+Every command handler receives a `ctx` object:
+
+```ts
+async (ctx) => {
+  // Basic
+  ctx.args                    // Parsed args + flags
+  ctx.config                  // Merged config
+  ctx.log(msg)                // Styled success output
+  ctx.warn(msg)               // Styled warning
+  ctx.error(msg)              // Styled error
+  ctx.spinner(text)           // Progress spinner
+  ctx.prompt(msg)             // Interactive input
+  ctx.confirm(msg)            // Yes/no confirm
+  ctx.abort(code?)            // Cancel execution
+
+  // Process-Aware (v0.2.0+)
+  ctx.isInteractive           // True when TTY + !json + !noInput
+  ctx.spawn(cmd, opts?)       // Spawn subprocess (TTY passthrough, abort-safe)
+  ctx.exitCode                // Writable exit code (propagated to process.exit)
+  ctx.teardown(fn)            // Register cleanup callback (LIFO, async-safe)
+}
+```
+
+### `ctx.spawn()` Options
+
+```ts
+const result = await ctx.spawn(["tmux", "new-session", "-s", "dev"], {
+  tty: true,           // Pass through stdin/stdout/stderr for interactive processes
+  stream: false,       // Stream output in real-time (default: collect)
+  env: { FOO: "bar" }, // Merge env vars with process.env
+  cwd: "/tmp",         // Working directory
+  abortOnError: true,  // Auto-kill process on ctx.abort()
+  suppressOutput: true, // Suppress stdout in --json mode
+})
+// result: { exitCode, stdout, stderr, aborted }
+```
+
 ## Packages
 
 | Package | Purpose |
@@ -183,6 +222,18 @@ Compose extensions into agent toolchains. Hooks and middleware let you inject au
 ## Tech Stack
 
 TypeScript · Bun · @opentui/core · picocolors · Biome
+
+## Exit Codes
+
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 1 | General error |
+| 2 | Invalid arguments / unknown command |
+| 3 | Extension error |
+| 4 | Config error |
+| 5 | Network error |
+| 10 | Aborted by hook/middleware |
 
 ## License
 
