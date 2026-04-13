@@ -4,6 +4,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CommandContext } from "../command/context.js";
+import { detectPackageManagers, getInstallArgs } from "./package-managers.js";
 
 /** Run a command safely without shell injection */
 async function runCommand(
@@ -61,6 +62,10 @@ export const updateCommand = async (ctx: CommandContext): Promise<void> => {
 	const entries = name ? { [name]: manifest[name] } : manifest;
 	let updated = 0;
 
+	// Detect available package managers once
+	const available = detectPackageManagers();
+	const pm = available[0] ?? "npm";
+
 	for (const [extName, info] of Object.entries(entries)) {
 		if (!info) {
 			ctx.warn(`Extension "${extName}" not found.`);
@@ -75,28 +80,32 @@ export const updateCommand = async (ctx: CommandContext): Promise<void> => {
 
 			if (info.source.startsWith("npm:")) {
 				const pkg = info.source.slice(4);
-				result = await runCommand("bun", ["add", "-g", pkg], {
+				const args = getInstallArgs(pm, pkg) ?? ["install", "-g", pkg];
+				result = await runCommand(pm, args, {
 					stdio: ctx.json ? "pipe" : "inherit",
 				});
-				manifest[extName].installedAt = new Date().toISOString();
-				updated++;
-				spinner.succeed(`Updated ${extName}`);
+				if (result.exitCode === 0 || result.exitCode === null) {
+					manifest[extName].installedAt = new Date().toISOString();
+					updated++;
+					spinner.succeed(`Updated ${extName}`);
+				} else {
+					spinner.fail(`Failed to update ${extName}`);
+				}
 			} else if (info.source.startsWith("git:")) {
 				const extDir = join(homedir(), ".kapy", "extensions", extName);
 				result = await runCommand("git", ["-C", extDir, "pull"], {
 					stdio: ctx.json ? "pipe" : "inherit",
 				});
-				manifest[extName].installedAt = new Date().toISOString();
-				updated++;
-				spinner.succeed(`Updated ${extName}`);
+				if (result.exitCode === 0 || result.exitCode === null) {
+					manifest[extName].installedAt = new Date().toISOString();
+					updated++;
+					spinner.succeed(`Updated ${extName}`);
+				} else {
+					spinner.fail(`Failed to update ${extName}`);
+				}
 			} else {
 				spinner.stop();
 				ctx.warn(`Cannot update local extension: ${extName}`);
-				continue;
-			}
-
-			if (result.exitCode !== 0 && result.exitCode !== null) {
-				spinner.fail(`Failed to update ${extName}`);
 			}
 		} catch {
 			spinner.fail(`Failed to update ${extName}`);
