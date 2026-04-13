@@ -37,4 +37,7 @@ coverage/
 .worktrees/
 .env
 docs/
+
+# Codebase wiki
+.codebase-wiki/
 .wiki/
