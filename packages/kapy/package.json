@@ -1,6 +1,6 @@
 {
 	"name": "@moikapy/kapy",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"type": "module",
 	"description": "The agent-first CLI framework — build AI tools from the terminal. Extensible commands, hooks, middleware, TUI.",
 	"main": "./dist/index.js",
@@ -49,7 +49,7 @@
 	},
 	"dependencies": {
 		"@opentui/core": "^0.1.97",
-		"@moikapy/kapy-components": "^0.1.2",
+		"@moikapy/kapy-components": "^0.1.3",
 		"picocolors": "^1.1.0"
 	},
 	"devDependencies": {
