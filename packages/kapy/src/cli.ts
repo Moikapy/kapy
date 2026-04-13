@@ -232,7 +232,12 @@ async function runCLI(
 	});
 	registry.register({
 		name: "upgrade",
-		options: withUniversalFlags({ description: "Upgrade kapy itself to the latest version" }),
+		options: withUniversalFlags({
+			description: "Upgrade kapy itself to the latest version",
+			flags: {
+				pm: { type: "string" as const, description: "Package manager to use (bun, npm, yarn, pnpm)" },
+			},
+		}),
 		handler: upgradeCommand,
 		agentHints: {
 			purpose: "Upgrade kapy itself to the latest version",

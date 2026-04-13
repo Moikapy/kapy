@@ -62,7 +62,7 @@ kapy()
 | `kapy list` | Show installed extensions |
 | `kapy update [name]` | Update all or a specific extension |
 | `kapy remove <name>` | Uninstall an extension |
-| `kapy upgrade` | Upgrade kapy itself to the latest version |
+| `kapy upgrade [--pm <bun|npm|yarn|pnpm>]` | Upgrade kapy (auto-detects package manager) |
 | `kapy config` | View/edit configuration |
 | `kapy dev` | Run CLI in dev mode with hot reload |
 | `kapy commands` | List all registered commands |
