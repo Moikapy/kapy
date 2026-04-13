@@ -12,7 +12,7 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -31,7 +31,7 @@ function readPkg(pkgDir: string) {
 
 function writePkg(pkgDir: string, pkg: Record<string, unknown>) {
 	const { path } = readPkg(pkgDir);
-	writeFileSync(path, JSON.stringify(pkg, null, "\t") + "\n");
+	writeFileSync(path, `${JSON.stringify(pkg, null, "\t")}\n`);
 }
 
 function bumpVersion(current: string, semver: string): string {
@@ -41,9 +41,12 @@ function bumpVersion(current: string, semver: string): string {
 	const [bMajor, bMinor, bPatch] = base.split(".").map(Number);
 
 	switch (semver) {
-		case "patch": return `${bMajor}.${bMinor}.${bPatch + 1}`;
-		case "minor": return `${bMajor}.${bMinor + 1}.0`;
-		case "major": return `${bMajor + 1}.0.0`;
+		case "patch":
+			return `${bMajor}.${bMinor}.${bPatch + 1}`;
+		case "minor":
+			return `${bMajor}.${bMinor + 1}.0`;
+		case "major":
+			return `${bMajor + 1}.0.0`;
 		default:
 			console.error(`Invalid version bump: "${semver}"`);
 			console.error("Use: patch, minor, major, or an exact version like 0.2.0");
@@ -79,7 +82,7 @@ function main() {
 			const deps = pkg[depField] as Record<string, string> | undefined;
 			if (!deps) continue;
 			for (const internalPkg of scopedNames) {
-				if (deps[internalPkg] && deps[internalPkg].startsWith("^")) {
+				if (deps[internalPkg]?.startsWith("^")) {
 					deps[internalPkg] = `^${newVersion}`;
 				} else if (deps[internalPkg]) {
 					deps[internalPkg] = newVersion;

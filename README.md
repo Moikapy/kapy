@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="./assets/capybara.webp" alt="Kapy — the pi.dev for CLI" width="256" />
+  <img src="./assets/capybara.webp" alt="Kapy — the agent-first CLI framework" width="256" />
 </p>
 
 <h1 align="center">kapy 🐹</h1>
 
 <p align="center">
-  <strong>The pi.dev for CLI</strong><br/>
-  An extensible CLI framework with first-class support for extensions, hooks, middleware, and a built-in TUI.
+  <strong>The agent-first CLI framework</strong><br/>
+  Build AI tools from the terminal. Commands, hooks, middleware, TUI — everything snaps together.
 </p>
 
 <p align="center">
@@ -159,9 +159,9 @@ KAPY_DEPLOY_AWS_REGION=us-west-2 kapy deploy:aws
 MY_CLI_DEPLOY_AWS_REGION=us-west-2 my-cli deploy:aws
 ```
 
-## AI Agent Compatibility
+## AI Agent Support
 
-All commands support `--json` and `--no-input` for machine-readable output:
+Kapy puts agents first. Every command supports `--json` and `--no-input` for machine-readable, non-interactive output:
 
 ```bash
 kapy commands --json
@@ -169,14 +169,16 @@ kapy deploy:aws --json --no-input
 kapy inspect --json
 ```
 
-Extensions can declare `agentHints` for machine-readable command descriptions. Structured exit codes: `0` success, `1` error, `2` invalid args, `3` extension error, `4` config error, `5` network error, `10` aborted.
+Extensions declare `agentHints` — structured metadata that AI agents can parse to understand what a command does and how to call it. Structured exit codes give agents unambiguous signal: `0` success, `1` error, `2` invalid args, `3` extension error, `4` config error, `5` network error, `10` aborted by hook/middleware.
+
+Compose extensions into agent toolchains. Hooks and middleware let you inject auth, rate-limiting, logging, and retries without touching command logic.
 
 ## Packages
 
 | Package | Purpose |
 |---|---|
-| `@moikapy/kapy` | Runtime + CLI + TUI shell. Install this. |
-| `@moikapy/kapy-components` | UI components on @opentui/core (Box, Text, Input, etc.). Re-exported by `@moikapy/kapy`. |
+| `@moikapy/kapy` | Runtime + CLI bin + TUI shell + agent support. Install this. |
+| `@moikapy/kapy-components` | UI components on @opentui/core (Banner, Box, Text, Input, Select, ScrollBox, Code, Diff, Spinner, Sidebar, StatusBar). Re-exported by `@moikapy/kapy`. |
 
 ## Tech Stack
 

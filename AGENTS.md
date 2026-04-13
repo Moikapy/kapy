@@ -2,7 +2,7 @@
 
 ## Project
 
-**Kapy** — the pi.dev for CLI. An extensible CLI framework with first-class support for extensions, hooks, middleware, and a built-in TUI.
+**Kapy** — the agent-first CLI framework. Build AI tools from the terminal. Commands, hooks, middleware, TUI — everything snaps together.
 
 ## Architecture
 

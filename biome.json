@@ -15,6 +15,11 @@
 	"files": {
 		"includes": ["**/*.ts", "**/*.js", "**/*.yml", "**/*.yaml"]
 	},
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"

@@ -2,7 +2,7 @@
 	"name": "@moikapy/kapy",
 	"version": "0.1.1",
 	"type": "module",
-	"description": "The pi.dev for CLI — extensible CLI framework with extensions, hooks, middleware, and TUI",
+	"description": "The agent-first CLI framework — build AI tools from the terminal. Extensible commands, hooks, middleware, TUI.",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"bin": {
