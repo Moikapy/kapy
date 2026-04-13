@@ -1,6 +1,6 @@
 {
 	"name": "@moikapy/kapy",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"type": "module",
 	"description": "The agent-first CLI framework — build AI tools from the terminal. Extensible commands, hooks, middleware, TUI.",
 	"main": "./dist/index.js",

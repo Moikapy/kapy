@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { DEFAULT_ENV_PREFIX, getDefaultConfig } from "./defaults.js";
 import { deepMergeConfigs } from "./loader-merge.js";
 import type { ConfigSource, GlobalConfig, MergedConfig, ProjectConfig } from "./schema.js";
+import { formatErrors, validateProjectConfig } from "./validator.js";
 
 /** Load and merge all config sources */
 export async function loadConfig(options?: {
@@ -31,6 +32,12 @@ export async function loadConfig(options?: {
 	// 2. Project config from kapy.config.ts
 	const projectConfig = await loadProjectConfig(cwd);
 	if (projectConfig) {
+		// Validate project config
+		const configErrors = validateProjectConfig(projectConfig as Record<string, unknown>);
+		if (configErrors.length > 0) {
+			console.warn(`[kapy] ${formatErrors(configErrors)}`);
+		}
+
 		sources.set("project", projectConfig);
 		// Extensions and middleware from project config aren't merged into the runtime config
 		// They're used by the extension loader and middleware pipeline

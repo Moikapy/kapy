@@ -47,6 +47,14 @@ export {
 	loadConfig,
 	parseEnvConfig,
 } from "./config/index.js";
+export type { DescribedField } from "./config/validator.js";
+export {
+	describeSchema,
+	formatErrors,
+	validate,
+	validateExtensionMeta,
+	validateProjectConfig,
+} from "./config/validator.js";
 export type {
 	ExtensionMeta,
 	ExtensionRegister,

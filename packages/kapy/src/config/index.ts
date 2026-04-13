@@ -18,3 +18,11 @@ export type {
 	ProjectConfig,
 } from "./schema.js";
 export { ConfigSourcePriority } from "./schema.js";
+export type { DescribedField } from "./validator.js";
+export {
+	describeSchema,
+	formatErrors,
+	validate,
+	validateExtensionMeta,
+	validateProjectConfig,
+} from "./validator.js";

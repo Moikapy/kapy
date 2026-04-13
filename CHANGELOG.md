@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-04-13
+
+### Added
+
+**Homebrew Validator**
+- `validate(schema, data, namespace)` — validate runtime data against ConfigSchema. Returns human-readable errors like `deploy.region: expected string, got number`.
+- `validateProjectConfig(config)` — validate kapy.config.ts at load time. Checks field types, required fields, and array item types.
+- `validateExtensionMeta(meta)` — validate extension metadata at registration time. Checks name/version required, type correctness, dependency arrays.
+- `describeSchema(schema)` — introspect ConfigSchema for agent consumption. Returns structured field descriptions with type, required, description, enum, default.
+- `formatErrors(errors)` — format validation errors into human-readable strings (single or bulleted).
+
+### Changed
+
+- Config loader now Validates project config on load and warns on errors
+- Extension loader now Validates extension metadata on registration and warns on errors
+- `kapy inspect --json` now includes `configSchemas` with `describeSchema()` output for each extension's declared config
+- `kapy inspect` (text mode) now shows config schema field details
+
 ## [0.2.0] - 2026-04-13
 
 ### Added

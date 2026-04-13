@@ -11,6 +11,7 @@ import { join, resolve } from "node:path";
 import { CommandContext } from "../command/context.js";
 import type { CommandRegistry } from "../command/registry.js";
 import type { ConfigSchema } from "../config/schema.js";
+import { formatErrors, validateExtensionMeta } from "../config/validator.js";
 import { ExtensionEmitter } from "../hooks/emitter.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
@@ -142,6 +143,12 @@ export class ExtensionLoader {
 			if (!register) {
 				console.warn(`[kapy] Extension "${name}" has no register() export. Skipping.`);
 				return null;
+			}
+
+			// Validate extension metadata
+			const metaErrors = validateExtensionMeta(meta as unknown as Record<string, unknown>);
+			if (metaErrors.length > 0) {
+				console.warn(`[kapy] Extension "${name}" has invalid metadata:\n${formatErrors(metaErrors)}`);
 			}
 
 			// Warn about declared permissions (documentation-only for MVP)

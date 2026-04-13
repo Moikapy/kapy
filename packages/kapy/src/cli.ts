@@ -295,7 +295,12 @@ async function runCLI(
 		options: withUniversalFlags({
 			description: "Dump full state (extensions, config, hooks, middleware)",
 		}),
-		handler: createInspectCommand(registry, userMiddlewares, extensionLoader.getHooks()),
+		handler: createInspectCommand(
+			registry,
+			userMiddlewares,
+			extensionLoader.getHooks(),
+			extensionLoader.getConfigSchemas(),
+		),
 		agentHints: {
 			purpose: "Dump full kapy state including extensions, config, hooks, and middleware",
 			when: "Debugging or auditing the CLI state",

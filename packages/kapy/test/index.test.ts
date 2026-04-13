@@ -59,13 +59,13 @@ describe("CommandRegistry", () => {
 		expect(subs.map((s) => s.name).sort()).toEqual(["deploy:aws", "deploy:gcp"]);
 	});
 
-	it("warns on duplicate command and uses last-loaded", () => {
+	it("first-registered wins on duplicate command", () => {
 		const registry = new CommandRegistry();
 		registry.register({ name: "test", options: { description: "First" }, handler: async () => {} });
 		registry.register({ name: "test", options: { description: "Second" }, handler: async () => {} });
 
 		const cmd = registry.get("test");
-		expect(cmd?.options.description).toBe("Second");
+		expect(cmd?.options.description).toBe("First");
 	});
 
 	it("returns null for unknown command", () => {

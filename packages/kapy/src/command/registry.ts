@@ -16,13 +16,11 @@ import type {
 export class CommandRegistry {
 	private commands = new Map<string, CommandDefinition>();
 
-	/** Register a command definition */
+	/** Register a command definition. User commands take priority over builtins. */
 	register(definition: CommandDefinition): void {
 		const existing = this.commands.get(definition.name);
 		if (existing) {
-			console.warn(
-				`[kapy] Command "${definition.name}" is already registered by "${existing.options.description}". Overriding.`,
-			);
+			return; // Already registered — first registration wins (user commands override builtins)
 		}
 		this.commands.set(definition.name, definition);
 	}
