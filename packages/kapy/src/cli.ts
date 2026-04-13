@@ -13,7 +13,7 @@ import {
 	updateCommand,
 	upgradeCommand,
 } from "./builtins/index.js";
-import { CommandContext } from "./command/context.js";
+import { AbortError, CommandContext } from "./command/context.js";
 /**
  * kapy — Extensible CLI framework.
  *
@@ -435,6 +435,10 @@ async function runCLI(
 				}
 			}
 		}
+
+		// Run teardown even on error
+		await ctx.runTeardowns();
+
 		throw err;
 	}
 
@@ -443,6 +447,14 @@ async function runCLI(
 	// JSON output for successful commands
 	if (jsonMode && !ctx.aborted) {
 		console.log(JSON.stringify({ status: "success", command: ctx.command, duration: ctx.duration }));
+	}
+
+	// Run teardown callbacks (cleanup processes, temp files, etc.)
+	await ctx.runTeardowns();
+
+	// Propagate exit code if non-zero
+	if (ctx.exitCode !== 0) {
+		process.exit(ctx.exitCode);
 	}
 }
 
@@ -466,5 +478,10 @@ function handleKapyError(err: unknown, jsonMode: boolean): never {
 if (import.meta.main) {
 	kapy()
 		.run()
-		.catch((err) => handleKapyError(err, process.argv.includes("--json")));
+		.catch((err) => {
+			if (err instanceof AbortError) {
+				process.exit(err.exitCode);
+			}
+			handleKapyError(err, process.argv.includes("--json"));
+		});
 }

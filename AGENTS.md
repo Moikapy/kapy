@@ -41,9 +41,23 @@ Dependency flow: `kapy → kapy-components → @opentui/core`. Kapy re-exports k
 
 ## Command System
 
-- Commands use `ctx` object: `ctx.args`, `ctx.config`, `ctx.log/warn/error`, `ctx.spinner`, `ctx.prompt`, `ctx.abort()`
+- Commands use `ctx` object: `ctx.args`, `ctx.config`, `ctx.log/warn/error`, `ctx.spinner`, `ctx.prompt`, `ctx.abort()`, `ctx.spawn()`, `ctx.teardown()`, `ctx.exitCode`, `ctx.isInteractive`
 - `--json` and `--no-input` injected automatically
 - Nested commands use `:` separator (e.g., `deploy:aws`)
+
+### Process-Aware ctx API (v0.2.0+)
+
+- **`ctx.spawn(cmd, opts?)`** — Subprocess helper with TTY passthrough, abort integration, and output control
+  - `tty: true` — pass through stdin/stdout/stderr for interactive processes
+  - `stream: true` — real-time output instead of buffering
+  - `env` / `cwd` — custom environment and working directory
+  - `abortOnError` — auto-kill process on `ctx.abort()`, registers teardown
+  - `suppressOutput` — control stdout/stderr in `--json` mode
+  - Returns `{ exitCode, stdout, stderr, aborted }`
+- **`ctx.isInteractive`** — computed getter: `!noInput && !json && !!process.stdout.isTTY`
+- **`ctx.exitCode`** — writable exit code. User-set takes priority over abort code.
+- **`ctx.teardown(fn)`** — register cleanup callbacks (LIFO, async-safe, error-resilient)
+- **`ctx.runTeardowns()`** — called by CLI runner after command execution (success or error)
 
 ## Extension API
 

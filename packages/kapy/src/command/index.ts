@@ -1,3 +1,4 @@
+export type { SpawnOptions, SpawnResult, TeardownCallback } from "./context.js";
 export { AbortError, CommandContext, Spinner } from "./context.js";
 export type {
 	AgentHints,

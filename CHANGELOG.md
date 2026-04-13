@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-13
+
+### Added
+
+**CommandContext — Process-Aware Extensions**
+- `ctx.spawn(cmd, opts?)` — blessed subprocess helper using Bun.spawn
+  - `tty: true` passes through stdin/stdout/stderr for interactive processes (tmux, shells)
+  - `stream: true` outputs in real-time instead of buffering
+  - `env` merges custom env vars with `process.env`
+  - `cwd` sets working directory
+  - `abortOnError` auto-kills process via abort signal + teardown registration
+  - `suppressOutput` controls output behavior in `--json` mode
+  - Returns `{ exitCode, stdout, stderr, aborted }`
+- `ctx.isInteractive` — computed getter: `!noInput && !json && !!process.stdout.isTTY`
+- `ctx.exitCode` — writable property for exit code propagation, user-set priority over abort code
+- `ctx.teardown(fn)` — register cleanup callbacks (LIFO order, async-safe, error-resilient)
+- `ctx.runTeardowns()` — called by CLI runner after command execution (success or error)
+- CLI runner propagates `ctx.exitCode` via `process.exit()` if non-zero
+- CLI runner catches `AbortError` at top level and exits with abort code
+
+### Changed
+
+- `CommandContext._exitCode` split into `_userExitCode` (explicit setter) and `_abortExitCode` (from abort)
+- `CommandContext` no longer has a single `_exitCode` field — `exitCode` getter returns `_userExitCode ?? _abortExitCode`
+
 ## [0.1.0] - 2025-04-12
 
 ### Added

@@ -22,6 +22,7 @@ export {
 } from "./builtins/index.js";
 export type { KapyBuilder } from "./cli.js";
 export { defineConfig, kapy } from "./cli.js";
+export type { SpawnOptions, SpawnResult, TeardownCallback } from "./command/context.js";
 export { AbortError, CommandContext } from "./command/context.js";
 // Command system
 export { CommandRegistry, parseArgs } from "./command/index.js";
