@@ -352,7 +352,7 @@ async function runCLI(
 			);
 		} else {
 			console.log("");
-			console.log("  🐹 kapy — the pi.dev for CLI");
+			console.log("  🐹 kapy — the agent-first CLI framework");
 			console.log("");
 			console.log("Usage: kapy <command> [flags]");
 			console.log("");

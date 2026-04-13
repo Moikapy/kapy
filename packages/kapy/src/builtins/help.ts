@@ -27,7 +27,7 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 				);
 			} else {
 				ctx.log("");
-				ctx.log("  🐹 kapy — the pi.dev for CLI");
+				ctx.log("  🐹 kapy — the agent-first CLI framework");
 				ctx.log("");
 				ctx.log("Usage: kapy <command> [flags]");
 				ctx.log("");

@@ -1,60 +1,9 @@
 /** kapy upgrade — upgrade kapy itself to the latest version */
-import { execSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import type { CommandContext } from "../command/context.js";
+import { detectPackageManagers, getInstallArgs } from "./package-managers.js";
 
 const PKG = "@moikapy/kapy";
-
-/** Package managers and their global install commands */
-const PACKAGE_MANAGERS = [
-	{
-		name: "bun",
-		detect: () => {
-			try {
-				execSync("bun --version", { stdio: "pipe" });
-				return true;
-			} catch {
-				return false;
-			}
-		},
-		args: ["add", "-g", `${PKG}@latest`],
-	},
-	{
-		name: "npm",
-		detect: () => {
-			try {
-				execSync("npm --version", { stdio: "pipe" });
-				return true;
-			} catch {
-				return false;
-			}
-		},
-		args: ["install", "-g", `${PKG}@latest`],
-	},
-	{
-		name: "yarn",
-		detect: () => {
-			try {
-				execSync("yarn --version", { stdio: "pipe" });
-				return true;
-			} catch {
-				return false;
-			}
-		},
-		args: ["global", "add", `${PKG}@latest`],
-	},
-	{
-		name: "pnpm",
-		detect: () => {
-			try {
-				execSync("pnpm --version", { stdio: "pipe" });
-				return true;
-			} catch {
-				return false;
-			}
-		},
-		args: ["add", "-g", `${PKG}@latest`],
-	},
-] as const;
 
 /** Run a command safely without shell injection */
 async function runCommand(
@@ -79,17 +28,6 @@ async function runCommand(
 			resolve({ stdout, stderr: stderr + err.message, exitCode: 1 });
 		});
 	});
-}
-
-/** Detect which package managers are available on this system */
-function detectPackageManagers(): string[] {
-	return PACKAGE_MANAGERS.filter((pm) => pm.detect()).map((pm) => pm.name);
-}
-
-/** Get the command args for a given package manager */
-function getUpgradeArgs(pmName: string): string[] | null {
-	const pm = PACKAGE_MANAGERS.find((p) => p.name === pmName);
-	return pm ? [...pm.args] : null;
 }
 
 export const upgradeCommand = async (ctx: CommandContext): Promise<void> => {
@@ -126,7 +64,7 @@ export const upgradeCommand = async (ctx: CommandContext): Promise<void> => {
 	const errors: string[] = [];
 
 	for (const pmName of candidates) {
-		const args = getUpgradeArgs(pmName);
+		const args = getInstallArgs(pmName, `${PKG}@latest`);
 		if (!args) continue;
 
 		spinner.update(`Upgrading via ${pmName}...`);
@@ -145,7 +83,7 @@ export const upgradeCommand = async (ctx: CommandContext): Promise<void> => {
 	}
 
 	if (!upgraded) {
-		const hint = candidates.map((pm) => `${pm} ${getUpgradeArgs(pm)?.join(" ") ?? ""}`).join("\n  ");
+		const hint = candidates.map((pm) => `${pm} ${getInstallArgs(pm, `${PKG}@latest`)?.join(" ") ?? ""}`).join("\n  ");
 		spinner.fail(`Failed to upgrade kapy. Try manually:\n  ${hint}`);
 	}
 

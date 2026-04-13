@@ -21,10 +21,9 @@ export const homeScreen: ScreenDefinition = {
 
 		const lines = [
 			"",
-			"  🐹 kapy — the pi.dev for CLI",
+			"  🐹 kapy — the agent-first CLI framework",
 			"",
-			"  An extensible CLI framework with first-class support for",
-			"  extensions, hooks, middleware, and a built-in TUI.",
+			"  Build AI tools from the terminal. Commands, hooks, middleware, TUI — everything snaps together.",
 			"",
 			`  📦 ${extCount} extension${extCount !== 1 ? "s" : ""} installed`,
 			"",

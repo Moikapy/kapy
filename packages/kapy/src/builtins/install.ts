@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import type { CommandContext } from "../command/context.js";
 import { ensureKapyDirs } from "../config/defaults.js";
 import type { ExtensionMeta } from "../extension/types.js";
+import { detectPackageManagers, getInstallArgs } from "./package-managers.js";
 
 /** Run a command safely without shell injection */
 async function runCommand(
@@ -120,7 +121,9 @@ export const installCommand = async (ctx: CommandContext): Promise<void> => {
 		if (source.startsWith("npm:")) {
 			const fullPkg = source.slice(4);
 			pkgName = fullPkg.split("@")[0] || fullPkg;
-			installResult = await runCommand("bun", ["add", "-g", fullPkg], {
+			const available = detectPackageManagers();
+			const pm = available[0] ?? "npm";
+			installResult = await runCommand(pm, getInstallArgs(pm, fullPkg) ?? ["install", "-g", fullPkg], {
 				stdio: ctx.json ? "pipe" : "inherit",
 			});
 		} else if (source.startsWith("git:")) {
@@ -136,7 +139,9 @@ export const installCommand = async (ctx: CommandContext): Promise<void> => {
 			installResult = { stdout: "", stderr: "", exitCode: 0 };
 		} else {
 			pkgName = source;
-			installResult = await runCommand("bun", ["add", "-g", source], {
+			const available = detectPackageManagers();
+			const pm = available[0] ?? "npm";
+			installResult = await runCommand(pm, getInstallArgs(pm, source) ?? ["install", "-g", source], {
 				stdio: ctx.json ? "pipe" : "inherit",
 			});
 		}
