@@ -108,21 +108,25 @@ async function runCLI(
 	const noInput = globalArgs["no-input"] === true;
 
 	// Load config
-	const { config: mergedConfig } = await loadConfig({
+	const { config: mergedConfig, projectConfig: loadedProjectConfig } = await loadConfig({
 		projectDir: process.cwd(),
 		envPrefix: projectConfig.envPrefix,
 		cliFlags: globalArgs as Record<string, unknown>,
 	});
 
+	// Use loaded project config if builder didn't specify one
+	const effectiveProjectConfig = Object.keys(projectConfig).length > 0 ? projectConfig : (loadedProjectConfig ?? {});
+
 	// Set up extension system
 	const extensionLoader = new ExtensionLoader(registry);
 
 	// Load extensions from project config
-	if (projectConfig.extensions?.length) {
-		await extensionLoader.loadFromConfig(projectConfig);
+	if (effectiveProjectConfig.extensions?.length) {
+		await extensionLoader.loadFromConfig(effectiveProjectConfig);
 	}
 
-	// Load extensions from global config (mergedConfig has extension settings)
+	// Load extensions from global config
+	// mergedConfig._extensions is populated by loadConfig from ~/.kapy/config.json
 	const globalExtensions = (mergedConfig as Record<string, unknown>)._extensions as string[] | undefined;
 	if (globalExtensions?.length) {
 		await extensionLoader.loadFromConfig({ extensions: globalExtensions });
@@ -329,8 +333,8 @@ async function runCLI(
 	});
 
 	// Load user commands (from project config middleware)
-	if (projectConfig.middleware) {
-		for (const mw of projectConfig.middleware) {
+	if (effectiveProjectConfig.middleware) {
+		for (const mw of effectiveProjectConfig.middleware) {
 			userMiddlewares.push(mw);
 		}
 	}

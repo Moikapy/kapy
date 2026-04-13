@@ -15,7 +15,11 @@ export async function loadConfig(options?: {
 	projectDir?: string;
 	envPrefix?: string;
 	cliFlags?: Record<string, unknown>;
-}): Promise<{ config: MergedConfig; sources: Map<ConfigSource, MergedConfig | ProjectConfig> }> {
+}): Promise<{
+	config: MergedConfig;
+	sources: Map<ConfigSource, MergedConfig | ProjectConfig>;
+	projectConfig: ProjectConfig | null;
+}> {
 	const envPrefix = options?.envPrefix ?? DEFAULT_ENV_PREFIX;
 	const cwd = options?.projectDir ?? process.cwd();
 	const sources = new Map<ConfigSource, MergedConfig | ProjectConfig>();
@@ -104,7 +108,14 @@ export async function loadConfig(options?: {
 		config = deepMergeConfigs(config, flagsMerged);
 	}
 
-	return { config, sources };
+	// Build _extensions array from global config for extension loader
+	if (globalConfig?.extensions && typeof globalConfig.extensions === "object") {
+		(config as Record<string, unknown>)._extensions = Object.values(globalConfig.extensions).map(
+			(e: { source: string }) => e.source,
+		);
+	}
+
+	return { config, sources, projectConfig };
 }
 
 /** Load project config from kapy.config.ts */
