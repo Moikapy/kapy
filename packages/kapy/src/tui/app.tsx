@@ -219,10 +219,6 @@ function App() {
                     onSubmit={() => { const t=inputVal().trim(); if (!t||streaming()) return; setInputVal(""); if (ref) ref.clear(); send(t); }}
                     ref={(r2: any) => { ref = r2; setTimeout(() => r2?.focus(), 10); }}
                   />
-                  <box flexDirection="row" paddingTop={1} gap={1}>
-                    <text fg="#00AAFF">⟩</text>
-                    <text fg="#c0caf5">kapy · {model()}</text>
-                  </box>
                 </box>
               </box>
               <box flexGrow={1} minHeight={0} />
@@ -262,11 +258,7 @@ function App() {
                       },0),0); }}
                       ref={(r2: any) => { sessRef = r2; setTimeout(() => r2?.focus(), 10); }}
                     />
-                    <box flexDirection="row" paddingTop={1} gap={1}>
-                      <text fg="#00AAFF">⟩</text>
-                      <text fg="#c0caf5">kapy · {model()}</text>
-                      <Show when={streaming()}><text fg="#565f89">thinking...</text></Show>
-                    </box>
+                    <Show when={streaming()}><text fg="#565f89">thinking...</text></Show>
                   </box>
                 </box>
               </box>
