@@ -1,5 +1,5 @@
 import { createCliRenderer, type KeyBinding } from "@opentui/core";
-import { render, useTerminalDimensions } from "@opentui/solid";
+import { render, useTerminalDimensions, useKeyboard } from "@opentui/solid";
 import { createSignal, createEffect, batch, Show, createContext, useContext, type ParentComponent } from "solid-js";
 
 type RD = { type: "home" } | { type: "session"; sid: string };
@@ -67,6 +67,13 @@ interface Msg { id: string; role: "user" | "assistant"; content: string; streami
 function App() {
   const route = useContext(RC)!;
   const dims = useTerminalDimensions();
+
+  // Global key handler — Ctrl+C/D exits even when textarea is focused
+  useKeyboard((evt: any) => {
+    if (evt.ctrl && (evt.name === "c" || evt.name === "d")) {
+      process.exit(0);
+    }
+  });
   const [sidebar, setSidebar] = createSignal(false);
   const [msgs, setMsgs] = createSignal<Msg[]>([]);
   const [streaming, setStreaming] = createSignal(false);
