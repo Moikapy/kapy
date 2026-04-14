@@ -1,6 +1,6 @@
 import { createCliRenderer, type KeyBinding } from "@opentui/core";
 import { render, useTerminalDimensions } from "@opentui/solid";
-import { createSignal, batch, Show, createContext, useContext, type ParentComponent } from "solid-js";
+import { createSignal, createEffect, batch, Show, createContext, useContext, type ParentComponent } from "solid-js";
 
 type RD = { type: "home" } | { type: "session"; sid: string };
 const RC = createContext<{ data: () => RD; navigate: (r: RD) => void }>();
@@ -11,6 +11,21 @@ const RP: ParentComponent = (props) => {
 
 const KB: KeyBinding[] = [{ name: "return", action: "submit" }, { name: "return", shift: true, action: "newline" }];
 const MODEL = "glm-5.1:cloud";
+const SYS_MSG = "You are Kapy, an agent-first CLI assistant. Be concise and direct.";
+
+// Load project context from AGENTS.md
+function loadProjectCtx(): string {
+  try {
+    const fs = require("fs"); const path = require("path");
+    const cwd = process.cwd();
+    for (const d of [cwd, path.dirname(cwd), path.dirname(path.dirname(cwd))]) {
+      try { return fs.readFileSync(path.join(d, "AGENTS.md"), "utf-8"); } catch {}
+    }
+  } catch {}
+  return "";
+}
+const projectCtx = loadProjectCtx();
+const sysPrompt = projectCtx ? `${SYS_MSG}\n\n# Project Context\n${projectCtx}` : SYS_MSG;
 
 interface API { role: string; content: string }
 async function* streamOllama(model: string, msgs: API[], sig?: AbortSignal): AsyncGenerator<string> {
@@ -29,7 +44,7 @@ async function* streamOllama(model: string, msgs: API[], sig?: AbortSignal): Asy
   } finally { rd.releaseLock(); }
 }
 
-interface Msg { id: string; role: "user" | "assistant"; content: string }
+interface Msg { id: string; role: "user" | "assistant"; content: string; streaming?: boolean }
 
 function App() {
   const route = useContext(RC)!;
@@ -39,8 +54,14 @@ function App() {
   const [streaming, setStreaming] = createSignal(false);
   const [err, setErr] = createSignal("");
   const [inputVal, setInputVal] = createSignal("");
+  const [model, setModel] = createSignal(MODEL);
+  const [models, setModels] = createSignal<string[]>([]);
+
   let abortCtrl: AbortController | null = null;
   let ref: any; let sessRef: any; let scrollRef: any;
+
+  // Auto-scroll to bottom on new messages
+  createEffect(() => { if (msgs().length > 0) setTimeout(() => scrollRef?.scrollTo?.(99999), 50); });
 
   const send = async (text: string) => {
     if (!text.trim() || streaming()) return;
@@ -49,16 +70,19 @@ function App() {
     if (route.data().type === "home") route.navigate({ type: "session", sid: "s"+Date.now() });
     setStreaming(true); abortCtrl = new AbortController();
     const aId = "a"+Date.now();
-    setMsgs(p => [...p, { id: aId, role: "assistant", content: "" }]);
+    setMsgs(p => [...p, { id: aId, role: "assistant", content: "", streaming: true }]);
     try {
-      const apiMsgs: API[] = [...msgs().map(m => ({ role: m.role, content: m.content })), { role: "user", content: userMsg }];
+      const apiMsgs: API[] = [{ role: "system", content: sysPrompt }, ...msgs().map(m => ({ role: m.role, content: m.content })), { role: "user", content: userMsg }];
       let full = "";
-      for await (const chunk of streamOllama(MODEL, apiMsgs, abortCtrl.signal)) {
+      for await (const chunk of streamOllama(model(), apiMsgs, abortCtrl.signal)) {
         full += chunk;
-        setMsgs(p => { const u=[...p]; const i=u.findIndex(m=>m.id===aId); if(i!==-1) u[i]={...u[i],content:full}; return u; });
+        setMsgs(p => { const u=[...p]; const i=u.findIndex(m=>m.id===aId); if(i!==-1) u[i]={...u[i],content:full,streaming:true}; return u; });
       }
     } catch (e: any) { if (e.name !== "AbortError") setErr(e instanceof Error ? e.message : String(e)); }
-    finally { setStreaming(false); abortCtrl = null; }
+    finally {
+      setMsgs(p => { const u=[...p]; const i=u.findIndex(m=>m.id===aId); if(i!==-1) u[i]={...u[i],streaming:false}; return u; });
+      setStreaming(false); abortCtrl = null;
+    }
   };
   const abort = () => { if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; } };
   const onKey = (evt: any) => {
@@ -69,6 +93,15 @@ function App() {
     const c = t.trim().toLowerCase();
     if (c === "/sidebar" || c === "/sb") { setSidebar(v=>!v); return true; }
     if (c === "/clear") { setMsgs([]); return true; }
+    if (c === "/models") {
+      fetch("http://localhost:11434/v1/models").then(r => r.json())
+        .then(d => { const names = (d.data||[]).map((m:any) => m.id).sort(); setModels(names); setSidebar(true); })
+        .catch(() => setErr("Failed to fetch models"));
+      return true;
+    }
+    // /model <name> to switch
+    const modelMatch = t.trim().match(/^\/model\s+(.+)$/i);
+    if (modelMatch) { setModel(modelMatch[1].trim()); return true; }
     return false;
   };
 
@@ -94,7 +127,7 @@ function App() {
                   />
                   <box flexDirection="row" paddingTop={1} gap={1}>
                     <text fg="#00AAFF">⟩</text>
-                    <text fg="#c0caf5">kapy · {MODEL}</text>
+                    <text fg="#c0caf5">kapy · {model()}</text>
                   </box>
                 </box>
               </box>
@@ -109,7 +142,7 @@ function App() {
                 {msgs().map(m =>
                   m.role === "user"
                     ? <box border={["left"]} borderColor="#00AAFF" marginTop={1} flexShrink={0}><box paddingTop={1} paddingBottom={1} paddingLeft={2} backgroundColor="#1a1a2e"><text fg="#c0caf5">{m.content}</text></box></box>
-                    : <box paddingLeft={3} marginTop={1} flexShrink={0}><text fg="#9ece6a">{m.content}</text></box>
+                    : <box paddingLeft={3} marginTop={1} flexShrink={0}><text fg="#9ece6a">{m.content}{m.streaming ? " ●" : ""}</text></box>
                 )}
                 <box height={2} />
               </scrollbox>
@@ -132,7 +165,7 @@ function App() {
                     />
                     <box flexDirection="row" paddingTop={1} gap={1}>
                       <text fg="#00AAFF">⟩</text>
-                      <text fg="#c0caf5">kapy · {MODEL}</text>
+                      <text fg="#c0caf5">kapy · {model()}</text>
                       <Show when={streaming()}><text fg="#565f89">thinking...</text></Show>
                     </box>
                   </box>
@@ -147,7 +180,7 @@ function App() {
             <text fg="#565f89">Current chat</text>
             <box height={1} />
             <text fg="#00AAFF">▸ Model</text>
-            <text fg="#c0caf5">  {MODEL}</text>
+            <text fg="#c0caf5">  {model()}</text>
             <box height={1} />
             <text fg="#00AAFF">▸ Messages</text>
             <text fg="#c0caf5">  {msgs().length}</text>
@@ -159,12 +192,17 @@ function App() {
             <text fg="#00AAFF">▸ Keys</text>
             <text fg="#565f89">  ctrl+\ sidebar</text>
             <text fg="#565f89">  esc abort/home</text>
+            <Show when={models().length > 0}>
+              <box height={1} />
+              <text fg="#00AAFF">▸ Models</text>
+              {models().map(m => <text fg="#565f89">  {m}</text>)}
+            </Show>
           </box>
         </Show>
       </box>
       <box flexDirection="row" justifyContent="space-between" paddingLeft={2} paddingRight={2} flexShrink={0}>
         <text fg="#565f89">~/kapy</text>
-        <text fg="#565f89">⊙ ollama · {MODEL}</text>
+        <text fg="#565f89">⊙ ollama · {model()}</text>
       </box>
     </box>
   );
