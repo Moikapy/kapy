@@ -1,4 +1,5 @@
 export type { ScreenContext, ScreenDefinition } from "../extension/types.js";
+export { launchChatTUI } from "./app.js";
 export { configScreen } from "./screens/config.js";
 export { extensionsScreen } from "./screens/extensions.js";
 export { homeScreen } from "./screens/home.js";

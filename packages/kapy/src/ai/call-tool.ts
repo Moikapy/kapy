@@ -56,5 +56,5 @@ export async function callTool(
 		signal: options.signal,
 	};
 
-	return tool.execute(toolCallId, parsed.data, options.signal, () => {}, ctx);
+	return tool.execute(toolCallId, parsed.data as Record<string, unknown>, options.signal, () => {}, ctx);
 }

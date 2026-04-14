@@ -7,6 +7,8 @@ import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
 import type { KapyToolRegistration } from "../tool/types.js";
 
+export type { KapyToolRegistration } from "../tool/types.js";
+
 /** Extension metadata */
 export interface ExtensionMeta {
 	name: string;

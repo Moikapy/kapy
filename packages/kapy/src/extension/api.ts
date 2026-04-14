@@ -10,7 +10,7 @@ import type { ExtensionEmitter } from "../hooks/emitter.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
 import type { ToolRegistry } from "../tool/registry.js";
-import type { KapyToolRegistration, ProviderRegistration, ScreenDefinition } from "./types.js";
+import type { KapyExtensionAPI, KapyToolRegistration, ProviderRegistration, ScreenDefinition } from "./types.js";
 
 export class ExtensionAPI implements KapyExtensionAPI {
 	private registry: CommandRegistry;

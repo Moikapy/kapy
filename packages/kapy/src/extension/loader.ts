@@ -15,8 +15,9 @@ import { formatErrors, validateExtensionMeta } from "../config/validator.js";
 import { ExtensionEmitter } from "../hooks/emitter.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
+import { ToolRegistry } from "../tool/registry.js";
 import { ExtensionAPI } from "./api.js";
-import type { ExtensionMeta, ExtensionRegister, ScreenDefinition } from "./types.js";
+import type { ExtensionMeta, ExtensionRegister, ProviderRegistration, ScreenDefinition } from "./types.js";
 
 interface LoadedExtension {
 	meta: ExtensionMeta;
@@ -116,6 +117,8 @@ export class ExtensionLoader {
 	private emitter: ExtensionEmitter;
 	private loaded: LoadedExtension[] = [];
 	private extensionsDir: string;
+	private tools: ToolRegistry;
+	private providers: Map<string, ProviderRegistration>;
 
 	constructor(registry: CommandRegistry, extensionsDir?: string) {
 		this.registry = registry;
@@ -124,6 +127,8 @@ export class ExtensionLoader {
 		this.screens = [];
 		this.configSchemas = new Map();
 		this.emitter = new ExtensionEmitter();
+		this.tools = new ToolRegistry();
+		this.providers = new Map();
 		this.extensionsDir = extensionsDir ?? join(process.cwd(), ".kapy", "extensions");
 	}
 
@@ -160,11 +165,13 @@ export class ExtensionLoader {
 
 			const api = new ExtensionAPI({
 				registry: this.registry,
+				tools: this.tools,
 				hooks: this.hooks,
 				middlewares: this.middlewares,
 				screens: this.screens,
 				configSchemas: this.configSchemas,
 				emitter: this.emitter,
+				providers: this.providers,
 				extensionName: meta.name,
 			});
 
