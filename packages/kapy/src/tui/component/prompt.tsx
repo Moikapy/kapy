@@ -1,9 +1,16 @@
 /**
  * Prompt component — real keyboard input using OpenTUI's TextareaRenderable.
- * 1:1 with OpenCode's Prompt component architecture.
  *
- * Uses <textarea> intrinsic from @opentui/solid for actual keyboard input,
- * cursor, selection, paste, and multiline support.
+ * Key design decisions (matching spec §9):
+ * - NO plan/build mode. Kapy uses implicit thinking levels, not modes.
+ * - Enter → steering message (sent after current tool calls finish)
+ * - Shift+Enter → follow-up message (sent after agent finishes all work)
+ * - Escape → abort + restore queued messages
+ * - Tab → cycle agents
+ * - `!` prefix → shell command
+ *
+ * Thinking levels are implicit per-request, not a mode switch.
+ * The agent decides how much to think based on the prompt.
  */
 
 import {
@@ -17,7 +24,8 @@ import {
 import { useTheme } from "../context/theme.jsx";
 import { useRoute } from "../context/route.jsx";
 import { useExit } from "../context/exit.jsx";
-import { useKeyboard, useRenderer } from "@opentui/solid";
+
+export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
 
 export interface PromptRef {
 	focused: boolean;
@@ -34,8 +42,12 @@ interface PromptProps {
 	disabled?: boolean;
 	/** Placeholder suggestions to rotate through */
 	placeholders?: { normal?: string[]; shell?: string[] };
-	onSubmit?: (input: string) => void;
+	onSubmit?: (input: string, opts?: { followUp?: boolean }) => void;
 	sessionID?: string;
+	/** Current agent name (displayed in prompt bar) */
+	agentName?: string;
+	/** Current model name (displayed in prompt bar) */
+	modelName?: string;
 	right?: JSX.Element;
 }
 
@@ -44,85 +56,70 @@ export function Prompt(props: PromptProps) {
 	const route = useRoute();
 	const exit = useExit();
 	const [input, setInput] = createSignal("");
-	const [mode, setMode] = createSignal<"normal" | "shell">("normal");
+	const [shellMode, setShellMode] = createSignal(false);
+	const [thinkingHint, setThinkingHint] = createSignal<string>("");
 	let textareaRef: any; // TextareaRenderable ref
 
 	// Placeholder rotation
 	const placeholder = () => {
+		if (shellMode()) {
+			const shellList = props.placeholders?.shell ?? ["ls -la", "git status", "pwd"];
+			const idx = Math.floor(Date.now() / 8000) % shellList.length;
+			return `Shell: ${shellList[idx]}`;
+		}
 		const list = props.placeholders?.normal ?? [
 			"Fix a TODO in the codebase",
 			"What is the tech stack?",
 			"Fix broken tests",
 		];
-		if (mode() === "shell") {
-			const shellList = props.placeholders?.shell ?? ["ls -la", "git status", "pwd"];
-			const idx = Math.floor(Date.now() / 8000) % shellList.length;
-			return `Run a command... "${shellList[idx]}"`;
-		}
 		const idx = Math.floor(Date.now() / 8000) % list.length;
-		return `Ask anything... "${list[idx]}"`;
+		return list[idx];
 	};
 
-	// Accent color from current mode
-	const highlight = () => {
-		if (mode() === "shell") return theme().primary;
-		return theme().accent;
-	};
+	// Accent color
+	const accent = () => shellMode() ? theme().warning : theme().accent;
 
 	const ref: PromptRef = {
-		get focused() {
-			return textareaRef?.focused ?? false;
-		},
-		get current() {
-			return { input: input() };
-		},
+		get focused() { return textareaRef?.focused ?? false; },
+		get current() { return { input: input() }; },
 		set(val: { input: string }) {
 			setInput(val.input);
-			if (textareaRef) {
-				textareaRef.setText(val.input);
-			}
+			if (textareaRef) textareaRef.setText(val.input);
 		},
-		submit() {
-			doSubmit();
-		},
-		focus() {
-			textareaRef?.focus();
-		},
-		blur() {
-			textareaRef?.blur();
-		},
+		submit() { doSubmit(); },
+		focus() { textareaRef?.focus(); },
+		blur() { textareaRef?.blur(); },
 	};
 
-	onMount(() => {
-		props.ref?.(ref);
-	});
+	onMount(() => { props.ref?.(ref); });
+	onCleanup(() => { props.ref?.(undefined); });
 
-	onCleanup(() => {
-		props.ref?.(undefined);
-	});
-
-	const doSubmit = () => {
+	const doSubmit = (opts?: { followUp?: boolean }) => {
 		if (props.disabled) return;
 		const text = input().trim();
 		if (!text) return;
 
-		// Check for exit commands
+		// Exit commands
 		if (text === "exit" || text === "quit" || text === ":q") {
 			exit();
 			return;
 		}
 
-		// Shell mode trigger
-		if (text.startsWith("!") && mode() === "normal") {
-			setMode("shell");
+		// Shell mode: !command
+		if (text.startsWith("!") && !shellMode()) {
+			const cmd = text.slice(1).trim();
+			if (cmd) {
+				setInput("");
+				if (textareaRef) textareaRef.clear();
+				props.onSubmit?.(cmd, { followUp: opts?.followUp });
+			}
 			return;
 		}
 
 		// Clear input
 		setInput("");
-		if (textareaRef) {
-			textareaRef.clear();
-		}
+		if (textareaRef) textareaRef.clear();
+		setThinkingHint("");
 
 		// Navigate to session on first submit from home
 		if (route.data().type === "home") {
@@ -133,7 +130,7 @@ export function Prompt(props: PromptProps) {
 			});
 		}
 
-		props.onSubmit?.(text);
+		props.onSubmit?.(text, { followUp: opts?.followUp });
 	};
 
 	createEffect(() => {
@@ -141,17 +138,21 @@ export function Prompt(props: PromptProps) {
 			textareaRef.cursorColor = props.disabled ? theme().border : theme().text;
 			textareaRef.traits = {
 				suspend: !!props.disabled,
-				status: mode() === "shell" ? "SHELL" : undefined,
+				status: shellMode() ? "!" : undefined,
 			};
 		}
 	});
 
+	// Model/agent display in prompt bar
+	const agentLabel = () => {
+		const name = props.agentName ?? "kapy";
+		const model = props.modelName ?? "";
+		return model ? `${name} · ${model}` : name;
+	};
+
 	return (
 		<box visible={props.visible !== false}>
-			<box
-				border={["left"]}
-				borderColor={highlight()}
-			>
+			<box border={["left"]} borderColor={accent()}>
 				<box
 					paddingLeft={2}
 					paddingRight={2}
@@ -169,53 +170,64 @@ export function Prompt(props: PromptProps) {
 						minHeight={1}
 						maxHeight={6}
 						onContentChange={() => {
-							if (textareaRef) {
-								setInput(textareaRef.plainText);
-							}
+							if (textareaRef) setInput(textareaRef.plainText);
 						}}
 						onKeyDown={(e: any) => {
-							if (props.disabled) {
-								e.preventDefault();
+							if (props.disabled) { e.preventDefault(); return; }
+
+							// Escape: abort current or exit shell mode
+							if (e.name === "escape") {
+								if (shellMode()) {
+									setShellMode(false);
+									e.preventDefault();
+									return;
+								}
+								// In session: abort current agent turn
 								return;
 							}
-							// Escape exits shell mode
-							if (e.name === "escape" && mode() === "shell") {
-								setMode("normal");
-								e.preventDefault();
-								return;
-							}
-							// Backspace at start exits shell mode
-							if (e.name === "backspace" && mode() === "shell" && textareaRef?.visualCursor?.offset === 0) {
-								setMode("normal");
-								e.preventDefault();
-								return;
-							}
-							// ! at start of line enters shell mode
+
+							// ! at start → shell mode
 							if (e.name === "!" && textareaRef?.visualCursor?.offset === 0) {
-								setMode("shell");
+								setShellMode(true);
 								e.preventDefault();
+								return;
+							}
+
+							// Backspace at start → exit shell mode
+							if (e.name === "backspace" && shellMode() && textareaRef?.visualCursor?.offset === 0) {
+								setShellMode(false);
+								e.preventDefault();
+								return;
+							}
+
+							// Shift+Enter → follow-up message (after agent finishes)
+							if (e.name === "return" && e.shift) {
+								e.preventDefault();
+								doSubmit({ followUp: true });
 								return;
 							}
 						}}
 						onSubmit={() => {
 							// Double-defer for IME (OpenCode pattern)
+							// Enter → steering message (delivered after current tool calls)
 							setTimeout(() => setTimeout(() => doSubmit(), 0), 0);
 						}}
-						ref={(r: any) => {
-							textareaRef = r;
-						}}
+						ref={(r: any) => { textareaRef = r; }}
 						onMouseDown={(e: any) => e.target?.focus()}
 					/>
 
-					{/* Label bar below textarea */}
+					{/* Prompt bar: agent, model, hints */}
 					<box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
 						<box flexDirection="row" gap={1}>
-							<text fg={highlight()}>
-								{mode() === "shell" ? "Shell" : "Build"}{" "}
+							<text fg={accent()}>
+								{shellMode() ? "!" : "⟩"}
 							</text>
-							<Show when={mode() === "normal"}>
-								<text fg={theme().text}>
-									{props.sessionID ? "qwen3:32b" : ""}
+							<text fg={theme().text}>
+								{agentLabel()}
+							</text>
+							<Show when={thinkingHint()}>
+								<text fg={theme().textMuted}>
+									💭 {thinkingHint()}
 								</text>
 							</Show>
 						</box>
@@ -224,14 +236,17 @@ export function Prompt(props: PromptProps) {
 				</box>
 			</box>
 
-			{/* Bottom hint bar */}
+			{/* Bottom keybinding hints */}
 			<box width="100%" flexDirection="row" justifyContent="space-between" paddingTop={1}>
 				<text fg={theme().textMuted}>
-					esc <span style={{ fg: theme().textMuted }}>interrupt</span>
+					esc abort
 				</text>
-				<text fg={theme().text}>
-					tab <span style={{ fg: theme().textMuted }}>agents</span>{" "}
-					ctrl+k <span style={{ fg: theme().textMuted }}>commands</span>
+				<text fg={theme().textMuted}>
+					enter steer
+					{"  "}
+					shift+enter follow
+					{"  "}
+					tab agents
 				</text>
 			</box>
 		</box>

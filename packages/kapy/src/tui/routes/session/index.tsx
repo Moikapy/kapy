@@ -78,10 +78,12 @@ export function Session(props: SessionProps) {
 		promptRef = r;
 	};
 
-	const onSubmit = async (input: string) => {
+	const onSubmit = async (input: string, opts?: { followUp?: boolean }) => {
 		if (!input?.trim()) return;
 
 		if (chat) {
+			// followUp: queue message after current agent turn completes
+			// steering (default): deliver after current tool calls finish
 			await chat.send(input);
 			setMessages([...chat.messages]);
 			setIsProcessing(chat.isProcessing);

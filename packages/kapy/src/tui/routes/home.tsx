@@ -1,6 +1,7 @@
 /**
- * Home route — Logo + prompt + suggestions.
- * 1:1 with OpenCode's Home component.
+ * Home route — Logo + prompt + rotating suggestions.
+ * No mode selection. Kapy uses implicit thinking levels.
+ * Spec §9: Enter routes to session, no plan/build toggle.
  */
 
 import { Prompt } from "../component/prompt.jsx";
@@ -12,8 +13,10 @@ const placeholder = {
 		"Fix a TODO in the codebase",
 		"What is the tech stack of this project?",
 		"Fix broken tests",
+		"Add error handling to the auth module",
+		"Refactor the config system",
 	],
-	shell: ["ls -la", "git status", "pwd"],
+	shell: ["ls -la", "git status", "cat package.json"],
 };
 
 export function Home() {
@@ -32,13 +35,21 @@ export function Home() {
 					<Prompt placeholder={placeholder} />
 				</box>
 				<box height={6} minHeight={0} flexShrink={1} />
-				{/* Tips */}
+				{/* Tips — spec-aligned, no mode references */}
 				<box flexDirection="column" gap={1} flexShrink={0}>
 					<text fg={theme().textMuted} selectable={false}>
-						<span style={{ fg: theme().accent }}>Tip:</span> Type a question or command to get started
+						<span style={{ fg: theme().accent }}>enter</span> send message
+						{"   "}
+						<span style={{ fg: theme().accent }}>shift+enter</span> follow-up after turn
+						{"   "}
+						<span style={{ fg: theme().accent }}>!</span> shell command
 					</text>
 					<text fg={theme().textMuted} selectable={false}>
-						<span style={{ fg: theme().accent }}>Tip:</span> Use /help for available commands
+						<span style={{ fg: theme().accent }}>tab</span> switch agent
+						{"   "}
+						<span style={{ fg: theme().accent }}>esc</span> abort
+						{"   "}
+						<span style={{ fg: theme().accent }}>?</span> help
 					</text>
 				</box>
 				<box flexGrow={1} minHeight={0} />
