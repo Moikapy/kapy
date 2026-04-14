@@ -1,17 +1,22 @@
 /**
- * Kapy TUI App — 1:1 with OpenCode's TUI architecture.
+ * Kapy TUI App — OpenCode's exit pattern.
  *
- * CRITICAL: Renderer cleanup is mandatory. createCliRenderer puts the terminal
- * into alternate screen buffer + raw mode. If we crash without calling
- * renderer.destroy(), the terminal is left in a broken state (borked tmux).
+ * Exit handling:
+ * - ExitProvider (from context/exit.jsx) provides exit() as Solid context
+ * - SIGHUP (tmux pane close) + SIGINT (Ctrl+C) call exit()
+ * - exit() calls renderer.destroy() + resolves the launch promise
+ * - NO process.exit() — let the event loop drain naturally
+ *
+ * Prompt uses a real TextareaRenderable for keyboard input.
  */
 
-import { render, useKeyboard, useTerminalDimensions } from "@opentui/solid";
-import { createCliRenderer, type CliRenderer, type CliRendererConfig } from "@opentui/core";
-import { Show, Switch, Match } from "solid-js";
+import { render, useTerminalDimensions, useKeyboard } from "@opentui/solid";
+import { createCliRenderer, type CliRendererConfig } from "@opentui/core";
+import { createSignal, Show, Switch, Match, onMount, onCleanup } from "solid-js";
 import { RouteProvider, useRoute } from "./context/route.jsx";
 import { ThemeProvider, useTheme } from "./context/theme.jsx";
 import { DialogProvider, useDialog } from "./context/dialog.jsx";
+import { ExitProvider, useExit } from "./context/exit.jsx";
 import { Home } from "./routes/home.jsx";
 import { Session } from "./routes/session/index.jsx";
 import { Footer } from "./component/footer.jsx";
@@ -33,7 +38,7 @@ function rendererConfig(): CliRendererConfig {
 
 /**
  * Launch the Kapy TUI.
- * Returns a promise that resolves when the TUI exits.
+ * Returns a promise that resolves when the TUI exits cleanly.
  */
 export async function launchChatTUI(): Promise<void> {
 	if (!process.stdout.isTTY) {
@@ -41,53 +46,51 @@ export async function launchChatTUI(): Promise<void> {
 		return;
 	}
 
-	let renderer: CliRenderer | undefined;
+	// TUI lifecycle wrapped in a promise.
+	// exit() resolves it, letting the process drain naturally.
+	await new Promise<void>(async (resolve) => {
+		let renderer;
 
-	try {
-		renderer = await createCliRenderer(rendererConfig());
+		try {
+			renderer = await createCliRenderer(rendererConfig());
+		} catch (err) {
+			console.error("Failed to create renderer:", err instanceof Error ? err.message : err);
+			resolve();
+			return;
+		}
 
 		const chatSession = new ChatSession({
-			systemPrompt: `You are Kapy, an agent-first CLI assistant. You help users with coding, debugging, and system tasks. You have access to tools for reading files, running commands, and more. Be concise and direct.`,
+			systemPrompt: `You are Kapy, an agent-first CLI assistant. Help with coding, debugging, and system tasks. Be concise.`,
 		});
 
 		await chatSession.init();
 
-		// Signal handlers — MUST clean up terminal before exit
-		const onSigInt = () => { cleanup(); process.exit(0); };
-		const onSigTerm = () => { cleanup(); process.exit(0); };
-		const onUncaught = (err: Error) => { cleanup(); console.error("Kapy TUI error:", err.message); process.exit(1); };
-		process.on("SIGINT", onSigInt);
-		process.on("SIGTERM", onSigTerm);
-		process.on("uncaughtException", onUncaught);
+		const onBeforeExit = async () => {
+			chatSession.abort();
+		};
+
+		const onExit = async () => {
+			resolve();
+		};
 
 		await render(() => (
 			<ThemeProvider>
 				<RouteProvider>
 					<DialogProvider>
-						<KapyApp chatSession={chatSession} />
+						<ExitProvider onBeforeExit={onBeforeExit} onExit={onExit}>
+							<KapyApp chatSession={chatSession} />
+						</ExitProvider>
 					</DialogProvider>
 				</RouteProvider>
 			</ThemeProvider>
 		), renderer);
 
-		cleanup();
-
-		function cleanup() {
-			if (renderer) {
-				try { renderer.destroy(); } catch { /* already destroyed */ }
-				renderer = undefined;
-			}
-			process.removeListener("SIGINT", onSigInt);
-			process.removeListener("SIGTERM", onSigTerm);
-			process.removeListener("uncaughtException", onUncaught);
-		}
-	} catch (err) {
-		if (renderer) {
-			try { renderer.destroy(); } catch { /* give up */ }
-		}
-		throw err;
-	}
+		// If render() returns (component unmounted), resolve
+		resolve();
+	});
 }
+
+// ─── App Component ──────────────────────────────────────
 
 interface KapyAppProps {
 	chatSession: ChatSession;
@@ -98,10 +101,25 @@ function KapyApp(props: KapyAppProps) {
 	const dimensions = useTerminalDimensions();
 	const { theme } = useTheme();
 	const dialog = useDialog();
+	const exit = useExit();
 
+	// SIGHUP (tmux pane close) + SIGINT (Ctrl+C) → clean exit
+	onMount(() => {
+		const onSighup = () => exit("SIGHUP");
+		const onSigint = () => exit("Ctrl+C");
+		process.on("SIGHUP", onSighup);
+		process.on("SIGINT", onSigint);
+		onCleanup(() => {
+			process.removeListener("SIGHUP", onSighup);
+			process.removeListener("SIGINT", onSigint);
+		});
+	});
+
+	// Global keyboard
 	useKeyboard((evt) => {
 		if (evt.ctrl && evt.name === "c") {
-			return; // Let SIGINT handler do cleanup
+			exit("Ctrl+C");
+			return;
 		}
 		if (evt.name === "escape") {
 			if (dialog.open()) {

@@ -1,6 +1,9 @@
 /**
- * Prompt component — the main input box for agent queries.
- * 1:1 with OpenCode's Prompt — multiline textarea with slash commands.
+ * Prompt component — real keyboard input using OpenTUI's TextareaRenderable.
+ * 1:1 with OpenCode's Prompt component architecture.
+ *
+ * Uses <textarea> intrinsic from @opentui/solid for actual keyboard input,
+ * cursor, selection, paste, and multiline support.
  */
 
 import {
@@ -8,25 +11,30 @@ import {
 	createEffect,
 	onCleanup,
 	onMount,
-	type JSX,
-	type Setter,
 	Show,
+	type JSX,
 } from "solid-js";
 import { useTheme } from "../context/theme.jsx";
 import { useRoute } from "../context/route.jsx";
+import { useExit } from "../context/exit.jsx";
+import { useKeyboard, useRenderer } from "@opentui/solid";
 
 export interface PromptRef {
-	current: { input: string; parts: unknown[] };
-	set: (val: { input: string; parts: unknown[] }) => void;
+	focused: boolean;
+	current: { input: string };
+	set: (val: { input: string }) => void;
 	submit: () => void;
+	focus: () => void;
+	blur: () => void;
 }
 
 interface PromptProps {
 	ref?: (r: PromptRef | undefined) => void;
 	visible?: boolean;
 	disabled?: boolean;
-	placeholder?: Record<string, string[]>;
-	onSubmit?: () => void;
+	/** Placeholder suggestions to rotate through */
+	placeholders?: { normal?: string[]; shell?: string[] };
+	onSubmit?: (input: string) => void;
 	sessionID?: string;
 	right?: JSX.Element;
 }
@@ -34,19 +42,54 @@ interface PromptProps {
 export function Prompt(props: PromptProps) {
 	const { theme } = useTheme();
 	const route = useRoute();
+	const exit = useExit();
 	const [input, setInput] = createSignal("");
-	const [focused, setFocused] = createSignal(true);
-	let textareaRef: HTMLTextAreaElement | undefined;
+	const [mode, setMode] = createSignal<"normal" | "shell">("normal");
+	let textareaRef: any; // TextareaRenderable ref
+
+	// Placeholder rotation
+	const placeholder = () => {
+		const list = props.placeholders?.normal ?? [
+			"Fix a TODO in the codebase",
+			"What is the tech stack?",
+			"Fix broken tests",
+		];
+		if (mode() === "shell") {
+			const shellList = props.placeholders?.shell ?? ["ls -la", "git status", "pwd"];
+			const idx = Math.floor(Date.now() / 8000) % shellList.length;
+			return `Run a command... "${shellList[idx]}"`;
+		}
+		const idx = Math.floor(Date.now() / 8000) % list.length;
+		return `Ask anything... "${list[idx]}"`;
+	};
+
+	// Accent color from current mode
+	const highlight = () => {
+		if (mode() === "shell") return theme().primary;
+		return theme().accent;
+	};
 
 	const ref: PromptRef = {
-		get current() {
-			return { input: input(), parts: [] };
+		get focused() {
+			return textareaRef?.focused ?? false;
 		},
-		set(val: { input: string; parts: unknown[] }) {
+		get current() {
+			return { input: input() };
+		},
+		set(val: { input: string }) {
 			setInput(val.input);
+			if (textareaRef) {
+				textareaRef.setText(val.input);
+			}
 		},
 		submit() {
-			onSubmitInternal();
+			doSubmit();
+		},
+		focus() {
+			textareaRef?.focus();
+		},
+		blur() {
+			textareaRef?.blur();
 		},
 	};
 
@@ -58,62 +101,139 @@ export function Prompt(props: PromptProps) {
 		props.ref?.(undefined);
 	});
 
-	const onSubmitInternal = () => {
+	const doSubmit = () => {
+		if (props.disabled) return;
 		const text = input().trim();
 		if (!text) return;
-		// Navigate to session on submit
-		route.navigate({
-			type: "session",
-			sessionID: `session-${Date.now()}`,
-			initialPrompt: { input: text, parts: [] },
-		});
+
+		// Check for exit commands
+		if (text === "exit" || text === "quit" || text === ":q") {
+			exit();
+			return;
+		}
+
+		// Shell mode trigger
+		if (text.startsWith("!") && mode() === "normal") {
+			setMode("shell");
+			return;
+		}
+
+		// Clear input
 		setInput("");
-		props.onSubmit?.();
+		if (textareaRef) {
+			textareaRef.clear();
+		}
+
+		// Navigate to session on first submit from home
+		if (route.data().type === "home") {
+			route.navigate({
+				type: "session",
+				sessionID: `session-${Date.now()}`,
+				initialPrompt: { input: text, parts: [] },
+			});
+		}
+
+		props.onSubmit?.(text);
 	};
 
-	// Placeholder rotation
-	const placeholders = () => {
-		const list = props.placeholder?.normal ?? [
-			"Fix a TODO in the codebase",
-			"What is the tech stack of this project?",
-			"Fix broken tests",
-		];
-		const idx = Math.floor(Date.now() / 8000) % list.length;
-		return list[idx];
-	};
-
-	const borderColor = () => {
-		if (props.disabled) return theme().border;
-		if (focused()) return theme().accent;
-		return theme().border;
-	};
+	createEffect(() => {
+		if (textareaRef && !textareaRef.isDestroyed) {
+			textareaRef.cursorColor = props.disabled ? theme().border : theme().text;
+			textareaRef.traits = {
+				suspend: !!props.disabled,
+				status: mode() === "shell" ? "SHELL" : undefined,
+			};
+		}
+	});
 
 	return (
-		<box
-			border
-			borderStyle="single"
-			borderColor={borderColor()}
-			backgroundColor={theme().backgroundPanel}
-			padding={1}
-			flexDirection="row"
-			gap={1}
-		>
-			<text fg={theme().accent} selectable={false}>
-				▸
-			</text>
-			<box flexGrow={1}>
-				<Show
-					when={input().length > 0}
-					fallback={
-						<text fg={theme().textMuted} selectable={false}>
-							{placeholders()}
-						</text>
-					}
+		<box visible={props.visible !== false}>
+			<box
+				border={["left"]}
+				borderColor={highlight()}
+			>
+				<box
+					paddingLeft={2}
+					paddingRight={2}
+					paddingTop={1}
+					flexGrow={1}
+					backgroundColor={theme().backgroundElement}
 				>
-					<text fg={theme().text}>{input()}</text>
-				</Show>
+					<textarea
+						placeholder={placeholder()}
+						placeholderColor={theme().textMuted}
+						textColor={theme().text}
+						focusedTextColor={theme().text}
+						focusedBackgroundColor={theme().backgroundElement}
+						cursorColor={theme().text}
+						minHeight={1}
+						maxHeight={6}
+						onContentChange={() => {
+							if (textareaRef) {
+								setInput(textareaRef.plainText);
+							}
+						}}
+						onKeyDown={(e: any) => {
+							if (props.disabled) {
+								e.preventDefault();
+								return;
+							}
+							// Escape exits shell mode
+							if (e.name === "escape" && mode() === "shell") {
+								setMode("normal");
+								e.preventDefault();
+								return;
+							}
+							// Backspace at start exits shell mode
+							if (e.name === "backspace" && mode() === "shell" && textareaRef?.visualCursor?.offset === 0) {
+								setMode("normal");
+								e.preventDefault();
+								return;
+							}
+							// ! at start of line enters shell mode
+							if (e.name === "!" && textareaRef?.visualCursor?.offset === 0) {
+								setMode("shell");
+								e.preventDefault();
+								return;
+							}
+						}}
+						onSubmit={() => {
+							// Double-defer for IME (OpenCode pattern)
+							setTimeout(() => setTimeout(() => doSubmit(), 0), 0);
+						}}
+						ref={(r: any) => {
+							textareaRef = r;
+						}}
+						onMouseDown={(e: any) => e.target?.focus()}
+					/>
+
+					{/* Label bar below textarea */}
+					<box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
+						<box flexDirection="row" gap={1}>
+							<text fg={highlight()}>
+								{mode() === "shell" ? "Shell" : "Build"}{" "}
+							</text>
+							<Show when={mode() === "normal"}>
+								<text fg={theme().text}>
+									{props.sessionID ? "qwen3:32b" : ""}
+								</text>
+							</Show>
+						</box>
+						{props.right}
+					</box>
+				</box>
 			</box>
-			{props.right}
+
+			{/* Bottom hint bar */}
+			<box width="100%" flexDirection="row" justifyContent="space-between" paddingTop={1}>
+				<text fg={theme().textMuted}>
+					esc <span style={{ fg: theme().textMuted }}>interrupt</span>
+				</text>
+				<text fg={theme().text}>
+					tab <span style={{ fg: theme().textMuted }}>agents</span>{" "}
+					ctrl+k <span style={{ fg: theme().textMuted }}>commands</span>
+				</text>
+			</box>
 		</box>
 	);
 }

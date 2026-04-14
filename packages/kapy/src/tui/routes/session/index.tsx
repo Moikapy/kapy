@@ -78,10 +78,8 @@ export function Session(props: SessionProps) {
 		promptRef = r;
 	};
 
-	const onSubmit = async () => {
-		const input = promptRef?.current.input;
+	const onSubmit = async (input: string) => {
 		if (!input?.trim()) return;
-		promptRef?.set({ input: "", parts: [] });
 
 		if (chat) {
 			await chat.send(input);
