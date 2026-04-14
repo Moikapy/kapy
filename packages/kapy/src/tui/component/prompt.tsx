@@ -1,16 +1,17 @@
 /**
  * Prompt component — real keyboard input using OpenTUI's TextareaRenderable.
  *
- * Key design decisions (matching spec §9):
- * - NO plan/build mode. Kapy uses implicit thinking levels, not modes.
- * - Enter → steering message (sent after current tool calls finish)
- * - Shift+Enter → follow-up message (sent after agent finishes all work)
- * - Escape → abort + restore queued messages
- * - Ctrl+C / Ctrl+D with empty input → exit app (OpenCode pattern)
- * - `!` prefix → shell command
- * - Tab → cycle agents (future)
+ * Architecture based on research of OpenCode and Pi TUI:
+ * - Enter = submit (via keyBindings, not default newline)
+ * - Shift+Enter = newline (multi-line input)
+ * - Ctrl+C / Ctrl+D with empty input = exit app
+ * - Escape = abort / exit shell mode
+ * - `!` prefix = shell command
+ * - Tab = cycle agents (future)
  *
- * Thinking levels are implicit per-request, not a mode switch.
+ * Key fix: TextareaRenderable defaults to Enter=newline.
+ * We MUST pass keyBindings to remap Enter to "submit" action.
+ * The onSubmit callback fires when "submit" action triggers.
  */
 
 import {
@@ -24,6 +25,7 @@ import {
 import { useTheme } from "../context/theme.jsx";
 import { useRoute } from "../context/route.jsx";
 import { useExit } from "../context/exit.jsx";
+import type { KeyBinding } from "@opentui/core";
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
 
@@ -35,6 +37,16 @@ export interface PromptRef {
 	focus: () => void;
 	blur: () => void;
 }
+
+/**
+ * Key bindings for the prompt textarea.
+ * Enter = submit (not newline), Shift+Enter = newline.
+ * This matches OpenCode and Pi's prompt behavior.
+ */
+const PROMPT_KEY_BINDINGS: KeyBinding[] = [
+	{ name: "return", action: "submit" },
+	{ name: "return", shift: true, action: "newline" },
+];
 
 interface PromptProps {
 	ref?: (r: PromptRef | undefined) => void;
@@ -91,8 +103,8 @@ export function Prompt(props: PromptProps) {
 
 	onMount(() => {
 		props.ref?.(ref);
-		// Explicitly focus the textarea after mount.
-		// The 'focused' prop alone doesn't trigger focus — we must call .focus().
+		// CRITICAL: The 'focused' prop doesn't actually focus the textarea.
+		// We must call .focus() explicitly after mount.
 		setTimeout(() => textareaRef?.focus(), 0);
 	});
 	onCleanup(() => { props.ref?.(undefined); });
@@ -102,11 +114,13 @@ export function Prompt(props: PromptProps) {
 		const text = input().trim();
 		if (!text) return;
 
+		// Exit commands
 		if (text === "exit" || text === "quit" || text === ":q") {
 			exit();
 			return;
 		}
 
+		// Shell mode: !command
 		if (text.startsWith("!") && !shellMode()) {
 			const cmd = text.slice(1).trim();
 			if (cmd) {
@@ -117,10 +131,12 @@ export function Prompt(props: PromptProps) {
 			return;
 		}
 
+		// Clear input and reset
 		setInput("");
 		if (textareaRef) textareaRef.clear();
 		setThinkingHint("");
 
+		// Navigate to session on first submit from home
 		if (route.data().type === "home") {
 			route.navigate({
 				type: "session",
@@ -137,8 +153,20 @@ export function Prompt(props: PromptProps) {
 			textareaRef.cursorColor = props.disabled ? theme().border : theme().text;
 			textareaRef.traits = {
 				suspend: !!props.disabled,
-				status: shellMode() ? "!" : undefined,
+				status: shellMode() ? "SHELL" : undefined,
 			};
+		}
+	});
+
+	// Re-focus when visibility changes (dialog closes, route changes back to home)
+	createEffect(() => {
+		if (props.visible === false) {
+			textareaRef?.blur();
+		} else if (textareaRef && !textareaRef.isDestroyed && textareaRef.focused === false) {
+			// Only re-focus if not already focused and not suspended
+			if (!props.disabled) {
+				textareaRef.focus();
+			}
 		}
 	});
 
@@ -168,20 +196,21 @@ export function Prompt(props: PromptProps) {
 						cursorColor={theme().text}
 						minHeight={1}
 						maxHeight={6}
+						keyBindings={PROMPT_KEY_BINDINGS}
 						onContentChange={() => {
 							if (textareaRef) setInput(textareaRef.plainText);
 						}}
 						onKeyDown={(e: any) => {
 							if (props.disabled) { e.preventDefault(); return; }
 
-							// Ctrl+C or Ctrl+D with empty input → exit app (OpenCode pattern)
+							// Ctrl+C or Ctrl+D with empty input → exit app
 							if ((e.ctrl && (e.name === "c" || e.name === "d")) && input().trim() === "") {
 								e.preventDefault();
 								exit();
 								return;
 							}
 
-							// Escape: abort current or exit shell mode
+							// Escape: exit shell mode or abort
 							if (e.name === "escape") {
 								if (shellMode()) {
 									setShellMode(false);
@@ -198,17 +227,10 @@ export function Prompt(props: PromptProps) {
 								return;
 							}
 
-							// Backspace at start → exit shell mode
+							// Backspace at start in shell mode → exit shell mode
 							if (e.name === "backspace" && shellMode() && textareaRef?.visualCursor?.offset === 0) {
 								setShellMode(false);
 								e.preventDefault();
-								return;
-							}
-
-							// Shift+Enter → follow-up message (after agent finishes)
-							if (e.name === "return" && e.shift) {
-								e.preventDefault();
-								doSubmit({ followUp: true });
 								return;
 							}
 						}}
@@ -245,11 +267,7 @@ export function Prompt(props: PromptProps) {
 					esc abort
 				</text>
 				<text fg={theme().textMuted}>
-					enter steer
-					{"  "}
-					shift+enter follow
-					{"  "}
-					! shell
+					enter send · shift+enter newline
 				</text>
 			</box>
 		</box>
