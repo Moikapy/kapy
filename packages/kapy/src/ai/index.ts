@@ -1,4 +1,5 @@
 export { KapyAgent } from "./agent/agent.js";
+export { AgentLoop } from "./agent-loop.js";
 export type {
 	AgentEvent,
 	AgentMessage,
@@ -27,3 +28,6 @@ export type {
 export { buildRegistrySchema } from "./schema.js";
 export { SessionManager } from "./session/manager.js";
 export type { AppendMessageOptions, SessionEntry } from "./session/types.js";
+export { AgentLoop } from "./agent-loop.js";
+export { createBuiltinSlashCommands, processSlashCommand } from "./slash-commands.js";
+export type { SlashCommandContext, SlashCommandDefinition } from "./slash-commands.js";
