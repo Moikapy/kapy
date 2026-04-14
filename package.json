@@ -16,7 +16,8 @@
 		"check": "biome check . && tsc --noEmit && bun test packages/kapy/test/",
 		"version:bump": "bun scripts/bump-version.ts",
 		"release": "bun scripts/release.ts",
-		"prepare": "husky"
+		"prepare": "husky",
+		"tui": "bun run packages/kapy/src/cli.ts"
 	},
 	"devDependencies": {
 		"typescript": "^5.7.0",
