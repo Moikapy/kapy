@@ -31,3 +31,5 @@ export type { AppendMessageOptions, SessionEntry } from "./session/types.js";
 export { AgentLoop } from "./agent-loop.js";
 export { createBuiltinSlashCommands, processSlashCommand } from "./slash-commands.js";
 export type { SlashCommandContext, SlashCommandDefinition } from "./slash-commands.js";
+export { ChatSession } from "./chat-session.js";
+export type { ChatMessage, ChatSessionOptions } from "./chat-session.js";

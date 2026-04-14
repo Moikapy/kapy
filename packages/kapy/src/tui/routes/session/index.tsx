@@ -1,6 +1,8 @@
 /**
  * Session route — Chat interface with messages + sidebar + prompt.
  * 1:1 with OpenCode's Session component.
+ *
+ * Now wired to ChatSession (AgentLoop + ProviderRegistry + ToolRegistry).
  */
 
 import {
@@ -9,6 +11,7 @@ import {
 	createSignal,
 	For,
 	Match,
+	onCleanup,
 	Show,
 	Switch,
 } from "solid-js";
@@ -17,73 +20,74 @@ import { useRoute } from "../../context/route.js";
 import { Prompt, type PromptRef } from "../../component/prompt.jsx";
 import { Sidebar } from "./sidebar.jsx";
 import type { RouteData } from "../../context/route.js";
+import type { ChatSession, ChatMessage } from "../../../ai/chat-session.js";
+import type { AgentEvent } from "../../../ai/agent/types.js";
 
-/** Mock message type — will be replaced by SessionManager entries */
-interface Message {
-	id: string;
-	role: "user" | "assistant" | "tool" | "system";
-	content: string;
-	timestamp: number;
+interface SessionProps {
+	/** ChatSession instance (shared across the app) */
+	chatSession?: ChatSession;
 }
 
-export function Session() {
+export function Session(props: SessionProps) {
 	const route = useRoute();
 	const { theme } = useTheme();
 	const [sidebarOpen, setSidebarOpen] = createSignal(false);
-	const [messages, setMessages] = createSignal<Message[]>([]);
+	const [messages, setMessages] = createSignal<ChatMessage[]>([]);
+	const [isProcessing, setIsProcessing] = createSignal(false);
 	let promptRef: PromptRef | undefined;
+	let chat: ChatSession | undefined = props.chatSession;
 
-	// When navigating to session with initial prompt, add it as user message
+	// Subscribe to chat session events
+	if (chat) {
+		const unsub = chat.onEvent((_event) => {
+			// Trigger reactive update by copying message list
+			setMessages([...chat!.messages]);
+			setIsProcessing(chat!.isProcessing);
+		});
+		onCleanup(() => unsub());
+	}
+
+	// When navigating to session with initial prompt, submit it
 	createEffect(() => {
 		const data = route.data();
 		if (data.type !== "session") return;
 		const initial = (data as Extract<RouteData, { type: "session" }>).initialPrompt;
-		if (initial?.input) {
-			setMessages((prev) => [
-				...prev,
-				{
-					id: `msg-${Date.now()}`,
-					role: "user",
-					content: initial.input,
-					timestamp: Date.now(),
-				},
-			]);
+		if (initial?.input && chat) {
+			// Only submit once — clear the initialPrompt after use
+			(async () => {
+				await chat!.send(initial.input);
+				setMessages([...chat!.messages]);
+			})();
 		}
 	});
 
+	// Periodically sync messages while processing
+	if (chat) {
+		const interval = setInterval(() => {
+			if (chat) {
+				setMessages([...chat.messages]);
+				setIsProcessing(chat.isProcessing);
+			}
+		}, 100);
+		onCleanup(() => clearInterval(interval));
+	}
+
 	const sidebarVisible = createMemo(() => sidebarOpen());
-	const contentWidth = createMemo(() => 80);
 
 	const bind = (r: PromptRef | undefined) => {
 		promptRef = r;
 	};
 
-	const onSubmit = () => {
+	const onSubmit = async () => {
 		const input = promptRef?.current.input;
 		if (!input?.trim()) return;
-		setMessages((prev) => [
-			...prev,
-			{
-				id: `msg-${Date.now()}`,
-				role: "user",
-				content: input,
-				timestamp: Date.now(),
-			},
-		]);
 		promptRef?.set({ input: "", parts: [] });
 
-		// Simulate assistant response (replaced by KapyAgent in production)
-		setTimeout(() => {
-			setMessages((prev) => [
-				...prev,
-				{
-					id: `msg-${Date.now() + 1}`,
-					role: "assistant",
-					content: `Processing: ${input}\n\nI'll help you with that. The kapy agent loop will be connected here.`,
-					timestamp: Date.now(),
-				},
-			]);
-		}, 500);
+		if (chat) {
+			await chat.send(input);
+			setMessages([...chat.messages]);
+			setIsProcessing(chat.isProcessing);
+		}
 	};
 
 	return (
@@ -104,14 +108,29 @@ export function Session() {
 								<Match when={message.role === "tool"}>
 									<ToolMessage message={message} />
 								</Match>
+								<Match when={message.role === "system"}>
+									<SystemMessage message={message} />
+								</Match>
 							</Switch>
 						)}
 					</For>
+
+					{/* Processing indicator */}
+					<Show when={isProcessing()}>
+						<box paddingLeft={3} marginTop={1} flexShrink={0}>
+							<text fg={theme().accent}>●</text>
+							<text fg={theme().textMuted}> thinking...</text>
+						</box>
+					</Show>
 				</scrollbox>
 
 				{/* Input prompt */}
 				<box flexShrink={0}>
-					<Prompt ref={bind} onSubmit={onSubmit} />
+					<Prompt
+						ref={bind}
+						onSubmit={onSubmit}
+						disabled={isProcessing()}
+					/>
 				</box>
 			</box>
 
@@ -123,7 +142,7 @@ export function Session() {
 	);
 }
 
-function UserMessage(props: { message: Message }) {
+function UserMessage(props: { message: ChatMessage }) {
 	const { theme } = useTheme();
 
 	return (
@@ -145,17 +164,22 @@ function UserMessage(props: { message: Message }) {
 	);
 }
 
-function AssistantMessage(props: { message: Message }) {
+function AssistantMessage(props: { message: ChatMessage }) {
 	const { theme } = useTheme();
 
 	return (
 		<box paddingLeft={3} marginTop={1} flexShrink={0}>
-			<text fg={theme().text}>{props.message.content}</text>
+			<text fg={theme().text}>
+				{props.message.content}
+				<Show when={props.message.isStreaming}>
+					<span style={{ fg: theme().accent }}> ●</span>
+				</Show>
+			</text>
 		</box>
 	);
 }
 
-function ToolMessage(props: { message: Message }) {
+function ToolMessage(props: { message: ChatMessage }) {
 	const { theme } = useTheme();
 
 	return (
@@ -163,6 +187,16 @@ function ToolMessage(props: { message: Message }) {
 			<text fg={theme().textMuted}>
 				<b>▸ tool</b>
 			</text>
+			<text fg={theme().textMuted}>{props.message.content}</text>
+		</box>
+	);
+}
+
+function SystemMessage(props: { message: ChatMessage }) {
+	const { theme } = useTheme();
+
+	return (
+		<box paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1} marginTop={1} flexShrink={0}>
 			<text fg={theme().textMuted}>{props.message.content}</text>
 		</box>
 	);

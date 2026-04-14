@@ -3,18 +3,12 @@
  *
  * Two routes: Home (logo + prompt) and Session (chat interface).
  * Uses Solid + @opentui/solid for rendering.
- * Kapy branding: 🐹 hamster blue accent on dark background.
- *
- * Layers (matching OpenCode):
- * - RouteProvider: home ↔ session navigation
- * - ThemeProvider: dark/light color palette
- * - DialogProvider: modal overlays (model, help, agent selector)
- * - Footer: cwd, permissions, tool count
+ * ChatSession wires the agent loop to the TUI.
  */
 
 import { render, useKeyboard, useTerminalDimensions } from "@opentui/solid";
 import { createCliRenderer, type CliRendererConfig } from "@opentui/core";
-import { Switch, Match, Show } from "solid-js";
+import { createSignal, Show, Switch, Match, onCleanup } from "solid-js";
 import { RouteProvider, useRoute } from "./context/route.jsx";
 import { ThemeProvider, useTheme } from "./context/theme.jsx";
 import { DialogProvider, useDialog } from "./context/dialog.jsx";
@@ -23,6 +17,7 @@ import { Session } from "./routes/session/index.jsx";
 import { Footer } from "./component/footer.jsx";
 import { HelpDialog } from "./component/help-dialog.jsx";
 import { ModelDialog } from "./component/model-dialog.jsx";
+import { ChatSession } from "../ai/chat-session.js";
 
 function rendererConfig(): CliRendererConfig {
 	return {
@@ -48,10 +43,22 @@ export async function launchChatTUI(): Promise<void> {
 
 	const renderer = await createCliRenderer(rendererConfig());
 
-	await render(() => <KapyApp />, renderer);
+	// Create shared ChatSession
+	const chatSession = new ChatSession({
+		systemPrompt: `You are Kapy, an agent-first CLI assistant. You help users with coding, debugging, and system tasks. You have access to tools for reading files, running commands, and more. Be concise and direct.`,
+	});
+
+	// Initialize providers (auto-detect Ollama)
+	await chatSession.init();
+
+	await render(() => <KapyApp chatSession={chatSession} />, renderer);
 }
 
-function KapyApp() {
+interface KapyAppProps {
+	chatSession: ChatSession;
+}
+
+function KapyApp(props: KapyAppProps) {
 	const route = useRoute();
 	const dimensions = useTerminalDimensions();
 	const { theme } = useTheme();
@@ -59,24 +66,16 @@ function KapyApp() {
 
 	// Global keyboard handling
 	useKeyboard((evt) => {
-		// Ctrl+C exits
 		if (evt.ctrl && evt.name === "c") {
 			return;
 		}
 
-		// Escape: close dialog or go home
 		if (evt.name === "escape") {
 			if (dialog.open()) {
 				dialog.closeDialog();
 			} else if (route.data().type === "session") {
 				route.navigate({ type: "home" });
 			}
-			return;
-		}
-
-		// Slash commands (forwarded from prompt)
-		if (evt.name === "/") {
-			// Will be handled by prompt component in the future
 			return;
 		}
 	});
@@ -95,13 +94,16 @@ function KapyApp() {
 						<Home />
 					</Match>
 					<Match when={route.data().type === "session"}>
-						<Session />
+						<Session chatSession={props.chatSession} />
 					</Match>
 				</Switch>
 			</box>
 
 			{/* Footer status bar */}
-			<Footer />
+			<Footer
+				toolCount={props.chatSession.tools.all().length}
+				providerStatus={props.chatSession.providers.all().length > 0 ? "connected" : "disconnected"}
+			/>
 
 			{/* Dialog overlays */}
 			<Show when={dialog.open() === "help"}>
