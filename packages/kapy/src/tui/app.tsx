@@ -208,7 +208,7 @@ function App() {
               <box flexGrow={1} minHeight={0} />
               <ascii_font text="KAPY" font="tiny" color="#00AAFF" />
               <text fg="#565f89">agent-first cli</text>
-              <box height={1} />
+              <box height={2} />
               <box border={["left"]} borderColor="#00AAFF" width="100%" maxWidth={72}>
                 <box paddingLeft={2} paddingTop={1} paddingBottom={1} backgroundColor="#22223a">
                   <textarea focused placeholder="Ask anything..." placeholderColor="#565f89"
