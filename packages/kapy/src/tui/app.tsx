@@ -62,7 +62,7 @@ async function executeTool(name: string, argsJson: string): Promise<string> {
   } catch (err) { return `Error: ${err instanceof Error ? err.message : String(err)}`; }
 }
 
-interface Msg { id: string; role: "user" | "assistant"; content: string; streaming?: boolean; reasoning?: string }
+interface Msg { id: string; role: "user" | "assistant" | "system" | "tool_call" | "tool_result"; content: string; streaming?: boolean; reasoning?: string; toolName?: string }
 
 function App() {
   const route = useContext(RC)!;
@@ -97,7 +97,7 @@ function App() {
 
     const apiMsgs: Array<{role: string; content: string; tool_call_id?: string}> = [
       { role: "system", content: sysPrompt },
-      ...msgs().map(m => ({ role: m.role, content: m.content })),
+      ...msgs().filter(m => m.role !== "tool_call" && m.role !== "tool_result").map(m => ({ role: m.role, content: m.content })),
       { role: "user", content: userMsg },
     ];
 
@@ -150,10 +150,10 @@ function App() {
         apiMsgs.push({ role: "assistant", content: full });
         for (const tc of toolCalls) {
           const toolMsg = `⟹ ${tc.name}(${tc.args.length > 80 ? tc.args.slice(0,77)+"..." : tc.args})`;
-          setMsgs(p => [...p, { id: "t"+Date.now(), role: "assistant", content: toolMsg }]);
+          setMsgs(p => [...p, { id: "t"+Date.now(), role: "tool_call", content: toolMsg, toolName: tc.name }]);
           const result = await executeTool(tc.name, tc.args);
           const preview = result.length > 200 ? result.slice(0,197)+"..." : result;
-          setMsgs(p => [...p, { id: "r"+Date.now(), role: "assistant", content: `⟸ ${preview}` }]);
+          setMsgs(p => [...p, { id: "r"+Date.now(), role: "tool_result", content: preview, toolName: tc.name }]);
           apiMsgs.push({ role: "tool", content: result, tool_call_id: tc.id });
         }
       }
@@ -180,14 +180,14 @@ function App() {
     if (c === "/tools") {
       import("../tool/index.js").then(m => {
         const names = [m.readFileTool.name, m.writeFileTool.name, m.bashTool.name, m.globTool.name, m.grepTool.name].join(", ");
-        batch(() => { setMsgs(p => [...p, { id: "t"+Date.now(), role: "assistant", content: `Available tools: ${names}` }]); });
+        batch(() => { setMsgs(p => [...p, { id: "t"+Date.now(), role: "system", content: `Available tools: ${names}` }]); });
       });
       return true;
     }
     if (c === "/help") {
       batch(() => {
         setMsgs(p => [...p,
-          { id: "h"+Date.now(), role: "assistant", content: "Commands:\n  /help     Show this help\n  /model X   Switch to model X\n  /models    List available models\n  /tools     List registered tools\n  /sidebar   Toggle sidebar\n  /clear     Clear chat\n  exit       Quit kapy" }
+          { id: "h"+Date.now(), role: "system", content: "Commands:\n  /help     Show this help\n  /model X   Switch to model X\n  /models    List available models\n  /tools     List registered tools\n  /sidebar   Toggle sidebar\n  /clear     Clear chat\n  exit       Quit kapy" }
         ]);
       });
       return true;
@@ -229,14 +229,16 @@ function App() {
               <scrollbox ref={(r: any) => { scrollRef = r; }} flexGrow={1} minHeight={0}>
                 <box height={1} />
                 <Show when={msgs().length === 0}><text fg="#565f89">No messages yet.</text></Show>
-                {msgs().map(m =>
-                  m.role === "user"
-                    ? <box border={["left"]} borderColor="#00AAFF" marginTop={1} flexShrink={0}><box paddingTop={1} paddingBottom={1} paddingLeft={2} backgroundColor="#1a1a2e"><text fg="#c0caf5">{m.content}</text></box></box>
-                    : <box paddingLeft={3} marginTop={1} flexShrink={0}>
-                        {(m.reasoning ?? "") !== "" && <box><text fg="#565f89" italic>{m.reasoning}</text></box>}
-                        <text fg="#9ece6a">{m.content}{m.streaming ? " ●" : ""}</text>
-                      </box>
-                )}
+                {msgs().map(m => {
+                  if (m.role === "user") return <box border={["left"]} borderColor="#00AAFF" marginTop={1} flexShrink={0}><box paddingTop={1} paddingBottom={1} paddingLeft={2} backgroundColor="#1a1a2e"><text fg="#c0caf5">{m.content}</text></box></box>;
+                  if (m.role === "system") return <box paddingLeft={3} marginTop={1} flexShrink={0}><text fg="#7aa2f7">{m.content}</text></box>;
+                  if (m.role === "tool_call") return <box border={["left"]} borderColor="#e0af68" marginTop={1} flexShrink={0}><box paddingLeft={2} paddingTop={1} paddingBottom={1} backgroundColor="#2a2a1e"><text fg="#e0af68">{"⚙ "}{m.content}</text></box></box>;
+                  if (m.role === "tool_result") return <box border={["left"]} borderColor="#565f89" marginTop={1} flexShrink={0}><box paddingLeft={2} paddingTop={1} paddingBottom={1} backgroundColor="#1a1a2a"><text fg="#a9b1d6">{"↳ "}{m.content}</text></box></box>;
+                  return <box paddingLeft={3} marginTop={1} flexShrink={0}>
+                    {(m.reasoning ?? "") !== "" && <box><text fg="#565f89" italic>{m.reasoning}</text></box>}
+                    <text fg="#9ece6a">{m.content}{m.streaming ? " ●" : ""}</text>
+                  </box>;
+                })}
                 <box height={2} />
               </scrollbox>
               <Show when={err().length > 0}><text fg="#f7768e">Error: {err()}</text></Show>
