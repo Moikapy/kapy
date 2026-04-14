@@ -35,3 +35,5 @@ export { ChatSession } from "./chat-session.js";
 export type { ChatMessage, ChatSessionOptions } from "./chat-session.js";
 export { ContextTracker } from "./context-tracker.js";
 export type { ContextUsage } from "./context-tracker.js";
+export { MemoryStore } from "./memory.js";
+export type { MemoryEntry, MemoryScope } from "./memory.js";
