@@ -1,6 +1,12 @@
 import { createCliRenderer, type KeyBinding } from "@opentui/core";
 import { render, useTerminalDimensions } from "@opentui/solid";
 import { createSignal, createEffect, batch, Show, createContext, useContext, type ParentComponent } from "solid-js";
+import { ToolRegistry as ToolReg } from "../tool/index.js";
+import { readFileTool as rFT, writeFileTool as wFT, bashTool as bT, globTool as gT, grepTool as grT } from "../tool/index.js";
+
+// Create and register built-in tools
+const tools = new ToolReg();
+tools.register(rFT); tools.register(wFT); tools.register(bT); tools.register(gT); tools.register(grT);
 
 type RD = { type: "home" } | { type: "session"; sid: string };
 const RC = createContext<{ data: () => RD; navigate: (r: RD) => void }>();
@@ -44,6 +50,15 @@ async function* streamOllama(model: string, msgs: API[], sig?: AbortSignal): Asy
           // Some models (GLM) return reasoning_content separately
           if (p.choices?.[0]?.delta?.reasoning_content) yield "\u0000r" + p.choices[0].delta.reasoning_content; } catch {} } }
   } finally { rd.releaseLock(); }
+}
+
+// Fetch available models from Ollama
+async function fetchModels(): Promise<string[]> {
+  try {
+    const res = await fetch("http://localhost:11434/v1/models");
+    const data = await res.json();
+    return (data.data || []).map((m: any) => m.id).sort();
+  } catch { return []; }
 }
 
 interface Msg { id: string; role: "user" | "assistant"; content: string; streaming?: boolean; reasoning?: string }
@@ -97,18 +112,22 @@ function App() {
     if (c === "/sidebar" || c === "/sb") { setSidebar(v=>!v); return true; }
     if (c === "/clear") { setMsgs([]); return true; }
     if (c === "/models") {
-      fetch("http://localhost:11434/v1/models").then(r => r.json())
-        .then(d => { const names = (d.data||[]).map((m:any) => m.id).sort(); setModels(names); setSidebar(true); })
+      fetchModels().then(names => { setModels(names); setSidebar(true); })
         .catch(() => setErr("Failed to fetch models"));
       return true;
     }
     // /model <name> to switch
     const modelMatch = t.trim().match(/^\/model\s+(.+)$/i);
     if (modelMatch) { setModel(modelMatch[1].trim()); return true; }
+    if (c === "/tools") {
+      const names = tools.all().map(t => t.name).join(", ");
+      batch(() => { setMsgs(p => [...p, { id: "t"+Date.now(), role: "assistant", content: `Available tools: ${names}` }]); });
+      return true;
+    }
     if (c === "/help") {
       batch(() => {
         setMsgs(p => [...p,
-          { id: "h"+Date.now(), role: "assistant", content: "Commands:\n  /help     Show this help\n  /model X   Switch to model X\n  /models    List available models\n  /sidebar   Toggle sidebar\n  /clear     Clear chat\n  exit       Quit kapy" }
+          { id: "h"+Date.now(), role: "assistant", content: "Commands:\n  /help     Show this help\n  /model X   Switch to model X\n  /models    List available models\n  /tools     List registered tools\n  /sidebar   Toggle sidebar\n  /clear     Clear chat\n  exit       Quit kapy" }
         ]);
       });
       return true;
@@ -198,6 +217,9 @@ function App() {
             <box height={1} />
             <text fg="#00AAFF">▸ Messages</text>
             <text fg="#c0caf5">  {msgs().length}</text>
+            <box height={1} />
+            <text fg="#00AAFF">▸ Tools</text>
+            <text fg="#c0caf5">  {tools.toolCount}</text>
             <box height={1} />
             <text fg="#00AAFF">▸ Commands</text>
             <text fg="#565f89">  /sidebar /clear</text>
