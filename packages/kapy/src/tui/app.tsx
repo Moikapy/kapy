@@ -210,7 +210,7 @@ function App() {
               <text fg="#565f89">agent-first cli</text>
               <box height={1} />
               <box border={["left"]} borderColor="#00AAFF" width="100%" maxWidth={72}>
-                <box paddingLeft={2} paddingTop={1} backgroundColor="#22223a">
+                <box paddingLeft={2} paddingTop={1} paddingBottom={1} backgroundColor="#22223a">
                   <textarea focused placeholder="Ask anything..." placeholderColor="#565f89"
                     textColor="#c0caf5" focusedTextColor="#c0caf5" focusedBackgroundColor="#22223a"
                     cursorColor="#c0caf5" minHeight={1} maxHeight={4} keyBindings={KB}
