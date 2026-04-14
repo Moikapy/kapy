@@ -8,3 +8,4 @@ export type {
 	ToolUpdateCallback,
 } from "./types.js";
 export { zodToJsonSchema } from "./zod-to-json-schema.js";
+export { readFileTool, writeFileTool, bashTool, globTool, grepTool } from "./builtin/index.js";

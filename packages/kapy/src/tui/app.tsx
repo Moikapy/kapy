@@ -40,11 +40,13 @@ async function* streamOllama(model: string, msgs: API[], sig?: AbortSignal): Asy
     while (true) { const { done, value } = await rd.read(); if (done) break;
       buf += dec.decode(value, { stream: true }); const ls = buf.split("\n"); buf = ls.pop() || "";
       for (const l of ls) { const d = l.startsWith("data: ") ? l.slice(6) : l; if (d === "[DONE]") return;
-        try { const p = JSON.parse(d); if (p.choices?.[0]?.delta?.content) yield p.choices[0].delta.content; } catch {} } }
+        try { const p = JSON.parse(d); if (p.choices?.[0]?.delta?.content) yield p.choices[0].delta.content;
+          // Some models (GLM) return reasoning_content separately
+          if (p.choices?.[0]?.delta?.reasoning_content) yield "\u0000r" + p.choices[0].delta.reasoning_content; } catch {} } }
   } finally { rd.releaseLock(); }
 }
 
-interface Msg { id: string; role: "user" | "assistant"; content: string; streaming?: boolean }
+interface Msg { id: string; role: "user" | "assistant"; content: string; streaming?: boolean; reasoning?: string }
 
 function App() {
   const route = useContext(RC)!;
@@ -73,10 +75,11 @@ function App() {
     setMsgs(p => [...p, { id: aId, role: "assistant", content: "", streaming: true }]);
     try {
       const apiMsgs: API[] = [{ role: "system", content: sysPrompt }, ...msgs().map(m => ({ role: m.role, content: m.content })), { role: "user", content: userMsg }];
-      let full = "";
+      let full = ""; let reasoning = "";
       for await (const chunk of streamOllama(model(), apiMsgs, abortCtrl.signal)) {
-        full += chunk;
-        setMsgs(p => { const u=[...p]; const i=u.findIndex(m=>m.id===aId); if(i!==-1) u[i]={...u[i],content:full,streaming:true}; return u; });
+        if (chunk.startsWith("\0r")) { reasoning += chunk.slice(2); }
+        else { full += chunk; }
+        setMsgs(p => { const u=[...p]; const i=u.findIndex(m=>m.id===aId); if(i!==-1) u[i]={...u[i],content:full,streaming:true,reasoning:reasoning||undefined}; return u; });
       }
     } catch (e: any) { if (e.name !== "AbortError") setErr(e instanceof Error ? e.message : String(e)); }
     finally {
@@ -102,6 +105,14 @@ function App() {
     // /model <name> to switch
     const modelMatch = t.trim().match(/^\/model\s+(.+)$/i);
     if (modelMatch) { setModel(modelMatch[1].trim()); return true; }
+    if (c === "/help") {
+      batch(() => {
+        setMsgs(p => [...p,
+          { id: "h"+Date.now(), role: "assistant", content: "Commands:\n  /help     Show this help\n  /model X   Switch to model X\n  /models    List available models\n  /sidebar   Toggle sidebar\n  /clear     Clear chat\n  exit       Quit kapy" }
+        ]);
+      });
+      return true;
+    }
     return false;
   };
 
@@ -142,7 +153,10 @@ function App() {
                 {msgs().map(m =>
                   m.role === "user"
                     ? <box border={["left"]} borderColor="#00AAFF" marginTop={1} flexShrink={0}><box paddingTop={1} paddingBottom={1} paddingLeft={2} backgroundColor="#1a1a2e"><text fg="#c0caf5">{m.content}</text></box></box>
-                    : <box paddingLeft={3} marginTop={1} flexShrink={0}><text fg="#9ece6a">{m.content}{m.streaming ? " ●" : ""}</text></box>
+                    : <box paddingLeft={3} marginTop={1} flexShrink={0}>
+                        {(m.reasoning ?? "") !== "" && <box><text fg="#565f89" italic>{m.reasoning}</text></box>}
+                        <text fg="#9ece6a">{m.content}{m.streaming ? " ●" : ""}</text>
+                      </box>
                 )}
                 <box height={2} />
               </scrollbox>
