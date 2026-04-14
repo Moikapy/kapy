@@ -57,6 +57,7 @@ export async function launchChatTUI(): Promise<void> {
 
 		const chatSession = new ChatSession({
 			systemPrompt: `You are Kapy, an agent-first CLI assistant. Help with coding, debugging, and system tasks. Be concise.`,
+			defaultModel: "ollama:glm-5.1:cloud",
 		});
 
 		await chatSession.init();

@@ -62,12 +62,14 @@ export class ChatSession {
 	private _isProcessing = false;
 	private initialized = false;
 	private sessionId: string;
+	private defaultModel: string | undefined;
 
 	constructor(options?: ChatSessionOptions) {
 		this.agent = new KapyAgent();
 		this.providers = new ProviderRegistry();
 		this.tools = new ToolRegistry();
 		this.permissions = new PermissionEvaluator(options?.permissionRules ?? []);
+		this.defaultModel = options?.defaultModel;
 		this.sessions = new SessionManager();
 		this.sessionId = `chat-${Date.now()}`;
 		this.contextTracker = new ContextTracker();
@@ -311,6 +313,12 @@ export class ChatSession {
 
 	/** Auto-select a model from available providers */
 	private autoSelectModel(): void {
+		// Use default model if specified
+		if (this.defaultModel) {
+			this.agent.setModel({ id: this.defaultModel, provider: "ollama" });
+			return;
+		}
+
 		const models = this.providers.getAllModels();
 		if (models.length === 0) return;
 
