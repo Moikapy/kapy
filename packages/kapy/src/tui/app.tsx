@@ -206,7 +206,7 @@ function App() {
           <Show when={route.data().type === "home"}>
             <box flexDirection="column" alignItems="center" paddingLeft={2} paddingRight={2} flexGrow={1}>
               <box flexGrow={1} minHeight={0} />
-              <text fg="#00AAFF" bold>KAPY</text>
+              <ascii_font text="KAPY" font="tiny" color="#00AAFF" />
               <text fg="#565f89">agent-first cli</text>
               <box height={1} />
               <box border={["left"]} borderColor="#00AAFF" width="100%" maxWidth={72}>
