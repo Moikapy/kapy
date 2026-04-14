@@ -76,23 +76,18 @@ function App() {
   );
 }
 
-export async function launchChatTUI(): Promise<void> {
-	if (!process.stdout.isTTY) {
-		console.error("TUI requires an interactive terminal (TTY).");
-		return;
-	}
-	const renderer = await createCliRenderer({
-		externalOutputMode: "passthrough" as const,
-		targetFps: 60,
-		gatherStats: false,
-		exitOnCtrlC: false,
-		useKittyKeyboard: {},
-		autoFocus: true,
-		openConsoleOnError: false,
-	});
-	const cleanup = () => { try { renderer.destroy(); } catch {} };
-	process.on("SIGHUP", () => { cleanup(); process.exit(0); });
-	process.on("SIGINT", () => { cleanup(); process.exit(0); });
-	process.on("SIGTERM", () => { cleanup(); process.exit(0); });
-	await render(() => <RP><App /></RP>, renderer);
+async function main() {
+  const renderer = await createCliRenderer({
+    externalOutputMode: "passthrough",
+    targetFps: 60,
+    exitOnCtrlC: false,
+    useKittyKeyboard: {},
+    autoFocus: true,
+    openConsoleOnError: false,
+  });
+  process.on("SIGHUP", () => { try { renderer.destroy(); } catch {} process.exit(0); });
+  process.on("SIGINT", () => { try { renderer.destroy(); } catch {} process.exit(0); });
+  setTimeout(() => { try { renderer.destroy(); } catch {} process.exit(0); }, 5000);
+  await render(() => <RP><App /></RP>, renderer);
 }
+main().catch(e => { console.error(e); process.exit(1); });
