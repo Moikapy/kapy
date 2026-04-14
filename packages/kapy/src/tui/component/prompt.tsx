@@ -203,13 +203,6 @@ export function Prompt(props: PromptProps) {
 						onKeyDown={(e: any) => {
 							if (props.disabled) { e.preventDefault(); return; }
 
-							// Ctrl+C or Ctrl+D with empty input → exit app
-							if ((e.ctrl && (e.name === "c" || e.name === "d")) && input().trim() === "") {
-								e.preventDefault();
-								exit();
-								return;
-							}
-
 							// Escape: exit shell mode or abort
 							if (e.name === "escape") {
 								if (shellMode()) {

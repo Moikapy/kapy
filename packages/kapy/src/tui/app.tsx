@@ -94,10 +94,16 @@ function KapyApp(props: KapyAppProps) {
 	const dimensions = useTerminalDimensions();
 	const { theme } = useTheme();
 	const dialog = useDialog();
+	const exit = useExit();
 
-	// Global keyboard: only Escape for dialog/close
-	// Ctrl+C is handled in Prompt component (OpenCode pattern)
+	// Global keyboard handlers
+	// Ctrl+C: exit the app (must be global, not in textarea, because
+	// TextareaRenderable may consume the key before onKeyDown fires)
 	useKeyboard((evt) => {
+		if (evt.ctrl && (evt.name === "c" || evt.name === "d")) {
+			exit("Ctrl+C");
+			return;
+		}
 		if (evt.name === "escape") {
 			if (dialog.open()) {
 				dialog.closeDialog();
