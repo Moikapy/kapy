@@ -1,14 +1,14 @@
 /**
  * Kapy TUI App — 1:1 with OpenCode's TUI architecture.
  *
- * Two routes: Home (logo + prompt) and Session (chat interface).
- * Uses Solid + @opentui/solid for rendering.
- * ChatSession wires the agent loop to the TUI.
+ * CRITICAL: Renderer cleanup is mandatory. createCliRenderer puts the terminal
+ * into alternate screen buffer + raw mode. If we crash without calling
+ * renderer.destroy(), the terminal is left in a broken state (borked tmux).
  */
 
 import { render, useKeyboard, useTerminalDimensions } from "@opentui/solid";
-import { createCliRenderer, type CliRendererConfig } from "@opentui/core";
-import { createSignal, Show, Switch, Match, onCleanup } from "solid-js";
+import { createCliRenderer, type CliRenderer, type CliRendererConfig } from "@opentui/core";
+import { Show, Switch, Match } from "solid-js";
 import { RouteProvider, useRoute } from "./context/route.jsx";
 import { ThemeProvider, useTheme } from "./context/theme.jsx";
 import { DialogProvider, useDialog } from "./context/dialog.jsx";
@@ -41,17 +41,52 @@ export async function launchChatTUI(): Promise<void> {
 		return;
 	}
 
-	const renderer = await createCliRenderer(rendererConfig());
+	let renderer: CliRenderer | undefined;
 
-	// Create shared ChatSession
-	const chatSession = new ChatSession({
-		systemPrompt: `You are Kapy, an agent-first CLI assistant. You help users with coding, debugging, and system tasks. You have access to tools for reading files, running commands, and more. Be concise and direct.`,
-	});
+	try {
+		renderer = await createCliRenderer(rendererConfig());
 
-	// Initialize providers (auto-detect Ollama)
-	await chatSession.init();
+		const chatSession = new ChatSession({
+			systemPrompt: `You are Kapy, an agent-first CLI assistant. You help users with coding, debugging, and system tasks. You have access to tools for reading files, running commands, and more. Be concise and direct.`,
+		});
 
-	await render(() => <KapyApp chatSession={chatSession} />, renderer);
+		await chatSession.init();
+
+		// Signal handlers — MUST clean up terminal before exit
+		const onSigInt = () => { cleanup(); process.exit(0); };
+		const onSigTerm = () => { cleanup(); process.exit(0); };
+		const onUncaught = (err: Error) => { cleanup(); console.error("Kapy TUI error:", err.message); process.exit(1); };
+		process.on("SIGINT", onSigInt);
+		process.on("SIGTERM", onSigTerm);
+		process.on("uncaughtException", onUncaught);
+
+		await render(() => (
+			<ThemeProvider>
+				<RouteProvider>
+					<DialogProvider>
+						<KapyApp chatSession={chatSession} />
+					</DialogProvider>
+				</RouteProvider>
+			</ThemeProvider>
+		), renderer);
+
+		cleanup();
+
+		function cleanup() {
+			if (renderer) {
+				try { renderer.destroy(); } catch { /* already destroyed */ }
+				renderer = undefined;
+			}
+			process.removeListener("SIGINT", onSigInt);
+			process.removeListener("SIGTERM", onSigTerm);
+			process.removeListener("uncaughtException", onUncaught);
+		}
+	} catch (err) {
+		if (renderer) {
+			try { renderer.destroy(); } catch { /* give up */ }
+		}
+		throw err;
+	}
 }
 
 interface KapyAppProps {
@@ -64,19 +99,16 @@ function KapyApp(props: KapyAppProps) {
 	const { theme } = useTheme();
 	const dialog = useDialog();
 
-	// Global keyboard handling
 	useKeyboard((evt) => {
 		if (evt.ctrl && evt.name === "c") {
-			return;
+			return; // Let SIGINT handler do cleanup
 		}
-
 		if (evt.name === "escape") {
 			if (dialog.open()) {
 				dialog.closeDialog();
 			} else if (route.data().type === "session") {
 				route.navigate({ type: "home" });
 			}
-			return;
 		}
 	});
 
@@ -87,7 +119,6 @@ function KapyApp(props: KapyAppProps) {
 			backgroundColor={theme().background}
 			flexDirection="column"
 		>
-			{/* Main content area */}
 			<box flexGrow={1}>
 				<Switch>
 					<Match when={route.data().type === "home"}>
@@ -99,14 +130,12 @@ function KapyApp(props: KapyAppProps) {
 				</Switch>
 			</box>
 
-			{/* Footer status bar */}
 			<Footer
 				toolCount={props.chatSession.tools.all().length}
 				providerStatus={props.chatSession.providers.all().length > 0 ? "connected" : "disconnected"}
 				contextUsage={props.chatSession.getContextUsage().fraction}
 			/>
 
-			{/* Dialog overlays */}
 			<Show when={dialog.open() === "help"}>
 				<HelpDialog />
 			</Show>

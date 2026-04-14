@@ -159,6 +159,13 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 	// Initialize OpenTUI renderer
 	const renderer = await createCliRenderer({ exitOnCtrlC: false });
 
+	// Signal handlers for proper terminal cleanup
+	const cleanup = () => { try { renderer.destroy(); } catch { /* already destroyed */ } };
+	const onSigInt = () => { cleanup(); process.exit(0); };
+	const onSigTerm = () => { cleanup(); process.exit(0); };
+	process.on("SIGINT", onSigInt);
+	process.on("SIGTERM", onSigTerm);
+
 	async function rebuild(): Promise<void> {
 		// Clear existing tree
 		while ((renderer.root as unknown as { children: Renderable[] }).children.length > 0) {
@@ -198,7 +205,7 @@ export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promi
 	// Handle keyboard navigation
 	renderer.keyInput.on("keypress", (key: { name: string; ctrl?: boolean }) => {
 		if (key.name === "q" || (key.ctrl && key.name === "c")) {
-			renderer.destroy();
+			cleanup();
 			return;
 		}
 
