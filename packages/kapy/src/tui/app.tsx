@@ -29,7 +29,7 @@ function rendererConfig(): CliRendererConfig {
 		gatherStats: false,
 		exitOnCtrlC: false,
 		useKittyKeyboard: {},
-		autoFocus: false,
+		autoFocus: true,
 		openConsoleOnError: false,
 	};
 }

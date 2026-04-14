@@ -60,7 +60,6 @@ export function Prompt(props: PromptProps) {
 	const [thinkingHint, setThinkingHint] = createSignal<string>("");
 	let textareaRef: any;
 
-	// Placeholder rotation
 	const placeholder = () => {
 		if (shellMode()) {
 			const shellList = props.placeholders?.shell ?? ["ls -la", "git status", "pwd"];
@@ -98,13 +97,11 @@ export function Prompt(props: PromptProps) {
 		const text = input().trim();
 		if (!text) return;
 
-		// Exit commands
 		if (text === "exit" || text === "quit" || text === ":q") {
 			exit();
 			return;
 		}
 
-		// Shell mode: !command
 		if (text.startsWith("!") && !shellMode()) {
 			const cmd = text.slice(1).trim();
 			if (cmd) {
@@ -115,12 +112,10 @@ export function Prompt(props: PromptProps) {
 			return;
 		}
 
-		// Clear input
 		setInput("");
 		if (textareaRef) textareaRef.clear();
 		setThinkingHint("");
 
-		// Navigate to session on first submit from home
 		if (route.data().type === "home") {
 			route.navigate({
 				type: "session",
@@ -159,6 +154,7 @@ export function Prompt(props: PromptProps) {
 					backgroundColor={theme().backgroundElement}
 				>
 					<textarea
+						focused
 						placeholder={placeholder()}
 						placeholderColor={theme().textMuted}
 						textColor={theme().text}
@@ -216,7 +212,6 @@ export function Prompt(props: PromptProps) {
 							setTimeout(() => setTimeout(() => doSubmit(), 0), 0);
 						}}
 						ref={(r: any) => { textareaRef = r; }}
-						onMouseDown={(e: any) => e.target?.focus()}
 					/>
 
 					{/* Prompt bar: agent, model, hints */}
