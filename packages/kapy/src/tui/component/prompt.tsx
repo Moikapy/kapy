@@ -6,11 +6,11 @@
  * - Enter → steering message (sent after current tool calls finish)
  * - Shift+Enter → follow-up message (sent after agent finishes all work)
  * - Escape → abort + restore queued messages
- * - Tab → cycle agents
+ * - Ctrl+C / Ctrl+D with empty input → exit app (OpenCode pattern)
  * - `!` prefix → shell command
+ * - Tab → cycle agents (future)
  *
  * Thinking levels are implicit per-request, not a mode switch.
- * The agent decides how much to think based on the prompt.
  */
 
 import {
@@ -46,7 +46,7 @@ interface PromptProps {
 	sessionID?: string;
 	/** Current agent name (displayed in prompt bar) */
 	agentName?: string;
-	/** Current model name (displayed in prompt bar) */
+	/** Current model display name */
 	modelName?: string;
 	right?: JSX.Element;
 }
@@ -58,7 +58,7 @@ export function Prompt(props: PromptProps) {
 	const [input, setInput] = createSignal("");
 	const [shellMode, setShellMode] = createSignal(false);
 	const [thinkingHint, setThinkingHint] = createSignal<string>("");
-	let textareaRef: any; // TextareaRenderable ref
+	let textareaRef: any;
 
 	// Placeholder rotation
 	const placeholder = () => {
@@ -76,7 +76,6 @@ export function Prompt(props: PromptProps) {
 		return list[idx];
 	};
 
-	// Accent color
 	const accent = () => shellMode() ? theme().warning : theme().accent;
 
 	const ref: PromptRef = {
@@ -143,7 +142,6 @@ export function Prompt(props: PromptProps) {
 		}
 	});
 
-	// Model/agent display in prompt bar
 	const agentLabel = () => {
 		const name = props.agentName ?? "kapy";
 		const model = props.modelName ?? "";
@@ -175,6 +173,13 @@ export function Prompt(props: PromptProps) {
 						onKeyDown={(e: any) => {
 							if (props.disabled) { e.preventDefault(); return; }
 
+							// Ctrl+C or Ctrl+D with empty input → exit app (OpenCode pattern)
+							if ((e.ctrl && (e.name === "c" || e.name === "d")) && input().trim() === "") {
+								e.preventDefault();
+								exit();
+								return;
+							}
+
 							// Escape: abort current or exit shell mode
 							if (e.name === "escape") {
 								if (shellMode()) {
@@ -182,7 +187,6 @@ export function Prompt(props: PromptProps) {
 									e.preventDefault();
 									return;
 								}
-								// In session: abort current agent turn
 								return;
 							}
 
@@ -209,7 +213,6 @@ export function Prompt(props: PromptProps) {
 						}}
 						onSubmit={() => {
 							// Double-defer for IME (OpenCode pattern)
-							// Enter → steering message (delivered after current tool calls)
 							setTimeout(() => setTimeout(() => doSubmit(), 0), 0);
 						}}
 						ref={(r: any) => { textareaRef = r; }}
@@ -246,7 +249,7 @@ export function Prompt(props: PromptProps) {
 					{"  "}
 					shift+enter follow
 					{"  "}
-					tab agents
+					! shell
 				</text>
 			</box>
 		</box>

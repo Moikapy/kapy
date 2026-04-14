@@ -9,7 +9,8 @@
  * 4. Calls onExit (resolves the launch promise)
  *
  * CRITICAL: Never calls process.exit(). Let the event loop drain naturally.
- * This is what prevents borked terminals in tmux.
+ * Only registers SIGHUP (tmux pane close). Ctrl+C is handled via useKeyboard
+ * in the prompt component, matching OpenCode's pattern.
  */
 
 import {
@@ -46,12 +47,16 @@ export const ExitProvider: ParentComponent<{
 			try { renderer.destroy(); } catch { /* already destroyed */ }
 			if (reason) {
 				const msg = reason instanceof Error ? reason.message : String(reason);
-				process.stderr.write(`\nKapy: ${msg}\n`);
+				process.stderr.write(`\n${msg}\n`);
 			}
 			await props.onExit?.();
 		})();
 		return exitTask;
 	};
+
+	// SIGHUP: tmux pane close, terminal disconnect
+	// Registered immediately (not in onMount) like OpenCode
+	process.on("SIGHUP", () => doExit());
 
 	return (
 		<ExitContext.Provider value={{ exit: doExit }}>

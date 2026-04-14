@@ -2,17 +2,15 @@
  * Kapy TUI App — OpenCode's exit pattern.
  *
  * Exit handling:
- * - ExitProvider (from context/exit.jsx) provides exit() as Solid context
- * - SIGHUP (tmux pane close) + SIGINT (Ctrl+C) call exit()
- * - exit() calls renderer.destroy() + resolves the launch promise
+ * - ExitProvider registers SIGHUP (tmux pane close) → exit()
+ * - Ctrl+C / Ctrl+D handled in Prompt component via onKeyDown
+ * - exit() = renderer.destroy() + resolve launch promise
  * - NO process.exit() — let the event loop drain naturally
- *
- * Prompt uses a real TextareaRenderable for keyboard input.
  */
 
 import { render, useTerminalDimensions, useKeyboard } from "@opentui/solid";
 import { createCliRenderer, type CliRendererConfig } from "@opentui/core";
-import { createSignal, Show, Switch, Match, onMount, onCleanup } from "solid-js";
+import { Show, Switch, Match } from "solid-js";
 import { RouteProvider, useRoute } from "./context/route.jsx";
 import { ThemeProvider, useTheme } from "./context/theme.jsx";
 import { DialogProvider, useDialog } from "./context/dialog.jsx";
@@ -46,8 +44,6 @@ export async function launchChatTUI(): Promise<void> {
 		return;
 	}
 
-	// TUI lifecycle wrapped in a promise.
-	// exit() resolves it, letting the process drain naturally.
 	await new Promise<void>(async (resolve) => {
 		let renderer;
 
@@ -85,12 +81,9 @@ export async function launchChatTUI(): Promise<void> {
 			</ThemeProvider>
 		), renderer);
 
-		// If render() returns (component unmounted), resolve
 		resolve();
 	});
 }
-
-// ─── App Component ──────────────────────────────────────
 
 interface KapyAppProps {
 	chatSession: ChatSession;
@@ -101,26 +94,10 @@ function KapyApp(props: KapyAppProps) {
 	const dimensions = useTerminalDimensions();
 	const { theme } = useTheme();
 	const dialog = useDialog();
-	const exit = useExit();
 
-	// SIGHUP (tmux pane close) + SIGINT (Ctrl+C) → clean exit
-	onMount(() => {
-		const onSighup = () => exit("SIGHUP");
-		const onSigint = () => exit("Ctrl+C");
-		process.on("SIGHUP", onSighup);
-		process.on("SIGINT", onSigint);
-		onCleanup(() => {
-			process.removeListener("SIGHUP", onSighup);
-			process.removeListener("SIGINT", onSigint);
-		});
-	});
-
-	// Global keyboard
+	// Global keyboard: only Escape for dialog/close
+	// Ctrl+C is handled in Prompt component (OpenCode pattern)
 	useKeyboard((evt) => {
-		if (evt.ctrl && evt.name === "c") {
-			exit("Ctrl+C");
-			return;
-		}
 		if (evt.name === "escape") {
 			if (dialog.open()) {
 				dialog.closeDialog();
