@@ -103,6 +103,7 @@ function KapyApp(props: KapyAppProps) {
 			<Footer
 				toolCount={props.chatSession.tools.all().length}
 				providerStatus={props.chatSession.providers.all().length > 0 ? "connected" : "disconnected"}
+				contextUsage={props.chatSession.getContextUsage().fraction}
 			/>
 
 			{/* Dialog overlays */}

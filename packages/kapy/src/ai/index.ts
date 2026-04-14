@@ -33,3 +33,5 @@ export { createBuiltinSlashCommands, processSlashCommand } from "./slash-command
 export type { SlashCommandContext, SlashCommandDefinition } from "./slash-commands.js";
 export { ChatSession } from "./chat-session.js";
 export type { ChatMessage, ChatSessionOptions } from "./chat-session.js";
+export { ContextTracker } from "./context-tracker.js";
+export type { ContextUsage } from "./context-tracker.js";

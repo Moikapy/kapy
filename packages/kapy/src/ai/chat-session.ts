@@ -24,6 +24,7 @@ import { PermissionEvaluator } from "../ai/permission/evaluator.js";
 import { SessionManager } from "../ai/session/manager.js";
 import { OllamaAdapter } from "../ai/provider/ollama.js";
 import { processSlashCommand, type SlashCommandContext } from "../ai/slash-commands.js";
+import { ContextTracker } from "../ai/context-tracker.js";
 import type { AgentEvent, AgentMessage } from "../ai/agent/types.js";
 import type { ProviderAdapter } from "../ai/provider/types.js";
 
@@ -55,6 +56,7 @@ export class ChatSession {
 	readonly tools: ToolRegistry;
 	readonly permissions: PermissionEvaluator;
 	readonly sessions: SessionManager;
+	readonly contextTracker: ContextTracker;
 	private listeners = new Set<(event: AgentEvent) => void>();
 	private _messages: ChatMessage[] = [];
 	private _isProcessing = false;
@@ -68,6 +70,7 @@ export class ChatSession {
 		this.permissions = new PermissionEvaluator(options?.permissionRules ?? []);
 		this.sessions = new SessionManager();
 		this.sessionId = `chat-${Date.now()}`;
+		this.contextTracker = new ContextTracker();
 
 		this.loop = new AgentLoop(
 			this.agent,
@@ -75,6 +78,21 @@ export class ChatSession {
 			this.providers,
 			this.permissions,
 		);
+
+		// Wire context tracker as context transformer
+		this.loop.setContextTransformer(async (messages) => {
+			const model = this.agent.state.model;
+			if (!model) return messages;
+
+			// Get model's context length from provider registry
+			const modelInfo = this.providers.getModel(model.id);
+			const maxTokens = modelInfo?.contextLength ?? 128_000;
+
+			if (this.contextTracker.shouldCompact(messages, maxTokens)) {
+				return this.contextTracker.compact(messages);
+			}
+			return messages;
+		});
 
 		// Subscribe to agent events → update messages
 		this.agent.subscribe((event) => this.handleAgentEvent(event));
@@ -122,6 +140,14 @@ export class ChatSession {
 	/** Whether the agent is currently processing */
 	get isProcessing(): boolean {
 		return this._isProcessing;
+	}
+
+	/** Get current context usage */
+	getContextUsage(): import("../ai/context-tracker.js").ContextUsage {
+		const model = this.agent.state.model;
+		const modelInfo = model ? this.providers.getModel(model.id) : undefined;
+		const maxTokens = modelInfo?.contextLength ?? 128_000;
+		return this.contextTracker.getUsage(this.agent.state.messages, maxTokens);
 	}
 
 	/** Subscribe to chat events (message updates, processing state) */

@@ -11,6 +11,7 @@ interface FooterProps {
 	permissionsCount?: number;
 	toolCount?: number;
 	providerStatus?: "connected" | "disconnected" | "error";
+	contextUsage?: number; // fraction 0-1
 }
 
 export function Footer(props: FooterProps) {
