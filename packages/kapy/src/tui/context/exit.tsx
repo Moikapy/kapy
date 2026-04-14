@@ -1,5 +1,5 @@
 /**
- * Exit context — OpenCode's exit pattern.
+ * Exit context — manages clean TUI shutdown.
  *
  * Provides `exit()` as a Solid context, so any component can call it.
  * The exit function:
@@ -8,9 +8,14 @@
  * 3. Destroys the renderer (restores terminal state)
  * 4. Calls onExit (resolves the launch promise)
  *
+ * Signal handling:
+ * - SIGHUP (tmux pane close) → exit()
+ * - SIGINT (Ctrl+C from terminal) → exit()
+ * - SIGTERM → exit()
+ *
  * CRITICAL: Never calls process.exit(). Let the event loop drain naturally.
- * Only registers SIGHUP (tmux pane close). Ctrl+C is handled via useKeyboard
- * in the prompt component, matching OpenCode's pattern.
+ * The renderer is in raw mode, so SIGINT comes from the terminal signal,
+ * not through the focused renderable's key handler.
  */
 
 import {
@@ -54,9 +59,14 @@ export const ExitProvider: ParentComponent<{
 		return exitTask;
 	};
 
-	// SIGHUP: tmux pane close, terminal disconnect
-	// Registered immediately (not in onMount) like OpenCode
-	process.on("SIGHUP", () => doExit());
+	// Register signal handlers IMMEDIATELY (not in onMount).
+	// These are needed because the terminal is in raw mode and
+	// SIGINT/SIGHUP come from the OS, not through the focused renderable.
+	// OpenCode also registers SIGHUP here. We add SIGINT and SIGTERM
+	// because Ctrl+C sends SIGINT and terminal kill sends SIGTERM.
+	process.on("SIGHUP", () => doExit("SIGHUP"));
+	process.on("SIGINT", () => doExit("Ctrl+C"));
+	process.on("SIGTERM", () => doExit("SIGTERM"));
 
 	return (
 		<ExitContext.Provider value={{ exit: doExit }}>
