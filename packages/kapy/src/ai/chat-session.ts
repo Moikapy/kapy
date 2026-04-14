@@ -35,6 +35,7 @@ export interface ChatMessage {
 	content: string;
 	timestamp: number;
 	isStreaming?: boolean;
+	reasoning?: string;
 	toolName?: string;
 }
 
@@ -272,6 +273,14 @@ export class ChatSession {
 							timestamp: Date.now(),
 						});
 					}
+				}
+				break;
+			}
+			case "reasoning_update": {
+				// Accumulate reasoning text on the last assistant message
+				const lastAssistant = this.findLastAssistantMessage();
+				if (lastAssistant) {
+					lastAssistant.reasoning = (lastAssistant.reasoning ?? "") + event.text;
 				}
 				break;
 			}

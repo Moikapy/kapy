@@ -69,7 +69,7 @@ export interface TokenUsage {
 
 /** Chunk from a streaming response */
 export interface StreamChunk {
-	type: "text" | "tool_call" | "usage" | "done";
+	type: "text" | "tool_call" | "usage" | "done" | "reasoning";
 	text?: string;
 	toolCallId?: string;
 	toolName?: string;

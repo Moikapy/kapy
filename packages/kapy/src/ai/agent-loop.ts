@@ -149,6 +149,13 @@ export class AgentLoop {
 						});
 					}
 
+					if (chunk.type === "reasoning" && chunk.text) {
+						this.emit({
+							type: "reasoning_update",
+							text: chunk.text,
+						});
+					}
+
 					if (chunk.type === "tool_call" && chunk.toolCallId && chunk.toolName) {
 						toolCalls.push({
 							id: chunk.toolCallId,

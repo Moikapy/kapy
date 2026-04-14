@@ -43,6 +43,7 @@ export type AgentEvent =
 	| { type: "message_start"; message: AgentMessage }
 	| { type: "message_update"; message: AgentMessage }
 	| { type: "message_end"; message: AgentMessage }
+	| { type: "reasoning_update"; text: string }
 	| { type: "error"; error: string };
 
 /** Steering mode (pi pattern) */

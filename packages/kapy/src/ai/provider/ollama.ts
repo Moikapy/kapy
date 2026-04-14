@@ -205,17 +205,24 @@ export class OllamaAdapter implements ProviderAdapter {
 		const headers: Record<string, string> = { "Content-Type": "application/json" };
 		if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
 
+		const body: Record<string, unknown> = {
+			model: this.stripProviderPrefix(options.model),
+			messages: options.messages,
+			temperature: options.temperature ?? 0.7,
+			max_tokens: options.maxTokens ?? 4096,
+			stream: true,
+		};
+
+		// Pass tool schemas if provided
+		if (options.tools && options.tools.length > 0) {
+			body.tools = options.tools;
+		}
+
 		const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
 			method: "POST",
 			headers,
 			signal: options.signal,
-			body: JSON.stringify({
-				model: this.stripProviderPrefix(options.model),
-				messages: options.messages,
-				temperature: options.temperature ?? 0.7,
-				max_tokens: options.maxTokens ?? 4096,
-				stream: true,
-			}),
+			body: JSON.stringify(body),
 		});
 
 		if (!response.ok) {
@@ -242,16 +249,43 @@ export class OllamaAdapter implements ProviderAdapter {
 					}
 					try {
 						const data = JSON.parse(dataLine) as {
-							choices: Array<{ delta: { content?: string; tool_calls?: unknown } }>;
+							choices: Array<{
+								delta: {
+									content?: string;
+									reasoning_content?: string;
+									tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
+								};
+							}>;
 							usage?: { prompt_tokens: number; completion_tokens: number };
 						};
-						const content = data.choices?.[0]?.delta?.content;
-						if (content) {
-							yield { type: "text", text: content };
+						const delta = data.choices?.[0]?.delta;
+
+						// Text content
+						if (delta?.content) {
+							yield { type: "text", text: delta.content };
 						}
+
+						// Reasoning content (GLM, DeepSeek, QwQ)
+						if (delta?.reasoning_content) {
+							yield { type: "reasoning", text: delta.reasoning_content };
+						}
+
+						// Tool calls (streaming function calls)
+						if (delta?.tool_calls) {
+							for (const tc of delta.tool_calls) {
+								yield {
+									type: "tool_call" as const,
+									toolCallId: tc.id ?? `call_${Date.now()}`,
+									toolName: tc.function?.name ?? "",
+									toolArgs: tc.function?.arguments ?? "{}",
+								};
+							}
+						}
+
+						// Usage
 						if (data.usage) {
 							yield {
-								type: "usage",
+								type: "usage" as const,
 								usage: {
 									inputTokens: data.usage.prompt_tokens,
 									outputTokens: data.usage.completion_tokens,

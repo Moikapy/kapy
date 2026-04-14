@@ -1,12 +1,6 @@
 import { createCliRenderer, type KeyBinding } from "@opentui/core";
 import { render, useTerminalDimensions } from "@opentui/solid";
 import { createSignal, createEffect, batch, Show, createContext, useContext, type ParentComponent } from "solid-js";
-import { ToolRegistry as ToolReg } from "../tool/index.js";
-import { readFileTool as rFT, writeFileTool as wFT, bashTool as bT, globTool as gT, grepTool as grT } from "../tool/index.js";
-
-// Create and register built-in tools
-const tools = new ToolReg();
-tools.register(rFT); tools.register(wFT); tools.register(bT); tools.register(gT); tools.register(grT);
 
 type RD = { type: "home" } | { type: "session"; sid: string };
 const RC = createContext<{ data: () => RD; navigate: (r: RD) => void }>();
@@ -33,32 +27,39 @@ function loadProjectCtx(): string {
 const projectCtx = loadProjectCtx();
 const sysPrompt = projectCtx ? `${SYS_MSG}\n\n# Project Context\n${projectCtx}` : SYS_MSG;
 
-interface API { role: string; content: string }
-async function* streamOllama(model: string, msgs: API[], sig?: AbortSignal): AsyncGenerator<string> {
-  const res = await fetch("http://localhost:11434/v1/chat/completions", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages: msgs, stream: true }), signal: sig,
-  });
-  if (!res.ok) throw new Error("Ollama: " + (await res.text().catch(() => res.statusText)));
-  if (!res.body) throw new Error("No body");
-  const rd = res.body.getReader(), dec = new TextDecoder(); let buf = "";
-  try {
-    while (true) { const { done, value } = await rd.read(); if (done) break;
-      buf += dec.decode(value, { stream: true }); const ls = buf.split("\n"); buf = ls.pop() || "";
-      for (const l of ls) { const d = l.startsWith("data: ") ? l.slice(6) : l; if (d === "[DONE]") return;
-        try { const p = JSON.parse(d); if (p.choices?.[0]?.delta?.content) yield p.choices[0].delta.content;
-          // Some models (GLM) return reasoning_content separately
-          if (p.choices?.[0]?.delta?.reasoning_content) yield "\u0000r" + p.choices[0].delta.reasoning_content; } catch {} } }
-  } finally { rd.releaseLock(); }
+
+async function fetchModels(): Promise<string[]> {
+  try { const r = await fetch("http://localhost:11434/v1/models"); const d = await r.json(); return (d.data||[]).map((m:any)=>m.id).sort(); }
+  catch { return []; }
 }
 
-// Fetch available models from Ollama
-async function fetchModels(): Promise<string[]> {
+// Lazy-loaded tool infrastructure (avoids module eval issues with OpenTUI)
+let _toolSchemas: unknown[] | null = null;
+async function getToolSchemas(): Promise<unknown[]> {
+  if (!_toolSchemas) {
+    const { ToolRegistry, readFileTool, writeFileTool, bashTool, globTool, grepTool } = await import("../tool/index.js");
+    const { zodToJsonSchema } = await import("../tool/zod-to-json-schema.js");
+    const reg = new ToolRegistry();
+    reg.register(readFileTool); reg.register(writeFileTool); reg.register(bashTool); reg.register(globTool); reg.register(grepTool);
+    _toolSchemas = reg.all().map(t => ({
+      type: "function" as const,
+      function: { name: t.name, description: t.description, parameters: t.parameters ? zodToJsonSchema(t.parameters) : { type: "object", properties: {} } },
+    }));
+  }
+  return _toolSchemas;
+}
+
+async function executeTool(name: string, argsJson: string): Promise<string> {
+  const { ToolRegistry, readFileTool, writeFileTool, bashTool, globTool, grepTool } = await import("../tool/index.js");
+  const reg = new ToolRegistry();
+  reg.register(readFileTool); reg.register(writeFileTool); reg.register(bashTool); reg.register(globTool); reg.register(grepTool);
+  const tool = reg.get(name);
+  if (!tool) return `Error: Tool "${name}" not found`;
   try {
-    const res = await fetch("http://localhost:11434/v1/models");
-    const data = await res.json();
-    return (data.data || []).map((m: any) => m.id).sort();
-  } catch { return []; }
+    const args = JSON.parse(argsJson);
+    const result = await tool.execute(`call_${Date.now()}`, args, undefined as any, () => {}, { cwd: process.cwd() });
+    return typeof result === "string" ? result : (result as any)?.output ?? JSON.stringify(result);
+  } catch (err) { return `Error: ${err instanceof Error ? err.message : String(err)}`; }
 }
 
 interface Msg { id: string; role: "user" | "assistant"; content: string; streaming?: boolean; reasoning?: string }
@@ -86,21 +87,71 @@ function App() {
     batch(() => { setMsgs(p => [...p, { id: "u"+Date.now(), role: "user", content: userMsg }]); setErr(""); });
     if (route.data().type === "home") route.navigate({ type: "session", sid: "s"+Date.now() });
     setStreaming(true); abortCtrl = new AbortController();
-    const aId = "a"+Date.now();
-    setMsgs(p => [...p, { id: aId, role: "assistant", content: "", streaming: true }]);
+
+    const apiMsgs: Array<{role: string; content: string; tool_call_id?: string}> = [
+      { role: "system", content: sysPrompt },
+      ...msgs().map(m => ({ role: m.role, content: m.content })),
+      { role: "user", content: userMsg },
+    ];
+
+    const MAX_ROUNDS = 10;
     try {
-      const apiMsgs: API[] = [{ role: "system", content: sysPrompt }, ...msgs().map(m => ({ role: m.role, content: m.content })), { role: "user", content: userMsg }];
-      let full = ""; let reasoning = "";
-      for await (const chunk of streamOllama(model(), apiMsgs, abortCtrl.signal)) {
-        if (chunk.startsWith("\0r")) { reasoning += chunk.slice(2); }
-        else { full += chunk; }
-        setMsgs(p => { const u=[...p]; const i=u.findIndex(m=>m.id===aId); if(i!==-1) u[i]={...u[i],content:full,streaming:true,reasoning:reasoning||undefined}; return u; });
+      for (let round = 0; round < MAX_ROUNDS; round++) {
+        const aId = "a"+Date.now()+"_"+round;
+        setMsgs(p => [...p, { id: aId, role: "assistant", content: "", streaming: true }]);
+        let full = ""; let reasoning = "";
+        const toolCalls: Array<{id: string; name: string; args: string}> = [];
+
+        // Build request body with tool schemas
+        const body: Record<string, unknown> = { model: model(), messages: apiMsgs, stream: true, temperature: 0.7, max_tokens: 4096 };
+        try {
+          const schemas = await getToolSchemas();
+          if (schemas.length > 0) body.tools = schemas;
+        } catch {} // tool schemas are optional
+
+        const res = await fetch("http://localhost:11434/v1/chat/completions", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body), signal: abortCtrl.signal,
+        });
+        if (!res.ok) throw new Error("Ollama: " + (await res.text().catch(() => res.statusText)));
+        if (!res.body) throw new Error("No body");
+
+        const rd = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
+        try {
+          while (true) { const { done, value } = await rd.read(); if (done) break;
+            buf += dec.decode(value, { stream: true }); const ls = buf.split("\n"); buf = ls.pop() || "";
+            for (const l of ls) { const d = l.startsWith("data: ") ? l.slice(6) : l; if (d === "[DONE]") break;
+              try { const p = JSON.parse(d); const delta = p.choices?.[0]?.delta;
+                if (delta?.content) full += delta.content;
+                if (delta?.reasoning_content) reasoning += delta.reasoning_content;
+                if (delta?.tool_calls) { for (const tc of delta.tool_calls) {
+                  const ex = toolCalls.find(t => t.id === tc.id);
+                  if (ex) { if (tc.function?.arguments) ex.args += tc.function.arguments; }
+                  else { toolCalls.push({ id: tc.id ?? `call_${Date.now()}`, name: tc.function?.name ?? "", args: tc.function?.arguments ?? "" }); }
+                } }
+                setMsgs(p => { const u=[...p]; const i=u.findIndex(m=>m.id===aId); if(i!==-1) u[i]={...u[i],content:full,streaming:true,reasoning:reasoning||undefined}; return u; });
+              } catch {}
+            }
+          }
+        } finally { rd.releaseLock(); }
+
+        setMsgs(p => { const u=[...p]; const i=u.findIndex(m=>m.id===aId); if(i!==-1) u[i]={...u[i],streaming:false}; return u; });
+
+        if (toolCalls.length === 0) break; // No tool calls, we're done
+
+        // Execute tool calls
+        apiMsgs.push({ role: "assistant", content: full });
+        for (const tc of toolCalls) {
+          const toolMsg = `⟹ ${tc.name}(${tc.args.length > 80 ? tc.args.slice(0,77)+"..." : tc.args})`;
+          setMsgs(p => [...p, { id: "t"+Date.now(), role: "assistant", content: toolMsg }]);
+          const result = await executeTool(tc.name, tc.args);
+          const preview = result.length > 200 ? result.slice(0,197)+"..." : result;
+          setMsgs(p => [...p, { id: "r"+Date.now(), role: "assistant", content: `⟸ ${preview}` }]);
+          apiMsgs.push({ role: "tool", content: result, tool_call_id: tc.id });
+        }
       }
     } catch (e: any) { if (e.name !== "AbortError") setErr(e instanceof Error ? e.message : String(e)); }
-    finally {
-      setMsgs(p => { const u=[...p]; const i=u.findIndex(m=>m.id===aId); if(i!==-1) u[i]={...u[i],streaming:false}; return u; });
-      setStreaming(false); abortCtrl = null;
-    }
+    finally { setStreaming(false); abortCtrl = null; }
   };
   const abort = () => { if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; } };
   const onKey = (evt: any) => {
@@ -120,8 +171,10 @@ function App() {
     const modelMatch = t.trim().match(/^\/model\s+(.+)$/i);
     if (modelMatch) { setModel(modelMatch[1].trim()); return true; }
     if (c === "/tools") {
-      const names = tools.all().map(t => t.name).join(", ");
-      batch(() => { setMsgs(p => [...p, { id: "t"+Date.now(), role: "assistant", content: `Available tools: ${names}` }]); });
+      import("../tool/index.js").then(m => {
+        const names = [m.readFileTool.name, m.writeFileTool.name, m.bashTool.name, m.globTool.name, m.grepTool.name].join(", ");
+        batch(() => { setMsgs(p => [...p, { id: "t"+Date.now(), role: "assistant", content: `Available tools: ${names}` }]); });
+      });
       return true;
     }
     if (c === "/help") {
@@ -219,7 +272,7 @@ function App() {
             <text fg="#c0caf5">  {msgs().length}</text>
             <box height={1} />
             <text fg="#00AAFF">▸ Tools</text>
-            <text fg="#c0caf5">  {tools.toolCount}</text>
+            <text fg="#c0caf5">  5</text>
             <box height={1} />
             <text fg="#00AAFF">▸ Commands</text>
             <text fg="#565f89">  /sidebar /clear</text>
