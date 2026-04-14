@@ -89,7 +89,12 @@ export function Prompt(props: PromptProps) {
 		blur() { textareaRef?.blur(); },
 	};
 
-	onMount(() => { props.ref?.(ref); });
+	onMount(() => {
+		props.ref?.(ref);
+		// Explicitly focus the textarea after mount.
+		// The 'focused' prop alone doesn't trigger focus — we must call .focus().
+		setTimeout(() => textareaRef?.focus(), 0);
+	});
 	onCleanup(() => { props.ref?.(undefined); });
 
 	const doSubmit = (opts?: { followUp?: boolean }) => {
