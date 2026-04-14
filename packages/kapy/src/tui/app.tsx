@@ -64,6 +64,9 @@ async function executeTool(name: string, argsJson: string): Promise<string> {
 
 interface Msg { id: string; role: "user" | "assistant" | "system" | "tool_call" | "tool_result"; content: string; streaming?: boolean; reasoning?: string; toolName?: string }
 
+// Module-level renderer ref so useKeyboard can call destroy on exit
+let _renderer: any = null;
+
 function App() {
   const route = useContext(RC)!;
   const dims = useTerminalDimensions();
@@ -71,7 +74,8 @@ function App() {
   // Global key handler — Ctrl+C/D exits even when textarea is focused
   useKeyboard((evt: any) => {
     if (evt.ctrl && (evt.name === "c" || evt.name === "d")) {
-      process.exit(0);
+      try { _renderer?.destroy(); } catch {}
+      setTimeout(() => process.exit(0), 50);
     }
   });
   const [sidebar, setSidebar] = createSignal(false);
@@ -252,7 +256,7 @@ function App() {
                       onKeyDown={onKey}
                       onSubmit={() => { setTimeout(()=>setTimeout(()=>{
                         const t=inputVal().trim(); if (!t) return;
-                        if (t==="exit"||t===":q") { process.exit(0); return; }
+                        if (t==="exit"||t===":q") { try { _renderer?.destroy(); } catch {} setTimeout(() => process.exit(0), 50); return; }
                         if (t.startsWith("/")&&isSlash(t)) { setInputVal(""); if(sessRef) sessRef.clear(); return; }
                         setInputVal(""); if(sessRef) sessRef.clear(); send(t);
                       },0),0); }}
@@ -320,9 +324,10 @@ export async function launchChatTUI(): Promise<void> {
 		autoFocus: true,
 		openConsoleOnError: false,
 	});
+	_renderer = renderer;
 	const cleanup = () => { try { renderer.destroy(); } catch {} };
-	process.on("SIGHUP", () => { cleanup(); process.exit(0); });
-	process.on("SIGINT", () => { cleanup(); process.exit(0); });
-	process.on("SIGTERM", () => { cleanup(); process.exit(0); });
+	process.on("SIGHUP", () => { cleanup(); setTimeout(() => process.exit(0), 50); });
+	process.on("SIGINT", () => { cleanup(); setTimeout(() => process.exit(0), 50); });
+	process.on("SIGTERM", () => { cleanup(); setTimeout(() => process.exit(0), 50); });
 	await render(() => <RP><App /></RP>, renderer);
 }
