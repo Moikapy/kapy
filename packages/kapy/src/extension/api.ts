@@ -1,6 +1,6 @@
 /**
  * Extension API — the surface extensions use to register commands, hooks,
- * middleware, screens, and config.
+ * middleware, screens, config, tools, and providers.
  */
 
 import type { CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
@@ -9,32 +9,39 @@ import type { ConfigSchema } from "../config/schema.js";
 import type { ExtensionEmitter } from "../hooks/emitter.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
-import type { KapyExtensionAPI, ScreenDefinition } from "./types.js";
+import type { ToolRegistry } from "../tool/registry.js";
+import type { KapyExtensionAPI, KapyToolRegistration, ProviderRegistration, ScreenDefinition } from "./types.js";
 
 export class ExtensionAPI implements KapyExtensionAPI {
 	private registry: CommandRegistry;
+	private tools: ToolRegistry;
 	private hooks: Map<string, HookHandler[]>;
 	private middlewares: Middleware[];
 	private screens: ScreenDefinition[];
 	private configSchemas: Map<string, ConfigSchema>;
 	private emitter: ExtensionEmitter;
+	private providers: Map<string, ProviderRegistration>;
 	private extensionName: string;
 
 	constructor(options: {
 		registry: CommandRegistry;
+		tools: ToolRegistry;
 		hooks: Map<string, HookHandler[]>;
 		middlewares: Middleware[];
 		screens: ScreenDefinition[];
 		configSchemas: Map<string, ConfigSchema>;
 		emitter: ExtensionEmitter;
+		providers: Map<string, ProviderRegistration>;
 		extensionName: string;
 	}) {
 		this.registry = options.registry;
+		this.tools = options.tools;
 		this.hooks = options.hooks;
 		this.middlewares = options.middlewares;
 		this.screens = options.screens;
 		this.configSchemas = options.configSchemas;
 		this.emitter = options.emitter;
+		this.providers = options.providers;
 		this.extensionName = options.extensionName;
 	}
 
@@ -74,5 +81,20 @@ export class ExtensionAPI implements KapyExtensionAPI {
 
 	on(event: string, handler: (data?: unknown) => Promise<void> | void): void {
 		this.emitter.on(event, handler);
+	}
+
+	/** Register a tool callable by the LLM (pi pattern: pi.registerTool) */
+	registerTool(definition: KapyToolRegistration): void {
+		this.tools.register(definition);
+	}
+
+	/** Register an LLM provider (pi pattern: pi.registerProvider) */
+	registerProvider(id: string, config: ProviderRegistration): void {
+		this.providers.set(id, config);
+	}
+
+	/** Unregister an LLM provider (pi pattern: pi.unregisterProvider) */
+	unregisterProvider(id: string): void {
+		this.providers.delete(id);
 	}
 }

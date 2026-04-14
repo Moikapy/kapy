@@ -350,7 +350,8 @@ async function runCLI(
 	// Resolve command from argv
 	const resolved = registry.resolve(commandParts);
 	if (!resolved || commandParts.length === 0) {
-		// No matching command — show help
+		// ADR-007: No command specified → agent-first default mode
+		// In JSON mode, still output the error structure
 		if (jsonMode) {
 			console.log(
 				JSON.stringify({
@@ -359,7 +360,11 @@ async function runCLI(
 					commands: registry.visible().map((c) => c.name),
 				}),
 			);
-		} else {
+			process.exit(0);
+		}
+
+		// No-input mode: can't launch TUI, show help instead
+		if (noInput) {
 			console.log("");
 			console.log("  🐹 kapy — the agent-first CLI framework");
 			console.log("");
@@ -369,10 +374,33 @@ async function runCLI(
 			for (const cmd of registry.visible()) {
 				console.log(`  ${cmd.name.padEnd(20)} ${cmd.options.description}`);
 			}
-			console.log("");
-			console.log("Use 'kapy help <command>' for more information about a command.");
+			process.exit(2);
 		}
-		process.exit(jsonMode ? 0 : 2);
+
+		// Agent-first: launch the chat TUI
+		if (process.stdout.isTTY) {
+			// ADR-007: kapy with no args → interactive agent TUI
+			// ADR-007: kapy with unknown text → single-shot agent (non-interactive)
+			if (commandParts.length === 0) {
+				const { launchChatTUI } = await import("./tui/app.js");
+				await launchChatTUI();
+				return;
+			}
+			// Single-shot: text that isn't a command → agent prompt
+			// For now, fall through to help. Full single-shot in Phase 9.
+		}
+
+		// Non-TTY fallback: show help
+		console.log("");
+		console.log("  🐹 kapy — the agent-first CLI framework");
+		console.log("");
+		console.log("Usage: kapy <command> [flags]");
+		console.log("");
+		console.log("Available commands:");
+		for (const cmd of registry.visible()) {
+			console.log(`  ${cmd.name.padEnd(20)} ${cmd.options.description}`);
+		}
+		process.exit(2);
 	}
 
 	// Parse command-specific flags

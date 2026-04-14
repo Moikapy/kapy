@@ -5,6 +5,9 @@ import type { AgentHints, CommandDefinition, CommandHandler, CommandOptions } fr
 import type { ConfigSchema } from "../config/schema.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
+import type { KapyToolRegistration } from "../tool/types.js";
+
+export type { KapyToolRegistration } from "../tool/types.js";
 
 /** Extension metadata */
 export interface ExtensionMeta {
@@ -37,7 +40,26 @@ export interface ScreenContext {
 	[key: string]: unknown;
 }
 
-/** The extension API surface */
+/** Provider registration (pi pattern: pi.registerProvider) */
+export interface ProviderRegistration {
+	name: string;
+	baseUrl?: string;
+	apiKey?: string;
+	models?: ProviderModelConfig[];
+	[key: string]: unknown;
+}
+
+/** Provider model configuration */
+export interface ProviderModelConfig {
+	id: string;
+	label?: string;
+	contextLength?: number;
+	supportsVision?: boolean;
+	supportsReasoning?: boolean;
+	[key: string]: unknown;
+}
+
+/** The extension API surface (pi-aligned) */
 export interface KapyExtensionAPI {
 	/** Register a command */
 	addCommand(definition: CommandDefinition): void;
@@ -61,4 +83,15 @@ export interface KapyExtensionAPI {
 
 	/** Listen for a custom event */
 	on(event: string, handler: (data?: unknown) => Promise<void> | void): void;
+
+	// === Pi-aligned additions ===
+
+	/** Register a tool callable by the LLM (pi.registerTool) */
+	registerTool(definition: KapyToolRegistration): void;
+
+	/** Register an LLM provider (pi.registerProvider) */
+	registerProvider(id: string, config: ProviderRegistration): void;
+
+	/** Unregister an LLM provider (pi.unregisterProvider) */
+	unregisterProvider(id: string): void;
 }

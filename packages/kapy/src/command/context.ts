@@ -257,6 +257,14 @@ export class CommandContext {
 	_tick(): void {
 		this.duration = Date.now() - this._startTime;
 	}
+
+	/** Emit a structured event. In --json mode, writes NDJSON to stdout. */
+	emit(event: string, data?: unknown): void {
+		if (this.json) {
+			process.stdout.write(`${JSON.stringify({ type: "event", event, data })}\n`);
+		}
+		// In non-json mode, events are consumed by the TUI (future: update message component)
+	}
 }
 
 /** Spinner with actual terminal output */
