@@ -1,19 +1,25 @@
 /**
- * Slash command registry and handler for the TUI chat.
+ * Slash command handler for the kapy TUI.
  *
- * Defines the available commands, provides a registry for UI discovery,
- * and returns a bound handler function for execution.
+ * Commands that display information (help, models, tools, keys)
+ * open a modal instead of appending system messages.
+ * Commands that mutate state (clear, model, sidebar) act directly.
  */
 
 import type { CommandEntry } from "@moikapy/kapy-components";
+import type { ModalView } from "../components/modal.js";
 import type { Msg } from "../types.js";
 
-/** Reactive setters from createChat() that slash commands need. */
+/** Actions slash commands can trigger. */
 export interface ChatActions {
 	setMsgs: (fn: (prev: Msg[]) => Msg[]) => void;
 	setModel: (model: string) => void;
-	setSidebar: (fn: (v: boolean) => boolean) => void;
 	fetchModels: () => void;
+	openModal: (view: ModalView) => void;
+	/** Current model string for highlighting in /models */
+	model: () => string;
+	/** Available model list (populated after fetchModels) */
+	models: () => string[];
 }
 
 /** A slash command definition for the command palette. */
@@ -41,9 +47,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 		description: "List registered tools",
 	},
 	{
-		name: "/sidebar",
-		description: "Toggle sidebar",
-		aliases: ["/sb"],
+		name: "/keys",
+		description: "Show keyboard shortcuts",
 	},
 	{
 		name: "/clear",
@@ -51,16 +56,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 	},
 ];
 
-const HELP_TEXT = `Commands:
-  /help     Show this help
-  /model X   Switch to model X
-  /models    List available models
-  /tools     List registered tools
-  /sidebar   Toggle sidebar
-  /clear     Clear chat
-  exit       Quit kapy`;
-
-const TOOLS_TEXT = "Available tools: read_file, write_file, bash, glob, grep";
+const _TOOLS_TEXT = "Available tools: read_file, write_file, bash, glob, grep";
 
 /**
  * Returns a slash command handler bound to the given chat actions.
@@ -70,38 +66,32 @@ export function useSlashCommands(actions: ChatActions) {
 	return (text: string): boolean => {
 		const cmd = text.trim().toLowerCase();
 
-		if (cmd === "/sidebar" || cmd === "/sb") {
-			actions.setSidebar((v) => !v);
-			return true;
-		}
 		if (cmd === "/clear") {
 			actions.setMsgs(() => []);
 			return true;
 		}
 		if (cmd === "/models") {
 			actions.fetchModels();
+			// Small delay to let fetchModels populate, then open modal
+			setTimeout(() => {
+				actions.openModal({
+					type: "models",
+					models: actions.models(),
+					current: actions.model(),
+				});
+			}, 100);
 			return true;
 		}
 		if (cmd === "/help") {
-			actions.setMsgs((prev) => [
-				...prev,
-				{
-					id: `h-${Date.now()}`,
-					role: "system" as const,
-					content: HELP_TEXT,
-				},
-			]);
+			actions.openModal({ type: "help" });
 			return true;
 		}
 		if (cmd === "/tools") {
-			actions.setMsgs((prev) => [
-				...prev,
-				{
-					id: `t-${Date.now()}`,
-					role: "system" as const,
-					content: TOOLS_TEXT,
-				},
-			]);
+			actions.openModal({ type: "tools", tools: ["read_file", "write_file", "bash", "glob", "grep"] });
+			return true;
+		}
+		if (cmd === "/keys") {
+			actions.openModal({ type: "keys" });
 			return true;
 		}
 

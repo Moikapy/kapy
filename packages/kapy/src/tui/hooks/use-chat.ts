@@ -7,7 +7,7 @@
  */
 
 import { batch, createSignal } from "solid-js";
-import { type ChatMessage, ChatSession } from "../../ai/chat-session.js";
+import { ChatSession } from "../../ai/chat-session.js";
 import { bashTool, globTool, grepTool, readFileTool, writeFileTool } from "../../tool/index.js";
 import { DEFAULT_MODEL, type Msg, systemPrompt } from "../types.js";
 
@@ -83,7 +83,7 @@ export function createChat() {
 					// Show tool calls as display messages
 					if (event.message.toolCalls && event.message.toolCalls.length > 0) {
 						for (const tc of event.message.toolCalls as Array<{ name: string; args: string }>) {
-							const toolMsg = `⟹ ${tc.name}(${tc.args.length > 80 ? tc.args.slice(0, 77) + "..." : tc.args})`;
+							const toolMsg = `⟹ ${tc.name}(${tc.args.length > 80 ? `${tc.args.slice(0, 77)}...` : tc.args})`;
 							setMsgs((prev) => [
 								...prev,
 								{
@@ -112,7 +112,7 @@ export function createChat() {
 								{
 									id: `tool-${Date.now()}-${Math.random()}`,
 									role: tr.role === "tool" ? ("tool_result" as const) : (tr.role as Msg["role"]),
-									content: tr.content.length > 200 ? tr.content.slice(0, 197) + "..." : tr.content,
+									content: tr.content.length > 200 ? `${tr.content.slice(0, 197)}...` : tr.content,
 								},
 							]);
 						}
@@ -167,7 +167,6 @@ export function createChat() {
 			const modelInfos = session.providers.getAllModels();
 			if (modelInfos.length > 0) {
 				setModels(modelInfos.map((m) => m.id).sort());
-				setSidebar(true);
 				return;
 			}
 		} catch {
@@ -178,14 +177,10 @@ export function createChat() {
 			const r = await fetch("http://localhost:11434/v1/models");
 			const d = await r.json();
 			setModels((d.data || []).map((m: any) => m.id).sort());
-			setSidebar(true);
 		} catch {
 			setErr("Failed to fetch models — is Ollama running?");
 		}
 	}
-
-	// Sidebar is TUI-local state, not ChatSession concern
-	const [sidebar, setSidebar] = createSignal(false);
 
 	return {
 		session,
@@ -199,8 +194,6 @@ export function createChat() {
 		setModel,
 		models,
 		setModels,
-		sidebar,
-		setSidebar,
 		send,
 		abort,
 		fetchModels,

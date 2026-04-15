@@ -1,9 +1,10 @@
 import { createCliRenderer } from "@opentui/core";
 import { render, useKeyboard, useTerminalDimensions } from "@opentui/solid";
 import { createEffect, Show, useContext } from "solid-js";
-import { Sidebar } from "./components/sidebar.js";
+import { Modal, type ModalView } from "./components/modal.js";
 import { StatusFooter } from "./components/status-footer.js";
 import { createChat } from "./hooks/use-chat.js";
+import { useModal } from "./hooks/use-modal.js";
 import { useSlashCommands } from "./hooks/use-slash-commands.js";
 import { RouteContext, RouteProvider } from "./router.js";
 import { KEY_BINDINGS } from "./types.js";
@@ -17,7 +18,16 @@ function App() {
 	const route = useContext(RouteContext)!;
 	const dims = useTerminalDimensions();
 	const chat = createChat();
-	const handleSlash = useSlashCommands(chat);
+	const modal = useModal();
+
+	const handleSlash = useSlashCommands({
+		setMsgs: chat.setMsgs,
+		setModel: chat.setModel,
+		fetchModels: chat.fetchModels,
+		model: chat.model,
+		models: chat.models,
+		openModal: (view: ModalView) => modal.open(view),
+	});
 
 	// Global key handler — Ctrl+C/D exits even when textarea is focused
 	useKeyboard((evt: any) => {
@@ -37,10 +47,18 @@ function App() {
 
 	// Shared key handler for non-palette keys
 	const onKey = (evt: any) => {
-		if (evt.ctrl && evt.name === "\\") chat.setSidebar((v) => !v);
+		// Escape closes modal first, then handles other behavior
 		if (evt.name === "escape") {
-			if (chat.streaming()) chat.abort();
-			else if (route.data().type === "session") route.navigate({ type: "home" });
+			if (modal.isOpen()) {
+				modal.close();
+				return;
+			}
+			if (chat.streaming()) {
+				chat.abort();
+				return;
+			}
+			if (route.data().type === "session") route.navigate({ type: "home" });
+			return;
 		}
 	};
 
@@ -93,11 +111,12 @@ function App() {
 						/>
 					</Show>
 				</box>
-				<Show when={chat.sidebar()}>
-					<Sidebar model={chat.model} msgCount={chat.msgs} models={chat.models} />
-				</Show>
 			</box>
 			<StatusFooter model={chat.model} />
+			{/* Modal overlay — renders on top when active */}
+			<Show when={modal.isOpen()}>
+				<Modal view={modal.view()!} onClose={() => modal.close()} />
+			</Show>
 		</box>
 	);
 }
