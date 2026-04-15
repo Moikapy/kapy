@@ -1,9 +1,9 @@
 import type { KeyBinding } from "@opentui/core";
 import type { JSX } from "solid-js";
 import { createEffect, createSignal, on, Show } from "solid-js";
-import { CommandPalette } from "../components/command-palette.js";
+import { CommandPalette, filterCommands } from "../components/command-palette.js";
 import { MessageItem } from "../components/message-item.js";
-import { filterCommands } from "../hooks/use-slash-commands.js";
+import { SLASH_COMMANDS } from "../hooks/use-slash-commands.js";
 import type { Msg } from "../types.js";
 
 interface ChatScreenProps {
@@ -37,7 +37,7 @@ export function ChatScreen(props: ChatScreenProps): JSX.Element {
 	);
 
 	// Whether palette is visible
-	const showPalette = () => props.inputVal.startsWith("/") && filterCommands(props.inputVal).length > 0;
+	const showPalette = () => props.inputVal.startsWith("/") && filterCommands(props.inputVal, SLASH_COMMANDS).length > 0;
 
 	return (
 		<box flexDirection="column" height="100%" paddingLeft={2} paddingRight={2}>
@@ -59,7 +59,7 @@ export function ChatScreen(props: ChatScreenProps): JSX.Element {
 			</Show>
 			{/* Command palette overlay — appears when typing / */}
 			<Show when={showPalette()}>
-				<CommandPalette input={props.inputVal} selectedIndex={paletteIndex()} />
+				<CommandPalette input={props.inputVal} selectedIndex={paletteIndex()} commands={SLASH_COMMANDS} />
 			</Show>
 			<box flexShrink={0}>
 				<box border={["left"]} borderColor="#00AAFF" width="100%">
@@ -80,17 +80,17 @@ export function ChatScreen(props: ChatScreenProps): JSX.Element {
 								// Command palette navigation
 								if (showPalette()) {
 									if (evt.name === "up") {
-										const cmds = filterCommands(props.inputVal);
+										const cmds = filterCommands(props.inputVal, SLASH_COMMANDS);
 										setPaletteIndex((i) => (i - 1 + cmds.length) % cmds.length);
 										return;
 									}
 									if (evt.name === "down") {
-										const cmds = filterCommands(props.inputVal);
+										const cmds = filterCommands(props.inputVal, SLASH_COMMANDS);
 										setPaletteIndex((i) => (i + 1) % cmds.length);
 										return;
 									}
 									if (evt.name === "tab" || (evt.name === "return" && !evt.shift)) {
-										const cmds = filterCommands(props.inputVal);
+										const cmds = filterCommands(props.inputVal, SLASH_COMMANDS);
 										if (cmds.length > 0) {
 											props.onSelectCommand(cmds[paletteIndex()].name);
 										}

@@ -1,6 +1,6 @@
 {
 	"name": "@moikapy/kapy-components",
-	"version": "0.1.3",
+	"version": "0.2.0",
 	"type": "module",
 	"description": "UI components for kapy TUI — built on @opentui/core",
 	"main": "./dist/index.js",
@@ -22,7 +22,7 @@
 	],
 	"scripts": {
 		"dev": "bun run --watch src/index.ts",
-		"build": "bun build src/index.ts --outdir dist --target bun && tsc --emitDeclarationOnly --outDir dist",
+		"build": "bun run build.ts && tsc --emitDeclarationOnly --outDir dist",
 		"test": "bun test",
 		"lint": "biome check src/",
 		"typecheck": "tsc --noEmit",

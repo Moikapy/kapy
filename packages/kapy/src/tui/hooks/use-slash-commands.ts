@@ -5,6 +5,7 @@
  * and returns a bound handler function for execution.
  */
 
+import type { CommandEntry } from "@moikapy/kapy-components";
 import type { Msg } from "../types.js";
 
 /** Reactive setters from createChat() that slash commands need. */
@@ -16,18 +17,7 @@ export interface ChatActions {
 }
 
 /** A slash command definition for the command palette. */
-export interface SlashCommand {
-	/** The command trigger (e.g. "/help", "/model") */
-	name: string;
-	/** Short description for the palette */
-	description: string;
-	/** Aliases (e.g. "/sb" for "/sidebar") */
-	aliases?: string[];
-	/** Whether the command takes an argument (e.g. "/model llama3") */
-	takesArg?: boolean;
-	/** Argument label for the palette (e.g. "model-id") */
-	argLabel?: string;
-}
+export type SlashCommand = CommandEntry;
 
 /** Built-in slash commands available in the TUI. */
 export const SLASH_COMMANDS: SlashCommand[] = [
@@ -123,16 +113,4 @@ export function useSlashCommands(actions: ChatActions) {
 
 		return false;
 	};
-}
-
-/**
- * Filter command list by partial input (e.g. "/m" matches "/model", "/models").
- * Returns commands whose name or aliases start with the prefix.
- */
-export function filterCommands(prefix: string): SlashCommand[] {
-	const lower = prefix.toLowerCase();
-	return SLASH_COMMANDS.filter((cmd) => {
-		if (cmd.name.startsWith(lower)) return true;
-		return cmd.aliases?.some((a) => a.startsWith(lower)) ?? false;
-	});
 }

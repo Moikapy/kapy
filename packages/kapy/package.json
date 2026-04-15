@@ -41,14 +41,14 @@
 	],
 	"scripts": {
 		"dev": "bun run --watch src/cli.ts",
-		"build": "bun build src/index.ts src/cli.ts --outdir dist --target bun && tsc --emitDeclarationOnly --outDir dist",
+		"build": "bun run build.ts && tsc --emitDeclarationOnly --outDir dist",
 		"test": "bun test",
 		"lint": "biome check src/",
 		"typecheck": "tsc --noEmit",
 		"prepublishOnly": "bun run build && bun test"
 	},
 	"dependencies": {
-		"@moikapy/kapy-components": "^0.1.3",
+		"@moikapy/kapy-components": "^0.2.0",
 		"@opentui/core": "^0.1.97",
 		"@opentui/solid": "^0.1.99",
 		"picocolors": "^1.1.0",
