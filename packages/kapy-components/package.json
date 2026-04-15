@@ -1,6 +1,6 @@
 {
 	"name": "@moikapy/kapy-components",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"type": "module",
 	"description": "UI components for kapy TUI — built on @opentui/core",
 	"main": "./dist/index.js",

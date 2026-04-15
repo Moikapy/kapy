@@ -13,6 +13,7 @@ const result = await Bun.build({
 	outdir: "dist",
 	target: "bun",
 	plugins: [solidPlugin],
+	external: ["@opentui/core", "@opentui/solid", "solid-js", "@moikapy/kapy-components"],
 });
 
 if (result.logs?.length) {

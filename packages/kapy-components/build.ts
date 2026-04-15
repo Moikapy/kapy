@@ -11,6 +11,7 @@ const result = await Bun.build({
 	outdir: "dist",
 	target: "bun",
 	plugins: [solidPlugin],
+	external: ["@opentui/core", "@opentui/solid", "solid-js"],
 });
 
 if (result.logs?.length) {

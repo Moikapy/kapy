@@ -1,6 +1,6 @@
 import { createCliRenderer } from "@opentui/core";
 import { render, useKeyboard, useTerminalDimensions } from "@opentui/solid";
-import { createEffect, createSignal, Show, useContext } from "solid-js";
+import { createEffect, Show, useContext } from "solid-js";
 import { Sidebar } from "./components/sidebar.js";
 import { StatusFooter } from "./components/status-footer.js";
 import { createChat } from "./hooks/use-chat.js";
@@ -35,7 +35,7 @@ function App() {
 		if (chat.msgs().length > 0) setTimeout(() => scrollRef?.scrollTo?.(99999), 50);
 	});
 
-	// Key handler for textareas
+	// Shared key handler for non-palette keys
 	const onKey = (evt: any) => {
 		if (evt.ctrl && evt.name === "\\") chat.setSidebar((v) => !v);
 		if (evt.name === "escape") {
@@ -44,10 +44,19 @@ function App() {
 		}
 	};
 
-	// Input refs
-	let homeRef: any;
-	let sessRef: any;
-	const [inputVal, setInputVal] = createSignal("");
+	// Shared callbacks for MessageInput
+	const onSubmit = (text: string) => chat.send(text, route.navigate);
+	const onSlashCommand = (text: string) => handleSlash(text);
+	const onExit = () => {
+		try {
+			_renderer?.destroy();
+		} catch {}
+		setTimeout(() => process.exit(0), 50);
+	};
+
+	// Input refs — one per screen, MessageInput sets them
+	let _homeRef: any;
+	let _sessRef: any;
 
 	return (
 		<box width={dims().width} height={dims().height} backgroundColor="#1a1b26" flexDirection="column">
@@ -56,20 +65,12 @@ function App() {
 					<Show when={route.data().type === "home"}>
 						<HomeScreen
 							keyBindings={KEY_BINDINGS}
-							onSubmit={() => {
-								const t = inputVal().trim();
-								if (!t || chat.streaming()) return;
-								setInputVal("");
-								if (homeRef) homeRef.clear();
-								chat.send(t, route.navigate);
-							}}
+							onSubmit={onSubmit}
+							onSlashCommand={onSlashCommand}
+							onExit={onExit}
 							onKeyDown={onKey}
-							onContentChange={() => {
-								if (homeRef) setInputVal(homeRef.plainText);
-							}}
-							inputRef={(r2: any) => {
-								homeRef = r2;
-								setTimeout(() => r2?.focus(), 10);
+							inputRef={(r: any) => {
+								_homeRef = r;
 							}}
 						/>
 					</Show>
@@ -79,51 +80,15 @@ function App() {
 							err={chat.err}
 							streaming={chat.streaming}
 							keyBindings={KEY_BINDINGS}
+							onSubmit={onSubmit}
+							onSlashCommand={onSlashCommand}
+							onExit={onExit}
 							onKeyDown={onKey}
-							inputVal={inputVal()}
-							onSubmit={() => {
-								setTimeout(
-									() =>
-										setTimeout(() => {
-											const t = inputVal().trim();
-											if (!t) return;
-											if (t === "exit" || t === ":q") {
-												try {
-													_renderer?.destroy();
-												} catch {}
-												setTimeout(() => process.exit(0), 50);
-												return;
-											}
-											if (t.startsWith("/") && handleSlash(t)) {
-												setInputVal("");
-												if (sessRef) sessRef.clear();
-												return;
-											}
-											setInputVal("");
-											if (sessRef) sessRef.clear();
-											chat.send(t, route.navigate);
-										}, 0),
-									0,
-								);
-							}}
 							scrollRef={(r: any) => {
 								scrollRef = r;
 							}}
 							inputRef={(r: any) => {
-								sessRef = r;
-								setTimeout(() => r?.focus(), 10);
-							}}
-							onContentChange={() => {
-								if (sessRef) setInputVal(sessRef.plainText);
-							}}
-							onSelectCommand={(cmd: string) => {
-								const suffix = cmd.endsWith(":") || cmd.endsWith(" ") ? "" : " ";
-								const text = cmd + suffix;
-								setInputVal(text);
-								if (sessRef) {
-									sessRef.clear();
-									sessRef.insertText(text);
-								}
+								_sessRef = r;
 							}}
 						/>
 					</Show>
