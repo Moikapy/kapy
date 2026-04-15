@@ -44,6 +44,8 @@ export function createBuiltinSlashCommands(): SlashCommandDefinition[] {
 				ctx.output("  /tree     Show session tree");
 				ctx.output("  /fork     Fork current session");
 				ctx.output("  /clear    Clear conversation");
+				ctx.output("  /wiki     Browse the grimoire");
+				ctx.output("  /soul     View SOUL.md info");
 				ctx.output("  /quit     Exit kapy");
 			},
 		},
@@ -121,6 +123,31 @@ export function createBuiltinSlashCommands(): SlashCommandDefinition[] {
 			description: "Exit kapy",
 			handler(_args, _ctx) {
 				process.exit(0);
+			},
+		},
+		{
+			name: "wiki",
+			description: "Browse the grimoire (agent knowledge base)",
+			async handler(args, ctx) {
+				const sub = args.trim();
+				if (!sub) {
+					ctx.output("📖 Grimoire commands:");
+					ctx.output("  /wiki list    List wiki pages");
+					ctx.output("  /wiki search  Search the grimoire");
+					ctx.output("  /wiki stats   Show grimoire stats");
+					ctx.output("  /wiki lint    Health-check the grimoire");
+					return;
+				}
+				ctx.output("📖 Use 'kapy wiki' CLI for full grimoire operations");
+			},
+		},
+		{
+			name: "soul",
+			description: "View info about SOUL.md (agent identity)",
+			handler(_args, ctx) {
+				ctx.output("📖 SOUL.md: ~/.kapy/SOUL.md");
+				ctx.output("   Edit this file to shape your agent's identity.");
+				ctx.output("   The agent can also evolve it during sessions.");
 			},
 		},
 	];

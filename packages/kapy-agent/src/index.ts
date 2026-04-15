@@ -6,3 +6,5 @@ export * from "./agent-loop.js";
 export * from "./proxy.js";
 // Types
 export * from "./types.js";
+// Grimoire — persistent agent knowledge base
+export * from "./grimoire/index.js";

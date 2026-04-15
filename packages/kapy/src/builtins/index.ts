@@ -10,3 +10,4 @@ export { removeCommand } from "./remove.js";
 export { searchCommand } from "./search.js";
 export { updateCommand } from "./update.js";
 export { upgradeCommand } from "./upgrade.js";
+export { wikiCommand, wikiCommandOptions } from "./wiki.js";

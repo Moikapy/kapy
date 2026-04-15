@@ -12,6 +12,8 @@ import {
 	searchCommand,
 	updateCommand,
 	upgradeCommand,
+	wikiCommand,
+	wikiCommandOptions,
 } from "./builtins/index.js";
 import { AbortError, CommandContext } from "./command/context.js";
 /**
@@ -334,6 +336,16 @@ async function runCLI(
 			purpose: "Show detailed help for a specific command",
 			when: "Learning about a command or its flags",
 			output: "Command description, args, flags, and agent hints",
+		},
+	});
+	registry.register({
+		name: "wiki",
+		options: withUniversalFlags(wikiCommandOptions),
+		handler: wikiCommand,
+		agentHints: {
+			purpose: "Manage the grimoire (agent knowledge base)",
+			when: "Browsing or searching accumulated agent knowledge",
+			output: "Wiki pages, search results, or lint issues",
 		},
 	});
 

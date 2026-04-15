@@ -14,6 +14,12 @@ export const EXTENSIONS_DIR = join(KAPY_HOME, "extensions");
 /** Path to the kapy cache directory */
 export const CACHE_DIR = join(KAPY_HOME, "cache");
 
+/** Path to the kapy grimoire directory (global wiki) */
+export const GRIMOIRE_DIR = join(KAPY_HOME, "wiki");
+
+/** Path to the kapy SOUL.md file */
+export const SOUL_FILE = join(KAPY_HOME, "SOUL.md");
+
 /** Built-in default config values */
 export const defaults: MergedConfig = {};
 
@@ -31,4 +37,5 @@ export async function ensureKapyDirs(): Promise<void> {
 	await mkdir(KAPY_HOME, { recursive: true });
 	await mkdir(EXTENSIONS_DIR, { recursive: true });
 	await mkdir(CACHE_DIR, { recursive: true });
+	await mkdir(GRIMOIRE_DIR, { recursive: true });
 }

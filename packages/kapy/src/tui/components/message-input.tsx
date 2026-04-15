@@ -1,11 +1,7 @@
 /**
  * MessageInput — shared textarea with command palette for kapy TUI.
  *
- * Encapsulates: styled textarea, slash command palette overlay,
- * palette keyboard navigation (↑↓ Tab/Enter), input value tracking,
- * and submit routing (slash commands vs regular messages vs exit).
- *
- * Used by both HomeScreen and ChatScreen for consistent behavior.
+ * Debug: writes to /tmp/kapy-debug.log for TUI troubleshooting.
  */
 
 import type { KeyBinding } from "@opentui/core";
@@ -13,6 +9,15 @@ import type { JSX } from "solid-js";
 import { createEffect, createSignal, on, Show } from "solid-js";
 import { ALL_PALETTE_COMMANDS, SLASH_COMMANDS } from "../hooks/use-slash-commands.js";
 import { filterCommands } from "./command-palette.js";
+
+const DEBUG_LOG = "/tmp/kapy-debug.log";
+function dbg(...args: any[]) {
+	try {
+		const ts = new Date().toISOString().slice(11, 23);
+		const line = args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ");
+		require("fs").appendFileSync(DEBUG_LOG, `${ts} ${line}\n`);
+	} catch {}
+}
 
 export interface MessageInputProps {
 	/** Keyboard bindings for textarea */
@@ -47,7 +52,14 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 		}),
 	);
 
-	const showPalette = () => inputVal().startsWith("/") && filterCommands(inputVal(), ALL_PALETTE_COMMANDS).length > 0;
+	const showPalette = () => {
+		const val = inputVal();
+		const starts = val.startsWith("/");
+		const cmds = starts ? filterCommands(val, ALL_PALETTE_COMMANDS) : [];
+		const show = starts && cmds.length > 0;
+		dbg("showPalette", JSON.stringify(val), "starts:", starts, "cmds:", cmds.length, "show:", show);
+		return show;
+	};
 
 	/** Clear input and reset textarea */
 	function clearInput() {
@@ -83,6 +95,7 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 
 	/** Process submission — routes to onSlashCommand, onExit, or onSubmit */
 	function handleSubmit() {
+		dbg("handleSubmit", "skip:", skipNextSubmit, "inputVal:", JSON.stringify(inputVal()));
 		if (skipNextSubmit) {
 			skipNextSubmit = false;
 			return;
@@ -130,7 +143,9 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 							maxHeight={4}
 							keyBindings={props.keyBindings}
 							onContentChange={(newText: any) => {
-								setInputVal(String(newText || textRef?.plainText || ""));
+								const val = String(newText || textRef?.plainText || "");
+								setInputVal(val);
+								dbg("onContentChange", JSON.stringify(val));
 							}}
 							onKeyDown={(evt: any) => {
 								// Command palette navigation intercepts keys

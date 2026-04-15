@@ -164,7 +164,7 @@ function init() {
 
 		/** Replace the dialog stack with a new dialog. Saves focus first. */
 		replace(element: JSX.Element | (() => JSX.Element), onClose?: () => void) {
-			// Save focus on first dialog open
+			try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} dialog.replace called stack=${store.stack.length}\n`); } catch {}
 			if (store.stack.length === 0) {
 				savedFocus = renderer.currentFocusedRenderable;
 				savedFocus?.blur();

@@ -12,9 +12,11 @@
  */
 
 import type { AgentEvent, AgentMessage, BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
-import { Agent } from "@moikapy/kapy-agent";
+import { Agent, GrimoireStore, extractQuery } from "@moikapy/kapy-agent";
 import type { Model } from "@moikapy/kapy-ai";
 import { getModel, registerModel, streamSimple } from "@moikapy/kapy-ai";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { ToolRegistry } from "../tool/registry.js";
 import type { KapyToolRegistration } from "../tool/types.js";
 import { kapyToolsToAgentTools } from "./tool-bridge.js";
@@ -23,6 +25,9 @@ import { PermissionEvaluator } from "./permission/evaluator.js";
 import { OllamaAdapter } from "./provider/ollama.js";
 import { SessionManager } from "./session/manager.js";
 import { processSlashCommand, type SlashCommandContext } from "./slash-commands.js";
+import { createGrimoireTools } from "./grimoire-tools.js";
+import { loadSoulMd, ensureSoulMd, buildSystemPrompt } from "./soul.js";
+import { GRIMOIRE_DIR, SOUL_FILE } from "../config/defaults.js";
 
 /** Message shape for TUI rendering */
 export interface ChatMessage {
@@ -42,7 +47,7 @@ export interface ChatSessionOptions {
 	permissionRules?: import("./permission/types.js").PermissionRule[];
 	/** Default model (e.g., "ollama:qwen3:32b") */
 	defaultModel?: string;
-	/** System prompt */
+	/** System prompt (overridden by SOUL.md if autoLoadSoul is true) */
 	systemPrompt?: string;
 	/** Thinking/reasoning level for models that support it. Defaults to "off". */
 	thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
@@ -52,6 +57,10 @@ export interface ChatSessionOptions {
 	resumeSession?: string;
 	/** Custom session directory override */
 	sessionDir?: string;
+	/** Load SOUL.md as system prompt? Default: true */
+	autoLoadSoul?: boolean;
+	/** Initialize grimoire stores? Default: true */
+	autoInitGrimoire?: boolean;
 }
 
 /** Model info for the internal registry */
@@ -72,6 +81,13 @@ export class ChatSession {
 
 	/** Session manager — handles JSONL persistence and tree structure */
 	sessions: SessionManager;
+
+	/** Grimoire stores — the agent's persistent knowledge base */
+	grimoireGlobal: GrimoireStore | null = null;
+	grimoireProject: GrimoireStore | null = null;
+
+	/** SOUL.md content */
+	private soulMd: string | undefined;
 
 	/** Internal model registry (populated by Ollama auto-detect + kapy-ai builtins) */
 	private models: RegisteredModel[] = [];
@@ -107,11 +123,14 @@ export class ChatSession {
 					(m) => m.role === "user" || m.role === "assistant" || m.role === "toolResult",
 				);
 			},
-			// Compact context when approaching context limits
+			// Compact context when approaching context limits + inject grimoire knowledge
 			transformContext: async (messages, _signal) => {
 				const model = this.agent.state.model;
 				if (!model) return messages;
 
+				let result = messages;
+
+				// ── Context compaction ─────────────────────────────────
 				const contextLength = model.contextWindow || 128_000;
 				const contextMsgs = messages.map((m) => ({
 					role: typeof m.role === "string" ? m.role : "user",
@@ -120,15 +139,55 @@ export class ChatSession {
 
 				if (this.contextTracker.shouldCompact(contextMsgs, contextLength)) {
 					const compacted = this.contextTracker.compact(contextMsgs);
-					// Convert compacted ContextMessages back to AgentMessages
-					return compacted.map((cm) => ({
+					result = compacted.map((cm) => ({
 						...messages.find((m) => {
 							const mContent = typeof m.content === "string" ? m.content : "";
 							return mContent === cm.content;
 						}) || { role: cm.role, content: cm.content, timestamp: Date.now() },
 					})) as typeof messages;
 				}
-				return messages;
+
+				// ── Grimoire context injection ─────────────────────────
+				// Search grimoire for relevant knowledge and inject as system context
+				if (this.grimoireGlobal || this.grimoireProject) {
+					const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+					if (lastUserMsg) {
+						const query = typeof lastUserMsg.content === "string"
+							? extractQuery(lastUserMsg.content)
+							: "";
+						if (query) {
+							try {
+								// Search both scopes, merge results
+								const globalResults = this.grimoireGlobal
+									? await this.grimoireGlobal.search(query, 3)
+									: [];
+								const projectResults = this.grimoireProject
+									? await this.grimoireProject.search(query, 2)
+									: [];
+								const allResults = [...globalResults, ...projectResults]
+									.sort((a, b) => b.score - a.score)
+									.slice(0, 5);
+
+								if (allResults.length > 0) {
+									const store = allResults[0].score >= (globalResults[0]?.score ?? 0)
+										? this.grimoireGlobal!
+										: this.grimoireProject!;
+									const grimoireContext = store.summarizeForContext(allResults, 500);
+									const ctxMessage = {
+										role: "system" as const,
+										content: grimoireContext,
+										timestamp: Date.now(),
+									};
+									result = [ctxMessage, ...result] as typeof messages;
+								}
+							} catch {
+								// Search failed, skip injection
+							}
+						}
+					}
+				}
+
+				return result;
 			},
 			beforeToolCall: async (context: BeforeToolCallContext, _signal?: AbortSignal): Promise<BeforeToolCallResult> => {
 				const toolName = context.toolCall.name;
@@ -174,7 +233,7 @@ export class ChatSession {
 		this.agent.subscribe((event) => this.handleAgentEvent(event));
 	}
 
-	/** Initialize providers and session persistence. */
+	/** Initialize providers, session persistence, grimoire, and SOUL.md. */
 	async init(): Promise<void> {
 		if (this.initialized) return;
 		this.initialized = true;
@@ -192,6 +251,38 @@ export class ChatSession {
 		// Load existing messages from session
 		if (this.sessions.getEntries().length > 0) {
 			this._messages = this.entriesToMessages(this.sessions.getBranch());
+		}
+
+		// ── SOUL.md ──────────────────────────────────────────────────
+		// Load SOUL.md as the system prompt
+		if (this._autoLoadSoul !== false) {
+			ensureSoulMd(SOUL_FILE);
+			this.soulMd = loadSoulMd(SOUL_FILE);
+			this.agent.state.systemPrompt = this.soulMd;
+		}
+
+		// ── Grimoire ───────────────────────────────────────────────
+		// Initialize global and project grimoire stores
+		if (this._autoInitGrimoire !== false) {
+			this.grimoireGlobal = new GrimoireStore({ scope: "global", rootDir: GRIMOIRE_DIR });
+			await this.grimoireGlobal.ensure();
+
+			// Project grimoire (if .kapy/wiki/ exists or cwd has .kapy/)
+			const projectWikiDir = join(process.cwd(), ".kapy", "wiki");
+			if (existsSync(join(process.cwd(), ".kapy"))) {
+				this.grimoireProject = new GrimoireStore({ scope: "project", rootDir: projectWikiDir });
+				await this.grimoireProject.ensure();
+			}
+
+			// Register grimoire tools
+			const grimoireTools = createGrimoireTools(
+				this.grimoireGlobal,
+				this.grimoireProject ?? undefined,
+			);
+			for (const tool of grimoireTools) {
+				this.tools.register(tool);
+			}
+			this.agent.state.tools = kapyToolsToAgentTools(this.tools.all());
 		}
 
 		// Auto-detect Ollama and register its models
@@ -243,6 +334,8 @@ export class ChatSession {
 
 	private _continueRecent = false;
 	private _resumeSessionPath: string | undefined;
+	private _autoLoadSoul?: boolean;
+	private _autoInitGrimoire?: boolean;
 
 	/** Set session options before init() */
 	setContinueRecent(value: boolean): void {

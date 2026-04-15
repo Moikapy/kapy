@@ -128,6 +128,8 @@ export async function launchChatTUI(): Promise<void> {
 		console.error("TUI requires an interactive terminal (TTY).");
 		return;
 	}
+	// Initialize debug log
+	try { require("fs").writeFileSync("/tmp/kapy-debug.log", `=== Kapy TUI started ${new Date().toISOString()} ===\n`); } catch {}
 	const renderer = await createCliRenderer({
 		externalOutputMode: "passthrough" as const,
 		targetFps: 120,

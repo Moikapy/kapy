@@ -5,7 +5,9 @@ export {
 	EXTENSIONS_DIR,
 	ensureKapyDirs,
 	getDefaultConfig,
+	GRIMOIRE_DIR,
 	KAPY_HOME,
+	SOUL_FILE,
 } from "./defaults.js";
 export { loadConfig, parseEnvConfig } from "./loader.js";
 export { deepMergeConfigs } from "./loader-merge.js";
