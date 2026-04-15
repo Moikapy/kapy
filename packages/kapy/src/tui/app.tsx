@@ -29,7 +29,6 @@ function App() {
 		openModal: (view: ModalView) => modal.open(view),
 	});
 
-	// Global key handler — Ctrl+C/D exits even when textarea is focused
 	useKeyboard((evt: any) => {
 		if (evt.ctrl && (evt.name === "c" || evt.name === "d")) {
 			try {
@@ -39,15 +38,12 @@ function App() {
 		}
 	});
 
-	// Auto-scroll to bottom on new messages
 	let scrollRef: any;
 	createEffect(() => {
 		if (chat.msgs().length > 0) setTimeout(() => scrollRef?.scrollTo?.(99999), 50);
 	});
 
-	// Shared key handler for non-palette keys
 	const onKey = (evt: any) => {
-		// Escape closes modal first, then handles other behavior
 		if (evt.name === "escape") {
 			if (modal.isOpen()) {
 				modal.close();
@@ -62,7 +58,6 @@ function App() {
 		}
 	};
 
-	// Shared callbacks for MessageInput
 	const onSubmit = (text: string) => chat.send(text, route.navigate);
 	const onSlashCommand = (text: string) => handleSlash(text);
 	const onExit = () => {
@@ -71,15 +66,18 @@ function App() {
 		} catch {}
 		setTimeout(() => process.exit(0), 50);
 	};
-
-	// Input refs — one per screen, MessageInput sets them
 	let _homeRef: any;
 	let _sessRef: any;
+
+	// When modal is open, render modal overlay on top of content
+	// (both in the same flex column — modal gets flexGrow to fill space)
+	const modalOpen = modal.isOpen();
 
 	return (
 		<box width={dims().width} height={dims().height} backgroundColor="#1a1b26" flexDirection="column">
 			<box flexDirection="row" flexGrow={1} minHeight={0}>
 				<box flexGrow={1} minWidth={0}>
+					{/* Content sits behind modal when open */}
 					<Show when={route.data().type === "home"}>
 						<HomeScreen
 							keyBindings={KEY_BINDINGS}
@@ -113,10 +111,8 @@ function App() {
 				</box>
 			</box>
 			<StatusFooter model={chat.model} />
-			{/* Modal overlay — renders on top when active */}
-			<Show when={modal.isOpen()}>
-				<Modal view={modal.view()!} onClose={() => modal.close()} />
-			</Show>
+			{/* Modal overlay renders on top when active */}
+			{modalOpen && <Modal view={modal.view()!} onClose={() => modal.close()} />}
 		</box>
 	);
 }
