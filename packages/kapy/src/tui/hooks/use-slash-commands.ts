@@ -125,7 +125,7 @@ export function useSlashCommands(actions: ChatActions) {
 			return true;
 		}
 		if (cmd === "/sessions" || cmd === "/history") {
-			actions.openModal({ type: "sessions" });
+			actions.openModal({ type: "sessions", onLoad: actions.loadSession });
 			return true;
 		}
 

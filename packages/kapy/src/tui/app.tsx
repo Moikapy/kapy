@@ -29,7 +29,7 @@ function App() {
 
 	/** Open a modal view inside the dialog system. */
 	function openModal(view: ModalView) {
-		dialog.replace(() => <ModalContent view={view} />);
+		dialog.replace(() => <ModalContent view={view} onClose={() => dialog.pop()} />);
 	}
 
 	const handleSlash = useSlashCommands({

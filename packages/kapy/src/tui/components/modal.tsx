@@ -8,6 +8,7 @@
 
 import type { JSX } from "solid-js";
 import { For, Show, createSignal, onMount } from "solid-js";
+import { useKeyboard } from "@opentui/solid";
 import type { SessionInfo } from "../../ai/session/types.js";
 import { ChatSession } from "../../ai/chat-session.js";
 
@@ -18,10 +19,11 @@ export type ModalView =
 	| { type: "models"; models: string[]; current: string }
 	| { type: "tools"; tools: string[] }
 	| { type: "keys" }
-	| { type: "sessions"; sessions?: SessionInfo[] }
+	| { type: "sessions"; sessions?: SessionInfo[]; onLoad?: (path: string) => void }
 
 export interface ModalContentProps {
 	view: ModalView;
+	onClose?: () => void;
 }
 
 // ── Content components ─────────────────────────────────────────────
@@ -95,8 +97,9 @@ function KeysContent(): JSX.Element {
 	);
 }
 
-function SessionsContent(): JSX.Element {
+function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Element {
 	const [sessions, setSessions] = createSignal<SessionInfo[]>([]);
+	const [idx, setIdx] = createSignal(0);
 
 	onMount(async () => {
 		try {
@@ -108,6 +111,28 @@ function SessionsContent(): JSX.Element {
 		}
 	});
 
+	// Keyboard navigation: up/down to move, Enter to load session
+	useKeyboard((evt: any) => {
+		const list = sessions();
+		if (list.length === 0) return;
+
+		if (evt.name === "up") {
+			setIdx((i: number) => Math.max(0, i - 1));
+			evt.preventDefault();
+		}
+		if (evt.name === "down") {
+			setIdx((i: number) => Math.min(list.length - 1, i + 1));
+			evt.preventDefault();
+		}
+		if (evt.name === "return" || evt.name === "enter") {
+			const s = list[idx()];
+			if (s && props.onLoad) {
+				props.onLoad(s.path);
+			}
+			evt.preventDefault();
+		}
+	});
+
 	const list = sessions();
 	return (
 		<box flexDirection="column">
@@ -115,16 +140,16 @@ function SessionsContent(): JSX.Element {
 			<box height={1} />
 			{list.length === 0
 				? <text fg="#565f89">No sessions found.</text>
-				: list.map((s) => (
-					<box flexDirection="row" width="100%" paddingBottom={1}>
-						<text fg="#565f89">{s.created.toLocaleDateString()} </text>
-						<text fg="#7aa2f7">{s.firstMessage.slice(0, 50) || s.id}</text>
+				: list.map((s, i) => (
+					<box flexDirection="row" width="100%" paddingBottom={1} backgroundColor={i === idx() ? "#22223a" : "transparent"}>
+						<text fg={i === idx() ? "#c0caf5" : "#565f89"}>{i === idx() ? "\u25b8 " : "  "}{s.created.toLocaleDateString()} </text>
+						<text fg={i === idx() ? "#7aa2f7" : "#565f89"}>{s.firstMessage.slice(0, 40) || s.id}</text>
 						<text fg="#565f89"> ({s.messageCount} msgs)</text>
 					</box>
 				))
 			}
 			<box height={1} />
-			<text fg="#565f89">Esc to close</text>
+			<text fg="#565f89">Up/Down navigate  Enter resume  Esc close</text>
 		</box>
 	);
 }
@@ -168,7 +193,7 @@ export function ModalContent(props: ModalContentProps): JSX.Element {
 				<KeysContent />
 			</Show>
 			<Show when={props.view.type === "sessions"}>
-				<SessionsContent />
+				<SessionsContent onLoad={(path) => { props.onClose?.(); (props.view as any).onLoad?.(path); }} />
 			</Show>
 		</box>
 	);
