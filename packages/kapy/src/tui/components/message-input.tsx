@@ -10,7 +10,7 @@
 
 import type { KeyBinding } from "@opentui/core";
 import type { JSX } from "solid-js";
-import { createEffect, createSignal, on, Show } from "solid-js";
+import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { ALL_PALETTE_COMMANDS, SLASH_COMMANDS } from "../hooks/use-slash-commands.js";
 import { CommandPalette, filterCommands } from "./command-palette.js";
 
@@ -120,10 +120,29 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 	}
 
 	return (
-		<box flexDirection="column" width="100%" maxWidth={props.maxWidth}>
-			{/* Command palette overlay */}
+		<box flexDirection="column" width="100%" maxWidth={props.maxWidth} position="relative" minHeight={3}>
+			{/* Command palette overlay — absolute positioned so it doesn't affect layout */}
 			<Show when={showPalette()}>
-				<CommandPalette input={inputVal()} selectedIndex={paletteIndex()} commands={ALL_PALETTE_COMMANDS} />
+				<box
+					position="absolute"
+					bottom={3}
+					width="100%"
+					border={["top"]}
+					borderColor="#333"
+					paddingLeft={2}
+					paddingRight={2}
+					backgroundColor="#1a1b26"
+					zIndex={100}
+				>
+					<box flexDirection="column" width="100%">
+						<For each={filterCommands(inputVal(), ALL_PALETTE_COMMANDS)}>{(cmd, i) => (
+							<box width="100%" backgroundColor={i() === paletteIndex() ? "#22223a" : "transparent"}>
+								<text fg="#00AAFF">{i() === paletteIndex() ? "▸ " : "  "}{cmd.name}</text>
+								<text fg={i() === paletteIndex() ? "#c0caf5" : "#565f89"}> — {cmd.description}</text>
+							</box>
+						)}</For>
+					</box>
+				</box>
 			</Show>
 			<box flexShrink={0}>
 				<box border={["left"]} borderColor="#00AAFF" width="100%">

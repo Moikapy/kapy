@@ -31,9 +31,9 @@ function Dialog(
 	let dismiss = false;
 
 	const width = () => {
-		if (props.size === "xlarge") return 116;
-		if (props.size === "large") return 88;
-		return 60;
+		if (props.size === "xlarge") return Math.min(116, dimensions().width - 4);
+		if (props.size === "large") return Math.min(88, dimensions().width - 4);
+		return Math.min(60, dimensions().width - 4);
 	};
 
 	return (
@@ -52,9 +52,9 @@ function Dialog(
 			width={dimensions().width}
 			height={dimensions().height}
 			alignItems="center"
+			justifyContent="center"
 			position="absolute"
 			zIndex={3000}
-			paddingTop={Math.floor(dimensions().height / 4)}
 			left={0}
 			top={0}
 			backgroundColor={RGBA.fromInts(0, 0, 0, 150)}
