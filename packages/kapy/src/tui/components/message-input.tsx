@@ -94,7 +94,18 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 		}
 
 		const t = inputVal().trim();
-		if (!t) return;
+		if (!t) {
+			// Debug: if textarea has content but signal doesn't, sync them
+			if (textRef?.plainText?.trim()) {
+				setInputVal(textRef.plainText);
+				const recovered = textRef.plainText.trim();
+				if (!recovered) return;
+				clearInput();
+				props.onSubmit(recovered);
+				return;
+			}
+			return;
+		}
 		if (t === "exit" || t === ":q") {
 			clearInput();
 			props.onExit();
@@ -128,8 +139,8 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 							minHeight={1}
 							maxHeight={4}
 							keyBindings={props.keyBindings}
-							onContentChange={() => {
-								if (textRef) setInputVal(textRef.plainText);
+							onContentChange={(newText: any) => {
+								setInputVal(String(newText || textRef?.plainText || ""));
 							}}
 							onKeyDown={(evt: any) => {
 								// Command palette navigation intercepts keys
