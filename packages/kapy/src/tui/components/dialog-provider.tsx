@@ -218,13 +218,15 @@ export function DialogProvider(props: ParentProps) {
 
 	return (
 		<ctx.Provider value={value}>
-			{props.children}
-			{/* Dialog overlay renders here — outside the route switch, works on all screens */}
-			<Show when={value.stack.length > 0}>
-				<Dialog onClose={() => value.clear()} size={value.size}>
-					{value.stack.at(-1)!.element}
-				</Dialog>
-			</Show>
+			<box position="relative" width="100%" height="100%">
+				{props.children}
+				{/* Dialog overlay renders here — outside the route switch, works on all screens */}
+				<Show when={value.stack.length > 0}>
+					<Dialog onClose={() => value.clear()} size={value.size}>
+						{value.stack.at(-1)!.element}
+					</Dialog>
+				</Show>
+			</box>
 		</ctx.Provider>
 	);
 }

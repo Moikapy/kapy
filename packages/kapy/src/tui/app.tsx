@@ -29,6 +29,7 @@ function App() {
 
 	/** Open a modal view inside the dialog system. */
 	function openModal(view: ModalView) {
+		try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} openModal called: ${view.type}\n`); } catch {}
 		dialog.replace(() => <ModalContent view={view} onClose={() => dialog.pop()} />);
 	}
 
@@ -89,7 +90,7 @@ function App() {
 	let _sessRef: any;
 
 	return (
-		<box width={dims().width} height={dims().height} backgroundColor="#1a1b26" flexDirection="column">
+		<box width={dims().width} height={dims().height} backgroundColor="#1a1b26" flexDirection="column" position="relative">
 			<box flexDirection="row" flexGrow={1} minHeight={0}>
 				<box flexGrow={1} minWidth={0}>
 					<Show when={route.data().type === "home"}>

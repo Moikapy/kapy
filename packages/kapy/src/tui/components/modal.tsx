@@ -98,12 +98,14 @@ function KeysContent(): JSX.Element {
 }
 
 function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Element {
+	try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} SessionsContent RENDERED\n`); } catch {}
 	const [sessions, setSessions] = createSignal<SessionInfo[]>([]);
 	const [idx, setIdx] = createSignal(0);
 
 	onMount(async () => {
 		try {
 			const all = await ChatSession.listAllSessions();
+			try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} SessionsContent loaded ${all.length} sessions\n`); } catch {}
 			all.sort((a, b) => b.modified.getTime() - a.modified.getTime());
 			setSessions(all.slice(0, 20));
 		} catch (e) {
