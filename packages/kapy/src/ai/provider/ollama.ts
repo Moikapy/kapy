@@ -95,7 +95,11 @@ export class OllamaAdapter {
 	/** Check if Ollama is running by attempting to list models */
 	async isAvailable(): Promise<boolean> {
 		try {
+			const headers: Record<string, string> = {};
+			if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
+
 			const response = await fetch(`${this.baseUrl}/api/tags`, {
+				headers,
 				signal: AbortSignal.timeout(3000),
 			});
 			return response.ok;
@@ -124,7 +128,7 @@ export class OllamaAdapter {
 				label: model.name,
 				contextLength: this.getContextLength(details, model.name),
 				supportsVision: this.hasVisionCapability(details),
-				supportsReasoning: this.hasReasoningCapability(model.name),
+				supportsReasoning: this.hasReasoningCapability(model.name, details),
 				provider: "ollama",
 				parameterSize: model.details?.parameter_size ?? details?.parameter_size,
 				family: model.details?.family ?? details?.families?.[0],
@@ -149,22 +153,19 @@ export class OllamaAdapter {
 		}
 	}
 
-	/** Get context length from model details or fallback to name-based estimation */
+	/** Get context length from Ollama /api/show data, fallback to name-based estimation */
 	getContextLength(modelInfo: OllamaModelDetails | null, modelName?: string): number {
-		if (!modelInfo) {
-			return modelName ? this.getContextLengthFromName(modelName) : 4096;
-		}
-
-		const info = (modelInfo.model_info ?? modelInfo) as Record<string, unknown>;
-
-		// Check for context_length in model_info keys
-		for (const key of Object.keys(info)) {
-			if (key.endsWith(".context_length") && typeof info[key] === "number") {
-				return info[key] as number;
+		// 1. Local models have context_length in model_info (from GGUF metadata)
+		if (modelInfo?.model_info) {
+			const info = modelInfo.model_info as Record<string, unknown>;
+			for (const key of Object.keys(info)) {
+				if (key.endsWith(".context_length") && typeof info[key] === "number") {
+					return info[key] as number;
+				}
 			}
 		}
 
-		// Fallback to name-based estimation
+		// 2. Fallback: name-based estimation (covers cloud models with no model_info)
 		if (modelName) return this.getContextLengthFromName(modelName);
 		return 4096;
 	}
@@ -172,6 +173,21 @@ export class OllamaAdapter {
 	/** Estimate context length from model name patterns */
 	private getContextLengthFromName(name: string): number {
 		const lower = name.toLowerCase();
+		// Cloud models (suffix :cloud or tag ending in -cloud) have larger context windows
+		const isCloud = lower.endsWith(":cloud") || lower.includes("-cloud");
+		if (isCloud) {
+			if (lower.includes("qwen3.5")) return 262_144;
+			if (lower.includes("kimi-k2.5")) return 262_144;
+			if (lower.includes("glm-5")) return 202_752;
+			if (lower.includes("deepseek")) return 163_840;
+			if (lower.includes("qwen3-coder")) return 262_144;
+			if (lower.includes("gpt-oss")) return 128_000;
+			if (lower.includes("gemma4")) return 128_000;
+			if (lower.includes("nemotron")) return 128_000;
+			if (lower.includes("minimax")) return 128_000;
+			return 128_000; // default for cloud models
+		}
+		// Local models
 		if (lower.includes("llama3.2") || lower.includes("llama3.3") || lower.includes("llama3.1")) return 128_000;
 		if (lower.includes("llama3")) return 8192;
 		if (lower.includes("mistral") || lower.includes("mixtral")) return 32_768;
@@ -180,14 +196,16 @@ export class OllamaAdapter {
 		if (lower.includes("kimi")) return 262_144;
 		if (lower.includes("deepseek")) return 128_000;
 		if (lower.includes("phi")) return 16_384;
+		if (lower.includes("nomic-embed")) return 8192;
 		return 4096;
 	}
 
-	/** Check if model has vision capability */
+	/** Check if model has vision capability — uses /api/show capabilities for cloud models, model_info for local */
 	hasVisionCapability(modelInfo: OllamaModelDetails | null): boolean {
 		if (!modelInfo) return false;
-		const caps = modelInfo.capabilities ?? [];
-		if (caps.some((c) => c.toLowerCase().includes("vision"))) return true;
+		// Cloud models expose capabilities array (e.g. ["completion", "tools", "thinking", "vision"])
+		if (modelInfo.capabilities?.some((c) => c === "vision")) return true;
+		// Local models have it in model_info
 		if (modelInfo.model_info) {
 			const info = modelInfo.model_info as Record<string, unknown>;
 			if (info["clip.has_vision_encoder"] === true) return true;
@@ -195,8 +213,11 @@ export class OllamaAdapter {
 		return false;
 	}
 
-	/** Check if model supports reasoning (name-based heuristic) */
-	hasReasoningCapability(modelName: string): boolean {
+	/** Check if model supports reasoning — uses /api/show capabilities for cloud, name heuristic as fallback */
+	hasReasoningCapability(modelName: string, modelInfo?: OllamaModelDetails | null): boolean {
+		// Cloud models expose capabilities array (e.g. ["completion", "tools", "thinking"])
+		if (modelInfo?.capabilities?.some((c) => c === "thinking")) return true;
+		// Fallback: name heuristic
 		const lower = modelName.toLowerCase();
 		return (
 			lower.includes("reason") ||
