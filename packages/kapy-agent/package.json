@@ -1,0 +1,44 @@
+{
+	"name": "@moikapy/kapy-agent",
+	"version": "0.1.0",
+	"description": "General-purpose agent with transport abstraction, state management, and tool execution. Forked from @mariozechner/pi-agent-core.",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"clean": "rm -rf dist",
+		"build": "tsc -p tsconfig.build.json",
+		"dev": "tsc -p tsconfig.build.json --watch",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@moikapy/kapy-ai": "workspace:*",
+		"@sinclair/typebox": "^0.34.49"
+	},
+	"keywords": [
+		"ai",
+		"agent",
+		"llm",
+		"transport",
+		"state-management",
+		"kapy"
+	],
+	"author": "Mario Zechner, Moikapy",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Moikapy/kapy.git",
+		"directory": "packages/kapy-agent"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	},
+	"devDependencies": {
+		"typescript": "^6.0.2",
+		"@types/node": "^24.3.0"
+	}
+}

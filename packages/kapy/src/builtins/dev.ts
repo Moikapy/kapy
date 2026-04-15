@@ -35,7 +35,7 @@ export const devCommand = async (ctx: CommandContext): Promise<void> => {
 			},
 		});
 
-		child.on("exit", (code) => {
+		(child as any).on("exit" as never, (code: number | null) => {
 			if (code !== null && code !== 0 && !child) {
 				if (debug) ctx.warn(`Process exited with code ${code}`);
 			}

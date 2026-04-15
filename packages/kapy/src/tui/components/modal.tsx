@@ -1,61 +1,44 @@
 /**
- * Modal — full-screen centered overlay for the kapy TUI.
+ * ModalContent — dialog content views for the kapy TUI.
  *
- * Renders a bordered box centered on screen over the content.
- * Content is driven by ModalView state. Escape key closes it.
- * No absolute positioning needed — renders after content in the tree
- * so it paints on top.
+ * These are content components rendered inside the DialogProvider overlay.
+ * The DialogProvider handles the absolute-positioned backdrop, borders,
+ * and close behavior. These components just render the inner content.
  */
 
-import { colors } from "@moikapy/kapy-components";
 import type { JSX } from "solid-js";
 import { For, Show } from "solid-js";
+
+// ── Types ──────────────────────────────────────────────────────────
 
 export type ModalView =
 	| { type: "help" }
 	| { type: "models"; models: string[]; current: string }
 	| { type: "tools"; tools: string[] }
-	| { type: "keys" };
+	| { type: "keys" }
+	| { type: "sessions" };
 
-export interface ModalProps {
-	/** What to show in the modal */
+export interface ModalContentProps {
 	view: ModalView;
-	/** Close handler */
-	onClose: () => void;
 }
+
+// ── Content components ─────────────────────────────────────────────
 
 function HelpContent(): JSX.Element {
 	return (
 		<box flexDirection="column">
-			<text fg={colors.primary}>Commands</text>
+			<text fg="#00AAFF">Commands</text>
 			<box height={1} />
-			<text fg={colors.text}>
-				{"  /help       "}
-				<text fg={colors.muted}>Show this help</text>
-			</text>
-			<text fg={colors.text}>
-				{"  /model X     "}
-				<text fg={colors.muted}>Switch to model X</text>
-			</text>
-			<text fg={colors.text}>
-				{"  /models      "}
-				<text fg={colors.muted}>List available models</text>
-			</text>
-			<text fg={colors.text}>
-				{"  /tools       "}
-				<text fg={colors.muted}>List registered tools</text>
-			</text>
-			<text fg={colors.text}>
-				{"  /clear       "}
-				<text fg={colors.muted}>Clear chat</text>
-			</text>
+			<text fg="#c0caf5">  /help       <text fg="#565f89">Show this help</text></text>
+			<text fg="#c0caf5">  /model X     <text fg="#565f89">Switch to model X</text></text>
+			<text fg="#c0caf5">  /models      <text fg="#565f89">List available models</text></text>
+			<text fg="#c0caf5">  /tools       <text fg="#565f89">List registered tools</text></text>
+			<text fg="#c0caf5">  /keys        <text fg="#565f89">Show keyboard shortcuts</text></text>
+			<text fg="#c0caf5">  /clear       <text fg="#565f89">Clear chat history</text></text>
 			<box height={1} />
-			<text fg={colors.text}>
-				{"  exit         "}
-				<text fg={colors.muted}>Quit kapy</text>
-			</text>
+			<text fg="#c0caf5">  exit         <text fg="#565f89">Quit kapy</text></text>
 			<box height={1} />
-			<text fg={colors.muted}>Press Esc to close</text>
+			<text fg="#565f89">Press Esc to close</text>
 		</box>
 	);
 }
@@ -63,18 +46,17 @@ function HelpContent(): JSX.Element {
 function ModelsContent(props: { models: string[]; current: string }): JSX.Element {
 	return (
 		<box flexDirection="column">
-			<text fg={colors.primary}>Models</text>
+			<text fg="#00AAFF">Models</text>
 			<box height={1} />
 			<For each={props.models}>
 				{(m: string) => (
-					<text fg={m === props.current ? colors.text : colors.muted}>
-						{m === props.current ? "▸ " : "  "}
-						{m}
+					<text fg={m === props.current ? "#c0caf5" : "#565f89"}>
+						{m === props.current ? "▸ " : "  "}{m}
 					</text>
 				)}
 			</For>
 			<box height={1} />
-			<text fg={colors.muted}>Use /model X to switch · Esc to close</text>
+			<text fg="#565f89">Use /model X to switch · Esc to close</text>
 		</box>
 	);
 }
@@ -82,18 +64,15 @@ function ModelsContent(props: { models: string[]; current: string }): JSX.Elemen
 function ToolsContent(props: { tools: string[] }): JSX.Element {
 	return (
 		<box flexDirection="column">
-			<text fg={colors.primary}>Tools</text>
+			<text fg="#00AAFF">Tools</text>
 			<box height={1} />
 			<For each={props.tools}>
 				{(t: string) => (
-					<text fg={colors.text}>
-						{"  "}
-						{t}
-					</text>
+					<text fg="#c0caf5">  {t}</text>
 				)}
 			</For>
 			<box height={1} />
-			<text fg={colors.muted}>Esc to close</text>
+			<text fg="#565f89">Esc to close</text>
 		</box>
 	);
 }
@@ -101,88 +80,76 @@ function ToolsContent(props: { tools: string[] }): JSX.Element {
 function KeysContent(): JSX.Element {
 	return (
 		<box flexDirection="column">
-			<text fg={colors.primary}>Keyboard Shortcuts</text>
+			<text fg="#00AAFF">Keyboard Shortcuts</text>
 			<box height={1} />
-			<text fg={colors.text}>
-				{"  Ctrl+C / Ctrl+D  "}
-				<text fg={colors.muted}>Quit</text>
-			</text>
-			<text fg={colors.text}>
-				{"  Esc               "}
-				<text fg={colors.muted}>Abort / Close modal</text>
-			</text>
-			<text fg={colors.text}>
-				{"  ↑ / ↓             "}
-				<text fg={colors.muted}>Navigate palette</text>
-			</text>
-			<text fg={colors.text}>
-				{"  Tab               "}
-				<text fg={colors.muted}>Autocomplete command</text>
-			</text>
-			<text fg={colors.text}>
-				{"  Enter             "}
-				<text fg={colors.muted}>Execute / Send</text>
-			</text>
+			<text fg="#c0caf5">  Ctrl+C / Ctrl+D  <text fg="#565f89">Quit</text></text>
+			<text fg="#c0caf5">  Esc               <text fg="#565f89">Abort / Close dialog</text></text>
+			<text fg="#c0caf5">  ↑ / ↓             <text fg="#565f89">Navigate palette</text></text>
+			<text fg="#c0caf5">  Tab               <text fg="#565f89">Autocomplete command</text></text>
+			<text fg="#c0caf5">  Enter             <text fg="#565f89">Execute / Send</text></text>
 			<box height={1} />
-			<text fg={colors.muted}>Esc to close</text>
+			<text fg="#565f89">Esc to close</text>
 		</box>
 	);
 }
 
-export function Modal(props: ModalProps): JSX.Element {
+function SessionsContent(): JSX.Element {
+	return (
+		<box flexDirection="column">
+			<text fg="#00AAFF">Sessions</text>
+			<box height={1} />
+			<text fg="#565f89">Previous chat sessions are stored in ~/.kapy/sessions/</text>
+			<text fg="#565f89">Sessions resume automatically on restart.</text>
+			<box height={1} />
+			<text fg="#c0caf5">  /sessions   <text fg="#565f89">List and resume sessions</text></text>
+			<text fg="#c0caf5">  /clear      <text fg="#565f89">Start a fresh session</text></text>
+			<box height={1} />
+			<text fg="#565f89">Esc to close</text>
+		</box>
+	);
+}
+
+// ── Main content component ─────────────────────────────────────────
+
+/** Renders dialog content based on the current ModalView. */
+export function ModalContent(props: ModalContentProps): JSX.Element {
 	const title = (): string => {
 		switch (props.view.type) {
-			case "help":
-				return "Help";
-			case "models":
-				return "Models";
-			case "tools":
-				return "Tools";
-			case "keys":
-				return "Keys";
+			case "help": return "Help";
+			case "models": return "Models";
+			case "tools": return "Tools";
+			case "keys": return "Keys";
+			case "sessions": return "Sessions";
 		}
 	};
 
 	return (
-		<box flexGrow={1} backgroundColor={colors.bg} flexDirection="column" alignItems="center" justifyContent="center">
-			<box
-				border={["top", "right", "bottom", "left"]}
-				borderColor={colors.primary}
-				backgroundColor={colors.bg}
-				paddingLeft={2}
-				paddingRight={2}
-				paddingTop={1}
-				paddingBottom={1}
-				width={48}
-			>
-				<box flexDirection="column" width="100%">
-					{/* Title bar */}
-					<box flexDirection="row" justifyContent="space-between">
-						<text fg={colors.primary}>{title()}</text>
-						<text fg={colors.muted}>× Esc</text>
-					</box>
-					<box border={["bottom"]} borderColor={colors.border} width="100%">
-						<text> </text>
-					</box>
-					<box height={1} />
-					{/* Content */}
-					<Show when={props.view.type === "help"}>
-						<HelpContent />
-					</Show>
-					<Show when={props.view.type === "models"}>
-						<ModelsContent
-							models={(props.view as { type: "models"; models: string[]; current: string }).models}
-							current={(props.view as { type: "models"; models: string[]; current: string }).current}
-						/>
-					</Show>
-					<Show when={props.view.type === "tools"}>
-						<ToolsContent tools={(props.view as { type: "tools"; tools: string[] }).tools} />
-					</Show>
-					<Show when={props.view.type === "keys"}>
-						<KeysContent />
-					</Show>
-				</box>
+		<box flexDirection="column" width="100%">
+			<box flexDirection="row" justifyContent="space-between">
+				<text fg="#00AAFF">{title()}</text>
+				<text fg="#565f89">× Esc</text>
 			</box>
+			<box height={1} />
+			<Show when={props.view.type === "help"}>
+				<HelpContent />
+			</Show>
+			<Show when={props.view.type === "models"}>
+				<ModelsContent
+					models={(props.view as { type: "models"; models: string[]; current: string }).models}
+					current={(props.view as { type: "models"; models: string[]; current: string }).current}
+				/>
+			</Show>
+			<Show when={props.view.type === "tools"}>
+				<ToolsContent
+					tools={(props.view as { type: "tools"; tools: string[] }).tools}
+				/>
+			</Show>
+			<Show when={props.view.type === "keys"}>
+				<KeysContent />
+			</Show>
+			<Show when={props.view.type === "sessions"}>
+				<SessionsContent />
+			</Show>
 		</box>
 	);
 }

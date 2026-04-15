@@ -1,8 +1,8 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { join } from "path";
 import { grepTool } from "../../../../src/tool/builtin/grep.js";
 import type { ToolExecutionContext } from "../../../../src/tool/types.js";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
-import { join } from "path";
 
 const TMP = join(import.meta.dir, "__tmp_grep__");
 const ctx: ToolExecutionContext = { cwd: TMP, signal: undefined };
@@ -13,7 +13,11 @@ beforeEach(() => {
 	writeFileSync(join(TMP, "hello.ts"), "export const hello = () => 'hello';\nexport default hello;\n");
 	writeFileSync(join(TMP, "src", "world.ts"), "export const world = () => 'world';\nexport const greeting = 'hi';\n");
 });
-afterEach(() => { try { rmSync(TMP, { recursive: true }); } catch {} });
+afterEach(() => {
+	try {
+		rmSync(TMP, { recursive: true });
+	} catch {}
+});
 
 test("searches for text pattern", async () => {
 	const result = await grepTool.execute("t1", { pattern: "hello" }, undefined, () => {}, ctx);

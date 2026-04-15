@@ -5,7 +5,7 @@
  * Unknown text → single-shot (future) or help (fallback)
  */
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 describe("ADR-007: Agent-First Default Mode (logic)", () => {
 	test("no command parts → should launch TUI in interactive mode", () => {

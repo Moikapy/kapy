@@ -2,7 +2,7 @@
  * Tests for TUI sidebar component logic — visibility, content.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { createSignal } from "solid-js";
 
 describe("TUI Sidebar (logic)", () => {

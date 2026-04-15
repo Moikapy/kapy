@@ -1,14 +1,20 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdirSync as mkdir, mkdirSync, rmSync, writeFileSync } from "fs";
+import { join } from "path";
 import { readFileTool } from "../../../../src/tool/builtin/read-file.js";
 import type { ToolExecutionContext } from "../../../../src/tool/types.js";
-import { mkdirSync, writeFileSync, rmSync, mkdirSync as mkdir } from "fs";
-import { join } from "path";
 
 const TMP = join(import.meta.dir, "__tmp_read_file__");
 const ctx: ToolExecutionContext = { cwd: TMP, signal: undefined };
 
-beforeEach(() => { mkdirSync(TMP, { recursive: true }); });
-afterEach(() => { try { rmSync(TMP, { recursive: true }); } catch {} });
+beforeEach(() => {
+	mkdirSync(TMP, { recursive: true });
+});
+afterEach(() => {
+	try {
+		rmSync(TMP, { recursive: true });
+	} catch {}
+});
 
 test("reads a file and adds line numbers", async () => {
 	writeFileSync(join(TMP, "test.txt"), "hello\nworld\n");

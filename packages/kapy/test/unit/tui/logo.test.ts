@@ -2,15 +2,9 @@
  * Tests for TUI logo component logic — ASCII art lines, branding.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
-const LOGO_LINES = [
-	"  ╭━━━╮  ",
-	"  ┃╺╮╺┃  ",
-	"  ┃╹ ╹┃  ",
-	"  ╰┳━┳╯  ",
-	"   ┗━┛   ",
-];
+const LOGO_LINES = ["  ╭━━━╮  ", "  ┃╺╮╺┃  ", "  ┃╹ ╹┃  ", "  ╰┳━┳╯  ", "   ┗━┛   "];
 
 const KAPY = "KAPY";
 const TAGLINE = "agent-first cli";
@@ -37,9 +31,7 @@ describe("TUI Logo (logic)", () => {
 	});
 
 	it("logo uses box-drawing characters", () => {
-		const hasBoxDrawing = LOGO_LINES.some((line) =>
-			/[╭╮╰╯┃━╺╹┳┗]/.test(line),
-		);
+		const hasBoxDrawing = LOGO_LINES.some((line) => /[╭╮╰╯┃━╺╹┳┗]/.test(line));
 		expect(hasBoxDrawing).toBe(true);
 	});
 });

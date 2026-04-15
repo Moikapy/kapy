@@ -1,14 +1,20 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { join } from "path";
 import { writeFileTool } from "../../../../src/tool/builtin/write-file.js";
 import type { ToolExecutionContext } from "../../../../src/tool/types.js";
-import { existsSync, readFileSync, writeFileSync, rmSync, mkdirSync } from "fs";
-import { join } from "path";
 
 const TMP = join(import.meta.dir, "__tmp_write_file__");
 const ctx: ToolExecutionContext = { cwd: TMP, signal: undefined };
 
-beforeEach(() => { mkdirSync(TMP, { recursive: true }); });
-afterEach(() => { try { rmSync(TMP, { recursive: true }); } catch {} });
+beforeEach(() => {
+	mkdirSync(TMP, { recursive: true });
+});
+afterEach(() => {
+	try {
+		rmSync(TMP, { recursive: true });
+	} catch {}
+});
 
 test("writes a new file", async () => {
 	await writeFileTool.execute("t1", { path: "new.txt", content: "hello world" }, undefined, () => {}, ctx);

@@ -9,6 +9,7 @@ interface ChatScreenProps {
 	msgs: () => Msg[];
 	err: () => string;
 	streaming: () => boolean;
+	queuedCount: () => number;
 	keyBindings: KeyBinding[];
 	onSubmit: MessageInputProps["onSubmit"];
 	onSlashCommand: MessageInputProps["onSlashCommand"];
@@ -35,7 +36,7 @@ export function ChatScreen(props: ChatScreenProps): JSX.Element {
 				<text fg="#f7768e">Error: {props.err()}</text>
 			</Show>
 			<Show when={props.streaming()}>
-				<text fg="#565f89">thinking...</text>
+				<text fg="#565f89">thinking{props.queuedCount() > 0 ? ` · ${props.queuedCount()} queued` : ""}...</text>
 			</Show>
 			<MessageInput
 				keyBindings={props.keyBindings}

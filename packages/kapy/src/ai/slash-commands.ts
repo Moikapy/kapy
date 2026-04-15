@@ -4,14 +4,18 @@
  * Commands: /help, /model, /agent, /compact, /tree, /fork, /clear, /quit
  */
 
-import type { KapyAgent } from "../ai/agent/agent.js";
-import type { ProviderRegistry } from "../ai/provider/registry.js";
+import type { Agent } from "@moikapy/kapy-agent";
 import type { ToolRegistry } from "../tool/registry.js";
-import type { SessionManager } from "../ai/session/manager.js";
+import type { SessionManager } from "./session/manager.js";
+
+/** Provider interface — implemented by ChatSession */
+export interface SlashCommandProvider {
+	getAllModels(): Array<{ id: string; label?: string; provider: string; supportsReasoning?: boolean }>;
+}
 
 export interface SlashCommandContext {
-	agent: KapyAgent;
-	providers: ProviderRegistry;
+	agent: Agent;
+	providers: SlashCommandProvider;
 	tools: ToolRegistry;
 	sessions: SessionManager;
 	output: (text: string) => void;
@@ -101,16 +105,14 @@ export function createBuiltinSlashCommands(): SlashCommandDefinition[] {
 					ctx.output("No entries to fork from.");
 					return;
 				}
-				const lastEntry = entries[entries.length - 1];
-				const forkId = ctx.sessions.forkFrom(lastEntry.id);
-				ctx.output(`Forked from entry ${lastEntry.id}: ${forkId}`);
+				ctx.output("Fork: use /branch <entry-id> to branch from an entry.");
 			},
 		},
 		{
 			name: "clear",
 			description: "Clear conversation",
 			handler(_args, ctx) {
-				ctx.agent.clearMessages();
+				ctx.agent.reset();
 				ctx.output("Conversation cleared.");
 			},
 		},

@@ -2,7 +2,7 @@
  * Tests for TUI route context — navigation between Home and Session.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { createSignal } from "solid-js";
 
 // We test the signal pattern directly since Solid contexts need a render root.

@@ -15,7 +15,7 @@ export function HomeScreen(props: HomeScreenProps): JSX.Element {
 	return (
 		<box flexDirection="column" alignItems="center" paddingLeft={2} paddingRight={2} flexGrow={1}>
 			<box flexGrow={1} minHeight={0} />
-			<ascii_font text="KAPY" font="slick" color="#00AAFF" />
+			<ascii_font text="KAPY" font="tiny" color="#00AAFF" />
 			<text fg="#565f89">human-first digital assistant</text>
 			<box height={2} />
 			<MessageInput

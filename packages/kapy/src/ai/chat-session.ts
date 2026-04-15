@@ -1,32 +1,27 @@
 /**
- * ChatSession — the glue between AgentLoop, registries, and TUI.
+ * ChatSession — the glue between kapy-agent, kapy-ai, and kapy's harness.
  *
- * Owns:
- * - KapyAgent (state, events, steering/followUp)
- * - AgentLoop (LLM ↔ tool cycle)
- * - ProviderRegistry + adapters
- * - ToolRegistry
- * - PermissionEvaluator
- * - SessionManager (tree-structured message history)
+ * Uses @moikapy/kapy-agent's Agent class for the LLM ↔ tool loop.
+ * Kapy provides: permissions, session persistence, Ollama auto-detect,
+ * context compaction, slash commands, memory store.
  *
- * Exposes:
- * - Reactive message list (for TUI rendering)
- * - send(input) — submit user input → agent loop
- * - slash command processing
- * - Event subscription for real-time UI updates
+ * These integrate via Agent hooks:
+ * - beforeToolCall ← PermissionEvaluator
+ * - transformContext ← ContextTracker
+ * - convertToLlm ← default (user/assistant/toolResult pass-through)
  */
 
-import { KapyAgent } from "../ai/agent/agent.js";
-import { AgentLoop } from "../ai/agent-loop.js";
-import { ProviderRegistry } from "../ai/provider/registry.js";
+import type { AgentEvent, AgentMessage, BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
+import { Agent } from "@moikapy/kapy-agent";
+import type { Model } from "@moikapy/kapy-ai";
+import { getModel, registerModel, streamSimple } from "@moikapy/kapy-ai";
 import { ToolRegistry } from "../tool/registry.js";
-import { PermissionEvaluator } from "../ai/permission/evaluator.js";
-import { SessionManager } from "../ai/session/manager.js";
-import { OllamaAdapter } from "../ai/provider/ollama.js";
-import { processSlashCommand, type SlashCommandContext } from "../ai/slash-commands.js";
-import { ContextTracker } from "../ai/context-tracker.js";
-import type { AgentEvent, AgentMessage } from "../ai/agent/types.js";
-import type { ProviderAdapter } from "../ai/provider/types.js";
+import type { KapyToolRegistration } from "../tool/types.js";
+import { type ContextMessage, ContextTracker } from "./context-tracker.js";
+import { PermissionEvaluator } from "./permission/evaluator.js";
+import { OllamaAdapter } from "./provider/ollama.js";
+import { SessionManager } from "./session/manager.js";
+import { processSlashCommand, type SlashCommandContext } from "./slash-commands.js";
 
 /** Message shape for TUI rendering */
 export interface ChatMessage {
@@ -43,21 +38,41 @@ export interface ChatSessionOptions {
 	/** Auto-detect Ollama on startup? Default: true */
 	autoDetectOllama?: boolean;
 	/** Permission rules */
-	permissionRules?: import("../ai/permission/types.js").PermissionRule[];
+	permissionRules?: import("./permission/types.js").PermissionRule[];
 	/** Default model (e.g., "ollama:qwen3:32b") */
 	defaultModel?: string;
 	/** System prompt */
 	systemPrompt?: string;
+	/** Continue most recent session instead of creating new? */
+	continueRecent?: boolean;
+	/** Path to specific session file to resume */
+	resumeSession?: string;
+	/** Custom session directory override */
+	sessionDir?: string;
+}
+
+/** Model info for the internal registry */
+interface RegisteredModel {
+	id: string;
+	label: string;
+	provider: string;
+	contextLength?: number;
+	supportsVision?: boolean;
+	supportsReasoning?: boolean;
 }
 
 export class ChatSession {
-	readonly agent: KapyAgent;
-	readonly loop: AgentLoop;
-	readonly providers: ProviderRegistry;
+	readonly agent: Agent;
 	readonly tools: ToolRegistry;
 	readonly permissions: PermissionEvaluator;
-	readonly sessions: SessionManager;
 	readonly contextTracker: ContextTracker;
+
+	/** Session manager — handles JSONL persistence and tree structure */
+	sessions: SessionManager;
+
+	/** Internal model registry (populated by Ollama auto-detect + kapy-ai builtins) */
+	private models: RegisteredModel[] = [];
+
 	private listeners = new Set<(event: AgentEvent) => void>();
 	private _messages: ChatMessage[] = [];
 	private _isProcessing = false;
@@ -66,73 +81,130 @@ export class ChatSession {
 	private defaultModel: string | undefined;
 
 	constructor(options?: ChatSessionOptions) {
-		this.agent = new KapyAgent();
-		this.providers = new ProviderRegistry();
 		this.tools = new ToolRegistry();
 		this.permissions = new PermissionEvaluator(options?.permissionRules ?? []);
 		this.defaultModel = options?.defaultModel;
-		this.sessions = new SessionManager();
-		this.sessionId = `chat-${Date.now()}`;
 		this.contextTracker = new ContextTracker();
 
-		this.loop = new AgentLoop(
-			this.agent,
-			this.tools,
-			this.providers,
-			this.permissions,
-		);
+		this.agent = new Agent({
+			initialState: {
+				systemPrompt: options?.systemPrompt ?? "",
+				model: undefined as unknown as Model<string>,
+				tools: [],
+			},
+			steeringMode: "one-at-a-time",
+			followUpMode: "one-at-a-time",
+			streamFn: streamSimple,
+			beforeToolCall: async (context: BeforeToolCallContext, _signal?: AbortSignal): Promise<BeforeToolCallResult> => {
+				const toolName = context.toolCall.name;
+				const inputStr = JSON.stringify(context.args);
 
-		// Wire context tracker as context transformer
-		this.loop.setContextTransformer(async (messages) => {
-			const model = this.agent.state.model;
-			if (!model) return messages;
+				const action = this.permissions.evaluate(toolName, inputStr);
 
-			// Get model's context length from provider registry
-			const modelInfo = this.providers.getModel(model.id);
-			const maxTokens = modelInfo?.contextLength ?? 128_000;
+				if (action === "deny") {
+					return { block: true, reason: "Permission denied: Tool not allowed" };
+				}
 
-			if (this.contextTracker.shouldCompact(messages, maxTokens)) {
-				return this.contextTracker.compact(messages);
-			}
-			return messages;
+				if (action === "ask") {
+					// TODO: interactive permission prompt
+					return { block: true, reason: "Permission required: Cannot prompt in current mode" };
+				}
+
+				return {};
+			},
 		});
+
+		// Initialize session — in-memory until init() persists
+		this.sessionId = `chat-${Date.now()}`;
+		this.sessions = SessionManager.inMemory(process.cwd());
 
 		// Subscribe to agent events → update messages
 		this.agent.subscribe((event) => this.handleAgentEvent(event));
-
-		// Set system prompt if provided
-		if (options?.systemPrompt) {
-			this.agent.setSystemPrompt(options.systemPrompt);
-		}
 	}
 
-	/** Initialize providers (auto-detect Ollama, etc.) */
+	/** Initialize providers and session persistence. */
 	async init(): Promise<void> {
 		if (this.initialized) return;
 		this.initialized = true;
 
-		// Auto-detect Ollama
+		// Initialize session persistence
+		if (this._resumeSessionPath) {
+			this.sessions = SessionManager.open(this._resumeSessionPath, undefined);
+		} else if (this._continueRecent) {
+			this.sessions = SessionManager.continueRecent(process.cwd());
+		} else {
+			this.sessions = SessionManager.create(process.cwd());
+		}
+		this.sessionId = this.sessions.getSessionId();
+
+		// Load existing messages from session
+		if (this.sessions.getEntries().length > 0) {
+			this._messages = this.entriesToMessages(this.sessions.getBranch());
+		}
+
+		// Auto-detect Ollama and register its models
 		const ollama = new OllamaAdapter();
 		const isAvailable = await ollama.isAvailable();
 		if (isAvailable) {
-			this.loop.setProviderAdapter("ollama", ollama);
-			this.providers.register({
-				id: "ollama",
-				name: "Ollama",
-				type: "ollama",
-				baseUrl: ollama.baseUrl,
-			});
-
-			// Fetch available models
 			try {
-				const models = await ollama.listModels();
-				for (const model of models) {
-					this.providers.addModel("ollama", model);
+				const ollamaModels = await ollama.listModels();
+				for (const model of ollamaModels) {
+					// Register with kapy-ai's model registry so getModel() works
+					registerModel("ollama", {
+						id: model.id,
+						name: model.id,
+						api: "openai-completions" as const,
+						provider: "ollama",
+						baseUrl: ollama.baseUrl,
+						reasoning: model.supportsReasoning,
+						input: model.supportsVision ? (["text", "image"] as const) : (["text"] as const),
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+						contextWindow: model.contextLength,
+						maxTokens: Math.min(model.contextLength, 4096),
+					});
+
+					this.models.push({
+						id: model.id,
+						label: model.id,
+						provider: "ollama",
+						contextLength: model.contextLength,
+						supportsVision: model.supportsVision,
+						supportsReasoning: model.supportsReasoning,
+					});
 				}
 			} catch {
 				// Model listing failed, that's OK
 			}
 		}
+
+		// Auto-select model if not set
+		if (!this.defaultModel) {
+			this.autoSelectModel();
+		}
+	}
+
+	private _continueRecent = false;
+	private _resumeSessionPath: string | undefined;
+
+	/** Set session options before init() */
+	setContinueRecent(value: boolean): void {
+		this._continueRecent = value;
+	}
+
+	setResumeSession(path: string): void {
+		this._resumeSessionPath = path;
+	}
+
+	/** Convert session entries to TUI messages. */
+	private entriesToMessages(entries: import("./session/types.js").SessionEntry[]): ChatMessage[] {
+		return entries
+			.filter((e) => e.type === "message" && e.role)
+			.map((e) => ({
+				id: e.id,
+				role: e.role as ChatMessage["role"],
+				content: e.content ?? "",
+				timestamp: new Date(e.timestamp).getTime(),
+			}));
 	}
 
 	/** Get current message list for TUI */
@@ -146,11 +218,13 @@ export class ChatSession {
 	}
 
 	/** Get current context usage */
-	getContextUsage(): import("../ai/context-tracker.js").ContextUsage {
-		const model = this.agent.state.model;
-		const modelInfo = model ? this.providers.getModel(model.id) : undefined;
-		const maxTokens = modelInfo?.contextLength ?? 128_000;
-		return this.contextTracker.getUsage(this.agent.state.messages, maxTokens);
+	getContextUsage(): import("./context-tracker.js").ContextUsage {
+		const msgs: ContextMessage[] = (this.agent.state.messages ?? []).map((m: AgentMessage) => ({
+			role: typeof m.role === "string" ? m.role : "user",
+			content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+		}));
+		const maxTokens = 128_000;
+		return this.contextTracker.getUsage(msgs, maxTokens);
 	}
 
 	/** Subscribe to chat events (message updates, processing state) */
@@ -167,40 +241,47 @@ export class ChatSession {
 		// Check for slash commands
 		const slashCtx: SlashCommandContext = {
 			agent: this.agent,
-			providers: this.providers,
+			providers: this,
 			tools: this.tools,
 			sessions: this.sessions,
 			output: (text) => this.addSystemMessage(text),
 		};
 
 		if (await processSlashCommand(trimmed, slashCtx)) {
-			return; // Slash command handled
+			return;
 		}
 
 		// Add user message immediately (optimistic UI)
 		this.addUserMessage(trimmed);
 
-		// Set model if not already set
-		if (!this.agent.state.model) {
+		// Persist user message to session
+		if (this.sessions.isPersisted()) {
+			this.sessions.appendMessage({ role: "user", content: trimmed });
+		}
+
+		// Ensure model is set
+		const currentModel = this.agent.state.model;
+		if (!currentModel || (currentModel as unknown as { id?: string })?.id === "unknown") {
 			this.autoSelectModel();
 		}
 
-		if (!this.agent.state.model) {
+		const model = this.agent.state.model;
+		if (!model || (model as unknown as { id?: string })?.id === "unknown") {
 			this.addSystemMessage("No model available. Connect a provider (e.g., start Ollama) and try again.");
 			return;
 		}
 
-		// Run agent loop
+		// Run agent
 		this._isProcessing = true;
-		this.notifyListeners({ type: "agent_start" });
+		this.notifyListeners({ type: "agent_start" } as AgentEvent);
 
 		try {
-			await this.loop.prompt(trimmed);
+			await this.agent.prompt(trimmed);
 		} catch (err) {
 			this.addSystemMessage(`Error: ${err instanceof Error ? err.message : String(err)}`);
 		} finally {
 			this._isProcessing = false;
-			this.notifyListeners({ type: "agent_end", messages: this.agent.state.messages });
+			this.notifyListeners({ type: "agent_end", messages: [] } as AgentEvent);
 		}
 	}
 
@@ -210,84 +291,152 @@ export class ChatSession {
 	}
 
 	/** Register a tool */
-	registerTool(definition: import("../tool/types.js").KapyToolRegistration): void {
+	registerTool(definition: KapyToolRegistration): void {
 		this.tools.register(definition);
 	}
 
-	/** Register a provider adapter */
-	registerProvider(providerId: string, adapter: ProviderAdapter): void {
-		this.loop.setProviderAdapter(providerId, adapter);
+	/** Register a model into the internal registry */
+	registerModel(model: RegisteredModel): void {
+		this.models.push(model);
+	}
+
+	/** Get all registered models */
+	getAllModels(): RegisteredModel[] {
+		return [...this.models];
+	}
+
+	/** Get model info by id */
+	getModel(id: string): RegisteredModel | undefined {
+		return this.models.find((m) => m.id === id);
 	}
 
 	/** Set the active model */
 	setModel(providerId: string, modelId: string): void {
-		this.agent.setModel({ id: modelId, provider: providerId });
+		// Try kapy-ai's model registry first (handles all known providers)
+		const knownModel = getModel(providerId as import("@moikapy/kapy-ai").KnownProvider, modelId as never);
+		if (knownModel) {
+			(this.agent.state as { model: Model<string> }).model = knownModel;
+		} else {
+			// Model not in static registry — check runtime-registered models
+			const registered = this.models.find((m) => m.provider === providerId && m.id === modelId);
+			if (registered) {
+				(this.agent.state as { model: Model<string> }).model = this.createLocalModel(providerId, modelId, registered);
+			} else {
+				// Unknown model — create a basic reference
+				(this.agent.state as { model: Model<string> }).model = this.createLocalModel(providerId, modelId);
+			}
+		}
+
+		// Persist model change to session
+		if (this.sessions.isPersisted()) {
+			this.sessions.appendModelChange(providerId, modelId);
+		}
 	}
 
-	/** Handle agent events → update internal message list */
+	/** List available sessions for the current cwd */
+	static async listSessions(cwd?: string): Promise<import("./session/types.js").SessionInfo[]> {
+		return SessionManager.list(cwd ?? process.cwd());
+	}
+
+	/** List all sessions across all projects */
+	static async listAllSessions(): Promise<import("./session/types.js").SessionInfo[]> {
+		return SessionManager.listAll();
+	}
+
+	/** Load a specific session by file path */
+	static async loadSession(path: string): Promise<SessionManager> {
+		return SessionManager.open(path);
+	}
+
+	// ── Internal ────────────────────────────────────────────────────
+
+	/** Create a Model reference for a local provider (e.g., Ollama) */
+	private createLocalModel(providerId: string, modelId: string, info?: RegisteredModel): Model<string> {
+		return {
+			id: modelId,
+			name: modelId,
+			api: "openai-completions",
+			provider: providerId,
+			baseUrl: providerId === "ollama" ? (process.env.OLLAMA_HOST ?? "http://localhost:11434") : "",
+			reasoning: info?.supportsReasoning ?? false,
+			input: info?.supportsVision ? (["text", "image"] as const) : (["text"] as const),
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: info?.contextLength ?? 128_000,
+			maxTokens: 4096,
+		};
+	}
+
+	/** Handle agent events → update internal message list + persist */
 	private handleAgentEvent(event: AgentEvent): void {
 		switch (event.type) {
 			case "message_start": {
-				// Start of assistant message (might be streaming)
 				if (event.message.role === "assistant") {
+					const content = this.extractContent(event.message);
 					this._messages.push({
 						id: `msg-${Date.now()}`,
 						role: "assistant",
-						content: event.message.content,
+						content,
 						timestamp: Date.now(),
 						isStreaming: true,
 					});
+					if (this.sessions.isPersisted()) {
+						this.sessions.appendMessage({ role: "assistant", content });
+					}
 				}
 				break;
 			}
 			case "message_update": {
-				// Streaming token — update last assistant message
 				if (event.message.role === "assistant") {
 					const lastAssistant = this.findLastAssistantMessage();
 					if (lastAssistant) {
-						lastAssistant.content = event.message.content;
+						lastAssistant.content = this.extractContent(event.message);
 						lastAssistant.isStreaming = true;
 					}
 				}
 				break;
 			}
 			case "message_end": {
-				// Finished streaming
 				if (event.message.role === "assistant") {
 					const lastAssistant = this.findLastAssistantMessage();
 					if (lastAssistant) {
-						lastAssistant.content = event.message.content;
+						lastAssistant.content = this.extractContent(event.message);
 						lastAssistant.isStreaming = false;
 					}
-				}
-				break;
-			}
-			case "turn_end": {
-				// Add tool results to message list
-				if (event.toolResults) {
-					for (const tr of event.toolResults) {
-						this._messages.push({
-							id: `msg-${Date.now()}-${Math.random()}`,
-							role: tr.role as "tool",
-							content: tr.content,
-							timestamp: Date.now(),
-						});
+				} else if (event.message.role === "toolResult") {
+					const content = this.extractContent(event.message);
+					this._messages.push({
+						id: `msg-${Date.now()}-tool`,
+						role: "tool",
+						content: content.length > 200 ? `${content.slice(0, 197)}...` : content,
+						timestamp: Date.now(),
+					});
+					if (this.sessions.isPersisted()) {
+						this.sessions.appendMessage({ role: "tool", content });
 					}
 				}
 				break;
 			}
-			case "reasoning_update": {
-				// Accumulate reasoning text on the last assistant message
-				const lastAssistant = this.findLastAssistantMessage();
-				if (lastAssistant) {
-					lastAssistant.reasoning = (lastAssistant.reasoning ?? "") + event.text;
-				}
+			case "tool_execution_start":
+			case "tool_execution_update":
+			case "tool_execution_end":
+				// Tool execution events — future: show progress
 				break;
-			}
 		}
 
 		// Forward to any listeners
 		this.notifyListeners(event);
+	}
+
+	/** Extract text content from an AgentMessage (handles content arrays) */
+	private extractContent(message: AgentMessage): string {
+		if (typeof message.content === "string") return message.content;
+		if (Array.isArray(message.content)) {
+			return message.content
+				.filter((c): c is { type: "text"; text: string } => c.type === "text")
+				.map((c) => c.text)
+				.join("");
+		}
+		return "";
 	}
 
 	/** Add a user message to the display list */
@@ -308,6 +457,9 @@ export class ChatSession {
 			content,
 			timestamp: Date.now(),
 		});
+		if (this.sessions.isPersisted()) {
+			this.sessions.appendMessage({ role: "system", content });
+		}
 	}
 
 	/** Find the last assistant message in the display list */
@@ -322,20 +474,20 @@ export class ChatSession {
 
 	/** Auto-select a model from available providers */
 	private autoSelectModel(): void {
-		// Use default model if specified
 		if (this.defaultModel) {
-			this.agent.setModel({ id: this.defaultModel, provider: "ollama" });
+			const colonIdx = this.defaultModel.indexOf(":");
+			const providerId = colonIdx !== -1 ? this.defaultModel.slice(0, colonIdx) : "ollama";
+			const modelId = colonIdx !== -1 ? this.defaultModel.slice(colonIdx + 1) : this.defaultModel;
+			this.setModel(providerId, modelId);
 			return;
 		}
 
-		const models = this.providers.getAllModels();
-		if (models.length === 0) return;
+		if (this.models.length === 0) return;
 
-		// Prefer a reasoning-capable model, then whatever's first
-		const reasoning = models.find((m) => m.supportsReasoning);
-		const pick = reasoning ?? models[0];
+		const reasoning = this.models.find((m) => m.supportsReasoning);
+		const pick = reasoning ?? this.models[0];
 		if (pick) {
-			this.agent.setModel({ id: pick.id, provider: pick.provider });
+			this.setModel(pick.provider, pick.id);
 		}
 	}
 

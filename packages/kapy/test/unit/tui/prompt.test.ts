@@ -2,14 +2,10 @@
  * Tests for TUI prompt component logic — placeholder rotation, input state.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
 const PLACEHOLDERS = {
-	normal: [
-		"Fix a TODO in the codebase",
-		"What is the tech stack of this project?",
-		"Fix broken tests",
-	],
+	normal: ["Fix a TODO in the codebase", "What is the tech stack of this project?", "Fix broken tests"],
 };
 
 describe("TUI Prompt (logic)", () => {

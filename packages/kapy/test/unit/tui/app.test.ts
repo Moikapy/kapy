@@ -2,12 +2,10 @@
  * Tests for TUI app shell — route switching, keyboard handling logic.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { createSignal } from "solid-js";
 
-type RouteData =
-	| { type: "home" }
-	| { type: "session"; sessionID: string; initialPrompt?: { input: string } };
+type RouteData = { type: "home" } | { type: "session"; sessionID: string; initialPrompt?: { input: string } };
 
 describe("TUI App Shell (logic)", () => {
 	it("escape navigates from session to home", () => {

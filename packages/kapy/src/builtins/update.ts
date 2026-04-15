@@ -25,10 +25,10 @@ async function runCommand(
 		proc.stderr?.on("data", (data: Buffer) => {
 			stderr += data.toString();
 		});
-		proc.on("close", (code) => {
+		(proc as any).on("close", (code: number | null) => {
 			resolve({ stdout, stderr, exitCode: code });
 		});
-		proc.on("error", (err) => {
+		(proc as any).on("error" as never, (err: Error) => {
 			resolve({ stdout, stderr: stderr + err.message, exitCode: 1 });
 		});
 	});

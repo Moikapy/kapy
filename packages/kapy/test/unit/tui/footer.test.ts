@@ -2,7 +2,7 @@
  * Tests for TUI footer component logic — status bar data.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
 describe("TUI Footer (logic)", () => {
 	it("shows cwd in footer", () => {

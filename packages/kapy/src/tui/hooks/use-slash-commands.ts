@@ -1,14 +1,15 @@
 /**
  * Slash command handler for the kapy TUI.
  *
- * Commands that display information (help, models, tools, keys)
+ * Commands that display information (help, models, tools, keys, sessions)
  * open a modal instead of appending system messages.
- * Commands that mutate state (clear, model, sidebar) act directly.
+ * Commands that mutate state (clear, model) act directly.
  */
 
 import type { CommandEntry } from "@moikapy/kapy-components";
 import type { ModalView } from "../components/modal.js";
 import type { Msg } from "../types.js";
+import type { SessionInfo } from "../../ai/session/types.js";
 
 /** Actions slash commands can trigger. */
 export interface ChatActions {
@@ -16,6 +17,12 @@ export interface ChatActions {
 	setModel: (model: string) => void;
 	fetchModels: () => void;
 	openModal: (view: ModalView) => void;
+	/** Load a session by file path */
+	loadSession: (path: string) => Promise<void>;
+	/** List available sessions for current cwd */
+	listSessions: () => Promise<SessionInfo[]>;
+	/** List all sessions across all projects */
+	listAllSessions: () => Promise<SessionInfo[]>;
 	/** Current model string for highlighting in /models */
 	model: () => string;
 	/** Available model list (populated after fetchModels) */
@@ -53,6 +60,11 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 	{
 		name: "/clear",
 		description: "Clear chat history",
+	},
+	{
+		name: "/sessions",
+		description: "List and resume previous sessions",
+		aliases: ["/history"],
 	},
 ];
 
@@ -92,6 +104,10 @@ export function useSlashCommands(actions: ChatActions) {
 		}
 		if (cmd === "/keys") {
 			actions.openModal({ type: "keys" });
+			return true;
+		}
+		if (cmd === "/sessions" || cmd === "/history") {
+			actions.openModal({ type: "sessions" });
 			return true;
 		}
 

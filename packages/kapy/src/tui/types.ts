@@ -44,4 +44,6 @@ export interface Msg {
 	streaming?: boolean;
 	reasoning?: string;
 	toolName?: string;
+	/** Message is queued and waiting for the current agent run to finish */
+	queued?: boolean;
 }

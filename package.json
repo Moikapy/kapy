@@ -20,8 +20,8 @@
 		"tui": "bun run --cwd packages/kapy src/cli.ts"
 	},
 	"devDependencies": {
-		"typescript": "^5.7.0",
-		"@biomejs/biome": "^2.0.0",
+		"typescript": "^6.0.2",
+		"@biomejs/biome": "^2.4.12",
 		"husky": "^9.1.7"
 	}
 }

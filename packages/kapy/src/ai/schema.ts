@@ -10,7 +10,7 @@ import { zodToJsonSchema } from "../tool/zod-to-json-schema.js";
 interface CommandSchema {
 	name: string;
 	description: string;
-	args?: Record<string, unknown>;
+	args?: unknown[];
 	flags?: Record<string, unknown>;
 	hidden?: boolean;
 	agentHints?: Record<string, unknown>;

@@ -2,10 +2,10 @@
  * Tests for MemoryStore — key-value persistence for project/global scopes.
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { MemoryStore } from "../../../src/ai/memory.js";
 
 describe("MemoryStore", () => {
@@ -20,8 +20,12 @@ describe("MemoryStore", () => {
 	});
 
 	afterEach(() => {
-		try { rmSync(projectDir, { recursive: true }); } catch {}
-		try { rmSync(globalDir, { recursive: true }); } catch {}
+		try {
+			rmSync(projectDir, { recursive: true });
+		} catch {}
+		try {
+			rmSync(globalDir, { recursive: true });
+		} catch {}
 	});
 
 	test("set and get in project scope", () => {

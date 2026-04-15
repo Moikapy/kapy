@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { OllamaAdapter } from "../../../../src/ai/provider/ollama.js";
 
 describe("OllamaAdapter tool calling", () => {

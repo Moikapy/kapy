@@ -1,13 +1,56 @@
 /**
- * Ollama provider adapter — pi-ollama pattern.
+ * Ollama provider — auto-detect, model listing, streaming chat.
  *
- * Auto-detects installed models via /api/tags,
- * fetches model details via /api/show,
- * estimates context length, vision, and reasoning capabilities.
- * No dependency on 'ollama' npm package — uses fetch directly.
+ * Works with kapy-agent via kapy-ai for remote providers,
+ * but Ollama is handled locally because it needs runtime
+ * auto-detection and model discovery that kapy-ai doesn't cover.
  */
 
-import type { ModelInfo, ProviderAdapter, StreamChatOptions, StreamChunk, TokenUsage } from "./types.js";
+// ── Local types (self-contained, no dependency on deleted provider/types) ──
+
+/** Model info returned by OllamaAdapter */
+export interface OllamaModelInfo {
+	id: string;
+	label: string;
+	contextLength: number;
+	supportsVision: boolean;
+	supportsReasoning: boolean;
+	provider: string;
+	parameterSize?: string;
+	family?: string;
+}
+
+/** Chat message for Ollama's OpenAI-compatible API */
+export interface OllamaChatMessage {
+	role: "system" | "user" | "assistant" | "tool";
+	content: string;
+}
+
+/** Options for chat/streamChat calls */
+export interface OllamaChatOptions {
+	model: string;
+	messages: OllamaChatMessage[];
+	temperature?: number;
+	maxTokens?: number;
+	tools?: unknown[];
+	signal?: AbortSignal;
+}
+
+/** Stream chunk from Ollama's SSE */
+export type OllamaStreamChunk =
+	| { type: "text"; text: string }
+	| { type: "reasoning"; text: string }
+	| { type: "tool_call"; toolCallId: string; toolName: string; toolArgs: string }
+	| { type: "usage"; usage: { inputTokens: number; outputTokens: number } }
+	| { type: "done" };
+
+/** Token usage info */
+export interface OllamaTokenUsage {
+	inputTokens: number;
+	outputTokens: number;
+}
+
+// ── Ollama model detail types ──
 
 export interface OllamaModelDetails {
 	model_info?: Record<string, unknown>;
@@ -38,7 +81,9 @@ export interface OllamaListedModel {
 	};
 }
 
-export class OllamaAdapter implements ProviderAdapter {
+// ── OllamaAdapter ────────────────────────────────────────────────────
+
+export class OllamaAdapter {
 	baseUrl: string;
 	apiKey?: string;
 
@@ -60,7 +105,7 @@ export class OllamaAdapter implements ProviderAdapter {
 	}
 
 	/** List available models from /api/tags */
-	async listModels(): Promise<ModelInfo[]> {
+	async listModels(): Promise<OllamaModelInfo[]> {
 		const headers: Record<string, string> = {};
 		if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
 
@@ -70,7 +115,7 @@ export class OllamaAdapter implements ProviderAdapter {
 		}
 
 		const data = (await response.json()) as { models: OllamaListedModel[] };
-		const models: ModelInfo[] = [];
+		const models: OllamaModelInfo[] = [];
 
 		for (const model of data.models ?? []) {
 			const details = await this.fetchModelDetails(model.name);
@@ -153,7 +198,15 @@ export class OllamaAdapter implements ProviderAdapter {
 	/** Check if model supports reasoning (name-based heuristic) */
 	hasReasoningCapability(modelName: string): boolean {
 		const lower = modelName.toLowerCase();
-		return lower.includes("reason") || lower.includes("r1") || lower.includes("qwq") || lower.includes("deepseek");
+		return (
+			lower.includes("reason") ||
+			lower.includes("r1") ||
+			lower.includes("qwq") ||
+			lower.includes("deepseek") ||
+			lower.includes("glm") ||
+			lower.includes("qwen3") ||
+			lower.includes("gemma4")
+		);
 	}
 
 	/** Strip provider prefix from model name (e.g., "ollama/llama3" → "llama3") */
@@ -165,7 +218,7 @@ export class OllamaAdapter implements ProviderAdapter {
 	}
 
 	/** Non-streaming chat (Ollama OpenAI-compatible /v1/chat/completions) */
-	async chat(options: StreamChatOptions): Promise<{ content: string; usage: TokenUsage }> {
+	async chat(options: OllamaChatOptions): Promise<{ content: string; usage: OllamaTokenUsage }> {
 		const headers: Record<string, string> = { "Content-Type": "application/json" };
 		if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
 
@@ -201,7 +254,7 @@ export class OllamaAdapter implements ProviderAdapter {
 	}
 
 	/** Streaming chat (SSE from /v1/chat/completions) */
-	async *streamChat(options: StreamChatOptions): AsyncGenerator<StreamChunk> {
+	async *streamChat(options: OllamaChatOptions): AsyncGenerator<OllamaStreamChunk> {
 		const headers: Record<string, string> = { "Content-Type": "application/json" };
 		if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
 
@@ -253,6 +306,7 @@ export class OllamaAdapter implements ProviderAdapter {
 								delta: {
 									content?: string;
 									reasoning_content?: string;
+									reasoning?: string;
 									tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
 								};
 							}>;
@@ -265,9 +319,10 @@ export class OllamaAdapter implements ProviderAdapter {
 							yield { type: "text", text: delta.content };
 						}
 
-						// Reasoning content (GLM, DeepSeek, QwQ)
-						if (delta?.reasoning_content) {
-							yield { type: "reasoning", text: delta.reasoning_content };
+						// Reasoning content — Ollama uses "reasoning", OpenAI spec uses "reasoning_content"
+						const reasoningText = delta?.reasoning_content ?? delta?.reasoning;
+						if (reasoningText) {
+							yield { type: "reasoning", text: reasoningText };
 						}
 
 						// Tool calls (streaming function calls)

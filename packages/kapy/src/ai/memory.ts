@@ -10,7 +10,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 export type MemoryScope = "project" | "global";
 
@@ -65,9 +65,7 @@ export class MemoryStore {
 	search(query: string): MemoryEntry[] {
 		const lower = query.toLowerCase();
 		return this.listAll().filter(
-			(entry) =>
-				entry.key.toLowerCase().includes(lower) ||
-				entry.value.toLowerCase().includes(lower),
+			(entry) => entry.key.toLowerCase().includes(lower) || entry.value.toLowerCase().includes(lower),
 		);
 	}
 

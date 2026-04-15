@@ -2,7 +2,7 @@
  * Tests for TUI session state — message list, prompt submission.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { createSignal } from "solid-js";
 
 interface Message {
@@ -21,10 +21,7 @@ describe("TUI Session State (logic)", () => {
 	it("adds user message on submit", () => {
 		const [messages, setMessages] = createSignal<Message[]>([]);
 		const input = "Fix the TODO in auth.ts";
-		setMessages((prev) => [
-			...prev,
-			{ id: "msg-1", role: "user", content: input, timestamp: Date.now() },
-		]);
+		setMessages((prev) => [...prev, { id: "msg-1", role: "user", content: input, timestamp: Date.now() }]);
 		expect(messages().length).toBe(1);
 		expect(messages()[0].role).toBe("user");
 		expect(messages()[0].content).toBe(input);
@@ -32,14 +29,8 @@ describe("TUI Session State (logic)", () => {
 
 	it("adds assistant response after user message", () => {
 		const [messages, setMessages] = createSignal<Message[]>([]);
-		setMessages((prev) => [
-			...prev,
-			{ id: "msg-1", role: "user", content: "hello", timestamp: Date.now() },
-		]);
-		setMessages((prev) => [
-			...prev,
-			{ id: "msg-2", role: "assistant", content: "Hi there!", timestamp: Date.now() },
-		]);
+		setMessages((prev) => [...prev, { id: "msg-1", role: "user", content: "hello", timestamp: Date.now() }]);
+		setMessages((prev) => [...prev, { id: "msg-2", role: "assistant", content: "Hi there!", timestamp: Date.now() }]);
 		expect(messages().length).toBe(2);
 		expect(messages()[1].role).toBe("assistant");
 	});
@@ -54,10 +45,7 @@ describe("TUI Session State (logic)", () => {
 		const [messages, setMessages] = createSignal<Message[]>([]);
 		const items = ["first", "second", "third"];
 		for (const text of items) {
-			setMessages((prev) => [
-				...prev,
-				{ id: `msg-${text}`, role: "user", content: text, timestamp: Date.now() },
-			]);
+			setMessages((prev) => [...prev, { id: `msg-${text}`, role: "user", content: text, timestamp: Date.now() }]);
 		}
 		expect(messages().map((m) => m.content)).toEqual(["first", "second", "third"]);
 	});

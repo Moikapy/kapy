@@ -2,9 +2,9 @@
  * Tests for TUI theme context — dark/light mode, color values.
  */
 
-import { describe, it, expect } from "bun:test";
-import { createSignal } from "solid-js";
+import { describe, expect, it } from "bun:test";
 import { RGBA } from "@opentui/core";
+import { createSignal } from "solid-js";
 
 describe("TUI Theme Context (logic)", () => {
 	const DARK = {
@@ -46,6 +46,8 @@ describe("TUI Theme Context (logic)", () => {
 
 	it("accent color differs between modes", () => {
 		// Compare by value (r,g,b differ)
-		expect(DARK.accent.r === LIGHT.accent.r && DARK.accent.g === LIGHT.accent.g && DARK.accent.b === LIGHT.accent.b).toBe(false);
+		expect(
+			DARK.accent.r === LIGHT.accent.r && DARK.accent.g === LIGHT.accent.g && DARK.accent.b === LIGHT.accent.b,
+		).toBe(false);
 	});
 });

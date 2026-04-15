@@ -1,30 +1,69 @@
 # AI Module
 
-This is the **spec'd AI harness architecture** — session management, agent loop, provider abstraction, permission system, and tool registry.
+The production AI harness — session management, agent loop, provider abstraction, permission system, and tool registry.
 
-## Status: Spec-only (not yet wired to TUI)
+## Status: ACTIVE — wired to TUI via `use-chat.ts`
 
-The TUI currently uses `src/tui/ollama-client.ts` for direct Ollama streaming. This module provides the proper architecture that will replace it:
+The TUI uses `ChatSession` as its single source of truth for:
+- Agent loop (LLM ↔ tool execution cycle)
+- Provider streaming (Ollama adapter with tool_calls + reasoning support)
+- Slash commands (via `processSlashCommand`)
+- Tool registry (built-in tools registered at init)
+- Permission evaluation (event-driven, ADR-012)
+- Context tracking (token counting, compaction)
 
-- `provider/` — Provider abstraction (Ollama, OpenAI, Anthropic adapters)
-- `agent/` — Named agents with configuration
-- `agent-loop.ts` — Turn-by-turn agent execution loop
-- `chat-session.ts` — Chat session with message history
-- `permission/` — Event-driven permission evaluation (ADR-012)
-- `session/` — Session persistence and management
-- `memory.ts` — Conversation memory and context window management
-- `context-tracker.ts` — Token counting and context window tracking
-- `slash-commands.ts` — AI-specific slash commands (/model, /clear, etc.)
-- `call-tool.ts` — Tool execution with permission checks
-- `schema.ts` — Zod schema utilities for tool parameters
+## Architecture
 
-## Wiring Plan
+```
+TUI (app.tsx)
+  └─ use-chat.ts (Solid signal bridge)
+       └─ ChatSession (glue layer)
+            ├─ KapyAgent (state, events, steering)
+            ├─ AgentLoop (LLM ↔ tool cycle)
+            ├─ ProviderRegistry + OllamaAdapter
+            ├─ ToolRegistry
+            ├─ PermissionEvaluator
+            ├─ SessionManager
+            └─ ContextTracker
+```
 
-When `ai/` is fully integrated:
-1. `ollama-client.ts` → delegates to `ai/chat-session.ts` + `ai/agent-loop.ts`
-2. `tui/commands.ts` slash commands → delegates to `ai/slash-commands.ts`
-3. Provider selection → uses `ai/provider/registry.ts`
-4. Tool execution → uses `ai/call-tool.ts` with permission checks
-5. Session persistence → uses `ai/session/manager.ts`
+## Key Files
 
-All 308 unit tests pass.
+| File | Purpose |
+|------|---------|
+| `chat-session.ts` | TUI-facing API: `send()`, `abort()`, event subscription |
+| `agent-loop.ts` | Turn-by-turn LLM cycle with tool execution |
+| `agent/agent.ts` | Agent state, events, steering/followUp queues |
+| `agent/types.ts` | ThinkingLevel, AgentEvent, AgentMessage types |
+| `provider/ollama.ts` | Ollama adapter (OpenAI-compatible SSE streaming) |
+| `provider/registry.ts` | Multi-provider registry |
+| `provider/types.ts` | ProviderAdapter, StreamChunk, ChatMessage interfaces |
+| `permission/evaluator.ts` | Event-driven permission evaluation |
+| `session/manager.ts` | Tree-structured message persistence |
+| `memory.ts` | Conversation memory |
+| `context-tracker.ts` | Token counting, context window tracking |
+| `slash-commands.ts` | /help, /model, /agent, /compact, /clear, etc. |
+| `call-tool.ts` | Tool execution with permission checks |
+| `schema.ts` | Zod-to-JSON-Schema for tool parameters |
+
+## Provider Support
+
+- **Ollama** (primary) — auto-detect, model listing, streaming with tool_calls + reasoning_content
+- **OpenAI** — adapter ready, needs API key config
+- **Anthropic** — adapter ready, needs API key config
+
+## Event Flow
+
+```
+ChatSession.send(input)
+  → AgentLoop.prompt(input)
+    → ProviderAdapter.streamChat()
+      → SSE chunks → AgentEvent (message_update, reasoning_update, tool_call)
+    → Tool execution → tool_result events
+    → Repeat until no tool calls or max rounds
+  → AgentEvent (agent_end)
+```
+
+TUI subscribes via `session.onEvent()` → `use-chat.ts` maps events to Solid signals → reactive render.
+
+## All 308 unit tests pass.

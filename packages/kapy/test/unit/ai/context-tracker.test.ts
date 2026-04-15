@@ -2,9 +2,9 @@
  * Tests for ContextTracker — token estimation, usage tracking, compaction.
  */
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
+import type { ContextMessage } from "../../../src/ai/context-tracker.js";
 import { ContextTracker, type ContextUsage } from "../../../src/ai/context-tracker.js";
-import type { AgentMessage } from "../../../src/ai/agent/types.js";
 
 describe("ContextTracker", () => {
 	test("empty messages → 0 tokens", () => {
@@ -17,9 +17,7 @@ describe("ContextTracker", () => {
 
 	test("estimates tokens from message content", () => {
 		const tracker = new ContextTracker();
-		const messages: AgentMessage[] = [
-			{ role: "user", content: "Hello world!", timestamp: Date.now() },
-		];
+		const messages: ContextMessage[] = [{ role: "user", content: "Hello world!", timestamp: Date.now() }];
 		const usage = tracker.getUsage(messages, 8192);
 		expect(usage.usedTokens).toBeGreaterThan(0);
 		expect(usage.usedTokens).toBeLessThan(100);
@@ -27,10 +25,8 @@ describe("ContextTracker", () => {
 
 	test("fraction increases with more messages", () => {
 		const tracker = new ContextTracker();
-		const short: AgentMessage[] = [
-			{ role: "user", content: "Hi", timestamp: Date.now() },
-		];
-		const long: AgentMessage[] = [
+		const short: ContextMessage[] = [{ role: "user", content: "Hi", timestamp: Date.now() }];
+		const long: ContextMessage[] = [
 			{ role: "user", content: "Hi", timestamp: Date.now() },
 			{ role: "assistant", content: "A".repeat(1000), timestamp: Date.now() },
 		];
@@ -42,7 +38,7 @@ describe("ContextTracker", () => {
 	test("shouldCompact triggers at threshold", () => {
 		const tracker = new ContextTracker({ compactThreshold: 0.8 });
 		// Fill up past 80%
-		const messages: AgentMessage[] = Array.from({ length: 100 }, (_, i) => ({
+		const messages: ContextMessage[] = Array.from({ length: 100 }, (_, i) => ({
 			role: "user" as const,
 			content: "A".repeat(300),
 			timestamp: Date.now() + i,
@@ -53,16 +49,14 @@ describe("ContextTracker", () => {
 
 	test("shouldCompact not triggered under threshold", () => {
 		const tracker = new ContextTracker({ compactThreshold: 0.8 });
-		const messages: AgentMessage[] = [
-			{ role: "user", content: "Short", timestamp: Date.now() },
-		];
+		const messages: ContextMessage[] = [{ role: "user", content: "Short", timestamp: Date.now() }];
 		const usage = tracker.getUsage(messages, 8192);
 		expect(usage.shouldCompact).toBe(false);
 	});
 
 	test("compact preserves recent messages", () => {
 		const tracker = new ContextTracker();
-		const messages: AgentMessage[] = Array.from({ length: 10 }, (_, i) => ({
+		const messages: ContextMessage[] = Array.from({ length: 10 }, (_, i) => ({
 			role: "user" as const,
 			content: `Message ${i}`,
 			timestamp: Date.now() + i,
@@ -78,7 +72,7 @@ describe("ContextTracker", () => {
 
 	test("compact preserves system messages", () => {
 		const tracker = new ContextTracker();
-		const messages: AgentMessage[] = [
+		const messages: ContextMessage[] = [
 			{ role: "system", content: "You are a helpful assistant.", timestamp: Date.now() },
 			{ role: "user", content: "Hello", timestamp: Date.now() },
 			{ role: "assistant", content: "Hi there!", timestamp: Date.now() },
@@ -91,16 +85,14 @@ describe("ContextTracker", () => {
 
 	test("compact on 2 or fewer messages returns as-is", () => {
 		const tracker = new ContextTracker();
-		const messages: AgentMessage[] = [
-			{ role: "user", content: "Hello", timestamp: Date.now() },
-		];
+		const messages: ContextMessage[] = [{ role: "user", content: "Hello", timestamp: Date.now() }];
 		const compacted = tracker.compact(messages);
 		expect(compacted).toEqual(messages);
 	});
 
 	test("shouldCompact delegates to getUsage", () => {
 		const tracker = new ContextTracker({ compactThreshold: 0.5 });
-		const messages: AgentMessage[] = Array.from({ length: 100 }, (_, i) => ({
+		const messages: ContextMessage[] = Array.from({ length: 100 }, (_, i) => ({
 			role: "user" as const,
 			content: "X".repeat(200),
 			timestamp: Date.now() + i,
@@ -111,7 +103,7 @@ describe("ContextTracker", () => {
 
 	test("custom thresholds", () => {
 		const tracker = new ContextTracker({ compactThreshold: 0.5, warnThreshold: 0.3 });
-		const messages: AgentMessage[] = Array.from({ length: 100 }, (_, i) => ({
+		const messages: ContextMessage[] = Array.from({ length: 100 }, (_, i) => ({
 			role: "user" as const,
 			content: "X".repeat(200),
 			timestamp: Date.now() + i,
@@ -124,7 +116,7 @@ describe("ContextTracker", () => {
 	test("setThresholds updates thresholds", () => {
 		const tracker = new ContextTracker({ compactThreshold: 0.8 });
 		tracker.setThresholds(0.5);
-		const messages: AgentMessage[] = Array.from({ length: 100 }, (_, i) => ({
+		const messages: ContextMessage[] = Array.from({ length: 100 }, (_, i) => ({
 			role: "user" as const,
 			content: "X".repeat(200),
 			timestamp: Date.now() + i,

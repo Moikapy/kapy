@@ -1,8 +1,8 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { join } from "path";
 import { globTool } from "../../../../src/tool/builtin/glob.js";
 import type { ToolExecutionContext } from "../../../../src/tool/types.js";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
-import { join } from "path";
 
 const TMP = join(import.meta.dir, "__tmp_glob__");
 const ctx: ToolExecutionContext = { cwd: TMP, signal: undefined };
@@ -15,7 +15,11 @@ beforeEach(() => {
 	writeFileSync(join(TMP, "src", "c.ts"), "// c");
 	writeFileSync(join(TMP, "src", "d.ts"), "// d");
 });
-afterEach(() => { try { rmSync(TMP, { recursive: true }); } catch {} });
+afterEach(() => {
+	try {
+		rmSync(TMP, { recursive: true });
+	} catch {}
+});
 
 test("finds files matching a glob pattern", async () => {
 	const result = await globTool.execute("t1", { pattern: "**/*.ts" }, undefined, () => {}, ctx);

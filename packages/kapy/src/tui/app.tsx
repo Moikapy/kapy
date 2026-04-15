@@ -1,10 +1,10 @@
 import { createCliRenderer } from "@opentui/core";
 import { render, useKeyboard, useTerminalDimensions } from "@opentui/solid";
 import { createEffect, Show, useContext } from "solid-js";
-import { Modal, type ModalView } from "./components/modal.js";
+import { DialogProvider, useDialog } from "./components/dialog-provider.js";
+import { ModalContent, type ModalView } from "./components/modal.js";
 import { StatusFooter } from "./components/status-footer.js";
 import { createChat } from "./hooks/use-chat.js";
-import { useModal } from "./hooks/use-modal.js";
 import { useSlashCommands } from "./hooks/use-slash-commands.js";
 import { RouteContext, RouteProvider } from "./router.js";
 import { KEY_BINDINGS } from "./types.js";
@@ -18,7 +18,12 @@ function App() {
 	const route = useContext(RouteContext)!;
 	const dims = useTerminalDimensions();
 	const chat = createChat();
-	const modal = useModal();
+	const dialog = useDialog();
+
+	/** Open a modal view inside the dialog system. */
+	function openModal(view: ModalView) {
+		dialog.replace(() => <ModalContent view={view} />);
+	}
 
 	const handleSlash = useSlashCommands({
 		setMsgs: chat.setMsgs,
@@ -26,7 +31,10 @@ function App() {
 		fetchModels: chat.fetchModels,
 		model: chat.model,
 		models: chat.models,
-		openModal: (view: ModalView) => modal.open(view),
+		openModal,
+		loadSession: chat.loadSession,
+		listSessions: chat.listSessions,
+		listAllSessions: chat.listAllSessions,
 	});
 
 	useKeyboard((evt: any) => {
@@ -43,12 +51,15 @@ function App() {
 		if (chat.msgs().length > 0) setTimeout(() => scrollRef?.scrollTo?.(99999), 50);
 	});
 
+	/** Global key handler for non-dialog keys.
+	 *  Escape is handled by DialogProvider when a dialog is open.
+	 *  When no dialog is open, Escape aborts streaming or navigates home.
+	 */
 	const onKey = (evt: any) => {
 		if (evt.name === "escape") {
-			if (modal.isOpen()) {
-				modal.close();
-				return;
-			}
+			// Dialog is open — DialogProvider handles Escape, so this won't fire
+			// (DialogProvider's useKeyboard runs first due to provider ordering)
+			// No dialog open:
 			if (chat.streaming()) {
 				chat.abort();
 				return;
@@ -69,15 +80,10 @@ function App() {
 	let _homeRef: any;
 	let _sessRef: any;
 
-	// When modal is open, render modal overlay on top of content
-	// (both in the same flex column — modal gets flexGrow to fill space)
-	const modalOpen = modal.isOpen();
-
 	return (
 		<box width={dims().width} height={dims().height} backgroundColor="#1a1b26" flexDirection="column">
 			<box flexDirection="row" flexGrow={1} minHeight={0}>
 				<box flexGrow={1} minWidth={0}>
-					{/* Content sits behind modal when open */}
 					<Show when={route.data().type === "home"}>
 						<HomeScreen
 							keyBindings={KEY_BINDINGS}
@@ -95,6 +101,7 @@ function App() {
 							msgs={chat.msgs}
 							err={chat.err}
 							streaming={chat.streaming}
+							queuedCount={() => chat.queuedCount}
 							keyBindings={KEY_BINDINGS}
 							onSubmit={onSubmit}
 							onSlashCommand={onSlashCommand}
@@ -111,8 +118,6 @@ function App() {
 				</box>
 			</box>
 			<StatusFooter model={chat.model} />
-			{/* Modal overlay renders on top when active */}
-			{modalOpen && <Modal view={modal.view()!} onClose={() => modal.close()} />}
 		</box>
 	);
 }
@@ -152,7 +157,9 @@ export async function launchChatTUI(): Promise<void> {
 	await render(
 		() => (
 			<RouteProvider>
-				<App />
+				<DialogProvider>
+					<App />
+				</DialogProvider>
 			</RouteProvider>
 		),
 		renderer,

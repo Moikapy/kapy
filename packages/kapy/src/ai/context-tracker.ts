@@ -6,7 +6,13 @@
  * Pi pattern: compaction only affects what's sent to LLM, full history stays in JSONL.
  */
 
-import type { AgentMessage } from "./agent/types.js";
+// ContextMessage type re-exported from the agent core
+// We define a compatible local type for context tracking
+export interface ContextMessage {
+	role: string;
+	content: string;
+	timestamp?: number;
+}
 
 export interface ContextUsage {
 	/** Estimated tokens used */
@@ -40,7 +46,7 @@ export class ContextTracker {
 	}
 
 	/** Calculate context usage from messages and model max tokens */
-	getUsage(messages: AgentMessage[], maxContextTokens: number): ContextUsage {
+	getUsage(messages: ContextMessage[], maxContextTokens: number): ContextUsage {
 		let usedTokens = 0;
 		for (const msg of messages) {
 			usedTokens += estimateTokens(msg.content);
@@ -59,7 +65,7 @@ export class ContextTracker {
 	}
 
 	/** Compact messages by keeping recent ones and summarizing the rest */
-	compact(messages: AgentMessage[], targetFraction: number = 0.4): AgentMessage[] {
+	compact(messages: ContextMessage[], targetFraction: number = 0.4): ContextMessage[] {
 		if (messages.length <= 2) return messages;
 
 		// Keep system message (first if role=system) and last N messages
@@ -75,9 +81,10 @@ export class ContextTracker {
 		const removed = nonSystem.slice(0, nonSystem.length - keepCount);
 		if (removed.length === 0) return messages;
 
-		const summary: AgentMessage = {
+		const summary: ContextMessage = {
 			role: "system",
-			content: `[Context compacted. ${removed.length} earlier messages summarized.]\n` +
+			content:
+				`[Context compacted. ${removed.length} earlier messages summarized.]\n` +
 				`Summary of removed messages:\n` +
 				removed.map((m) => `- ${m.role}: ${m.content.slice(0, 100)}${m.content.length > 100 ? "..." : ""}`).join("\n"),
 			timestamp: Date.now(),
@@ -87,7 +94,7 @@ export class ContextTracker {
 	}
 
 	/** Check if context usage exceeds compact threshold */
-	shouldCompact(messages: AgentMessage[], maxContextTokens: number): boolean {
+	shouldCompact(messages: ContextMessage[], maxContextTokens: number): boolean {
 		const usage = this.getUsage(messages, maxContextTokens);
 		return usage.shouldCompact;
 	}
