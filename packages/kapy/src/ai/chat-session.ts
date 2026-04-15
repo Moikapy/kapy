@@ -96,6 +96,37 @@ export class ChatSession {
 			steeringMode: "one-at-a-time",
 			followUpMode: "one-at-a-time",
 			streamFn: streamSimple,
+			// Convert kapy messages to LLM-compatible format
+			// Filter out UI-only messages (system status, internal notifications)
+			// and ensure only user/assistant/toolResult reach the LLM
+			convertToLlm: (messages) => {
+				return messages.filter(
+					(m) => m.role === "user" || m.role === "assistant" || m.role === "toolResult",
+				);
+			},
+			// Compact context when approaching context limits
+			transformContext: async (messages, _signal) => {
+				const model = this.agent.state.model;
+				if (!model) return messages;
+
+				const contextLength = model.contextWindow || 128_000;
+				const contextMsgs = messages.map((m) => ({
+					role: typeof m.role === "string" ? m.role : "user",
+					content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+				}));
+
+				if (this.contextTracker.shouldCompact(contextMsgs, contextLength)) {
+					const compacted = this.contextTracker.compact(contextMsgs);
+					// Convert compacted ContextMessages back to AgentMessages
+					return compacted.map((cm) => ({
+						...messages.find((m) => {
+							const mContent = typeof m.content === "string" ? m.content : "";
+							return mContent === cm.content;
+						}) || { role: cm.role, content: cm.content, timestamp: Date.now() },
+					})) as typeof messages;
+				}
+				return messages;
+			},
 			beforeToolCall: async (context: BeforeToolCallContext, _signal?: AbortSignal): Promise<BeforeToolCallResult> => {
 				const toolName = context.toolCall.name;
 				const inputStr = JSON.stringify(context.args);
@@ -107,8 +138,25 @@ export class ChatSession {
 				}
 
 				if (action === "ask") {
-					// TODO: interactive permission prompt
-					return { block: true, reason: "Permission required: Cannot prompt in current mode" };
+					// In interactive mode, prompt the user
+					if (process.stdout.isTTY) {
+						const inputPreview = inputStr.length > 80 ? `${inputStr.slice(0, 77)}...` : inputStr;
+						process.stdout.write(`\n? Allow ${toolName}(${inputPreview})? [y/n] `);
+						const answer = await new Promise<string>((resolve) => {
+							process.stdin.setRawMode(false);
+							process.stdin.once("data", (data) => {
+								resolve(data.toString().trim().toLowerCase());
+							});
+						});
+						if (answer === "y" || answer === "yes") {
+							// Add an allow rule for future calls
+							this.permissions.addRule({ permission: toolName, pattern: "*", action: "allow" });
+							return {};
+						}
+						return { block: true, reason: "Permission denied by user" };
+					}
+					// Non-interactive: default deny
+					return { block: true, reason: "Permission required: Cannot prompt in non-interactive mode" };
 				}
 
 				return {};

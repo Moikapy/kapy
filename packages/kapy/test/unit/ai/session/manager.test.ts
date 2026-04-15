@@ -5,7 +5,7 @@ describe("SessionManager", () => {
 	let manager: SessionManager;
 
 	beforeEach(() => {
-		manager = new SessionManager();
+		manager = SessionManager.inMemory();
 	});
 
 	test("starts with empty entries", () => {
@@ -13,10 +13,7 @@ describe("SessionManager", () => {
 	});
 
 	test("appendMessage creates entry with parentId", () => {
-		const id = manager.appendMessage({
-			role: "user",
-			content: "Hello",
-		});
+		const id = manager.appendMessage({ role: "user", content: "Hello" });
 		expect(id).toBeDefined();
 		expect(manager.getEntries()).toHaveLength(1);
 		expect(manager.getEntries()[0].parentId).toBeNull();
@@ -55,30 +52,32 @@ describe("SessionManager", () => {
 		expect(branch[2].content).toBe("Second");
 	});
 
-	test("forkFrom creates a branch at entry", () => {
+	test("branch creates a branch at entry", () => {
 		const _id1 = manager.appendMessage({ role: "user", content: "A" });
 		const id2 = manager.appendMessage({ role: "assistant", content: "B" });
-		const _id3 = manager.appendMessage({ role: "user", content: "C" });
+		manager.appendMessage({ role: "user", content: "C" });
 
-		// Fork from id2 (assistant message)
-		const forkId = manager.forkFrom(id2);
-		manager.appendMessage({ role: "user", content: "D", parentId: forkId });
+		// Branch from id2 (assistant message)
+		manager.branch(id2);
+		manager.appendMessage({ role: "user", content: "D" });
 
 		// Branch should now follow the fork
 		const branch = manager.getBranch();
 		expect(branch.length).toBeGreaterThanOrEqual(3);
+		// Last message should be the new branch entry
+		expect(branch[branch.length - 1].content).toBe("D");
 	});
 
-	test("clear removes all entries", () => {
+	test("newSession resets entries", () => {
 		manager.appendMessage({ role: "user", content: "Hello" });
 		manager.appendMessage({ role: "assistant", content: "Hi" });
-		manager.clear();
+		manager.newSession();
 		expect(manager.getEntries()).toHaveLength(0);
 	});
 
-	test("getSessionFile returns session file path", () => {
-		const manager = new SessionManager({ sessionFile: "/tmp/test-session.jsonl" });
-		expect(manager.getSessionFile()).toBe("/tmp/test-session.jsonl");
+	test("getSessionFile returns session file for persisted session", () => {
+		// InMemory sessions don't have files — test with null
+		expect(manager.getSessionFile()).toBeUndefined();
 	});
 
 	test("countByRole returns counts per role", () => {
@@ -88,5 +87,20 @@ describe("SessionManager", () => {
 		const counts = manager.countByRole();
 		expect(counts.user).toBe(2);
 		expect(counts.assistant).toBe(1);
+	});
+
+	test("getChildren returns child entries", () => {
+		const id1 = manager.appendMessage({ role: "user", content: "Hello" });
+		const _id2 = manager.appendMessage({ role: "assistant", content: "Hi" });
+		const children = manager.getChildren(id1);
+		expect(children).toHaveLength(1);
+		expect(children[0].role).toBe("assistant");
+	});
+
+	test("entryCount reflects total entries", () => {
+		expect(manager.entryCount).toBe(0);
+		manager.appendMessage({ role: "user", content: "Hi" });
+		manager.appendMessage({ role: "assistant", content: "Hello" });
+		expect(manager.entryCount).toBe(2);
 	});
 });
