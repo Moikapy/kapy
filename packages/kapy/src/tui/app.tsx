@@ -80,6 +80,7 @@ function App() {
 							streaming={chat.streaming}
 							keyBindings={KEY_BINDINGS}
 							onKeyDown={onKey}
+							inputVal={inputVal()}
 							onSubmit={() => {
 								setTimeout(
 									() =>
@@ -114,6 +115,15 @@ function App() {
 							}}
 							onContentChange={() => {
 								if (sessRef) setInputVal(sessRef.plainText);
+							}}
+							onSelectCommand={(cmd: string) => {
+								const suffix = cmd.endsWith(":") || cmd.endsWith(" ") ? "" : " ";
+								const text = cmd + suffix;
+								setInputVal(text);
+								if (sessRef) {
+									sessRef.clear();
+									sessRef.insertText(text);
+								}
 							}}
 						/>
 					</Show>
