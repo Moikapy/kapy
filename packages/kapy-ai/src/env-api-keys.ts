@@ -109,6 +109,11 @@ export function getEnvApiKey(provider: any): string | undefined {
 		}
 	}
 
+	// Ollama doesn't require an API key by default — return a sentinel to bypass the check
+	if (provider === "ollama") {
+		return process.env.OLLAMA_API_KEY || "ollama-no-key-required";
+	}
+
 	const envMap: Record<string, string> = {
 		openai: "OPENAI_API_KEY",
 		"azure-openai-responses": "AZURE_OPENAI_API_KEY",

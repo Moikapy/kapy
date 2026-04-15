@@ -55,6 +55,7 @@ export {
 // ── Kapy-specific modules ──────────────────────────────────────────
 
 export { callTool } from "./call-tool.js";
+export { kapyToolToAgentTool, kapyToolsToAgentTools } from "./tool-bridge.js";
 export type { ChatMessage, ChatSessionOptions } from "./chat-session.js";
 export { ChatSession } from "./chat-session.js";
 export type { ContextMessage, ContextUsage } from "./context-tracker.js";

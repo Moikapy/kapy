@@ -17,6 +17,7 @@ import type { Model } from "@moikapy/kapy-ai";
 import { getModel, registerModel, streamSimple } from "@moikapy/kapy-ai";
 import { ToolRegistry } from "../tool/registry.js";
 import type { KapyToolRegistration } from "../tool/types.js";
+import { kapyToolsToAgentTools } from "./tool-bridge.js";
 import { type ContextMessage, ContextTracker } from "./context-tracker.js";
 import { PermissionEvaluator } from "./permission/evaluator.js";
 import { OllamaAdapter } from "./provider/ollama.js";
@@ -155,7 +156,7 @@ export class ChatSession {
 						name: model.id,
 						api: "openai-completions" as const,
 						provider: "ollama",
-						baseUrl: ollama.baseUrl,
+						baseUrl: `${ollama.baseUrl}/v1`,
 						reasoning: model.supportsReasoning,
 						input: model.supportsVision ? (["text", "image"] as const) : (["text"] as const),
 						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -177,8 +178,13 @@ export class ChatSession {
 			}
 		}
 
-		// Auto-select model if not set
-		if (!this.defaultModel) {
+		// Set model — either from defaultModel or auto-detect
+		if (this.defaultModel) {
+			const colonIdx = this.defaultModel.indexOf(":");
+			const providerId = colonIdx !== -1 ? this.defaultModel.slice(0, colonIdx) : "ollama";
+			const modelId = colonIdx !== -1 ? this.defaultModel.slice(colonIdx + 1) : this.defaultModel;
+			this.setModel(providerId, modelId);
+		} else {
 			this.autoSelectModel();
 		}
 	}
@@ -290,9 +296,11 @@ export class ChatSession {
 		this.agent.abort();
 	}
 
-	/** Register a tool */
+	/** Register a tool and sync to agent state */
 	registerTool(definition: KapyToolRegistration): void {
 		this.tools.register(definition);
+		// Sync tools to agent state so the LLM can call them
+		this.agent.state.tools = kapyToolsToAgentTools(this.tools.all());
 	}
 
 	/** Register a model into the internal registry */
@@ -357,7 +365,7 @@ export class ChatSession {
 			name: modelId,
 			api: "openai-completions",
 			provider: providerId,
-			baseUrl: providerId === "ollama" ? (process.env.OLLAMA_HOST ?? "http://localhost:11434") : "",
+			baseUrl: providerId === "ollama" ? `${process.env.OLLAMA_HOST ?? "http://localhost:11434"}/v1` : "",
 			reasoning: info?.supportsReasoning ?? false,
 			input: info?.supportsVision ? (["text", "image"] as const) : (["text"] as const),
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
