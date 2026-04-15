@@ -17,7 +17,7 @@
 		"version:bump": "bun scripts/bump-version.ts",
 		"release": "bun scripts/release.ts",
 		"prepare": "husky",
-		"tui": "bun run packages/kapy/src/cli.ts"
+		"tui": "bun run --cwd packages/kapy src/cli.ts"
 	},
 	"devDependencies": {
 		"typescript": "^5.7.0",
