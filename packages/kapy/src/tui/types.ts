@@ -27,6 +27,11 @@ Core traits:
 
 When asked "who are you" or "what are you", answer: "I'm Kapy, your digital assistant."`;
 
+// Thinking/reasoning level for models that support it (e.g. GLM, Qwen)
+// "off" = no thinking tokens (fastest, cheapest)
+// "low" / "medium" / "high" / "xhigh" = progressive reasoning depth
+export const DEFAULT_THINKING_LEVEL: "off" | "low" | "medium" | "high" | "xhigh" = "medium";
+
 // Load project context from AGENTS.md (walks up from cwd)
 function loadProjectCtx(): string {
 	try {

@@ -15,12 +15,13 @@ import { ChatSession } from "../../ai/chat-session.js";
 import type { AgentEvent } from "@moikapy/kapy-agent";
 import type { SessionInfo } from "../../ai/session/types.js";
 import { bashTool, globTool, grepTool, readFileTool, writeFileTool } from "../../tool/index.js";
-import { DEFAULT_MODEL, type Msg, systemPrompt } from "../types.js";
+import { DEFAULT_MODEL, DEFAULT_THINKING_LEVEL, type Msg, systemPrompt } from "../types.js";
 
 export function createChat() {
 	const session = new ChatSession({
 		defaultModel: DEFAULT_MODEL,
 		systemPrompt,
+		thinkingLevel: DEFAULT_THINKING_LEVEL,
 		continueRecent: true, // Auto-resume last session
 	});
 
@@ -174,6 +175,13 @@ export function createChat() {
 		setStreaming(false);
 	}
 
+	/** Change thinking level at runtime */
+	function setThinkingLevel(level: string) {
+		const valid: string[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+		if (!valid.includes(level)) return;
+		session.agent.state.thinkingLevel = level as any;
+	}
+
 	// Model list from provider registry
 	async function fetchModels() {
 		await session.init();
@@ -242,6 +250,7 @@ export function createChat() {
 		setErr,
 		model,
 		setModel,
+		setThinkingLevel,
 		models,
 		setModels,
 		send,

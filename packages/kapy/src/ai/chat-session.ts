@@ -44,6 +44,8 @@ export interface ChatSessionOptions {
 	defaultModel?: string;
 	/** System prompt */
 	systemPrompt?: string;
+	/** Thinking/reasoning level for models that support it. Defaults to "off". */
+	thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 	/** Continue most recent session instead of creating new? */
 	continueRecent?: boolean;
 	/** Path to specific session file to resume */
@@ -92,6 +94,7 @@ export class ChatSession {
 				systemPrompt: options?.systemPrompt ?? "",
 				model: undefined as unknown as Model<string>,
 				tools: [],
+				thinkingLevel: options?.thinkingLevel ?? "off",
 			},
 			steeringMode: "one-at-a-time",
 			followUpMode: "one-at-a-time",

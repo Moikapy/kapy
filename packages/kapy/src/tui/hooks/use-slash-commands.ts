@@ -23,6 +23,8 @@ export interface ChatActions {
 	listSessions: () => Promise<SessionInfo[]>;
 	/** List all sessions across all projects */
 	listAllSessions: () => Promise<SessionInfo[]>;
+	/** Set thinking/reasoning level */
+	setThinkingLevel: (level: string) => void;
 	/** Current model string for highlighting in /models */
 	model: () => string;
 	/** Available model list (populated after fetchModels) */
@@ -56,6 +58,12 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 	{
 		name: "/keys",
 		description: "Show keyboard shortcuts",
+	},
+	{
+		name: "/think",
+		description: "Set thinking level (off/low/medium/high/xhigh)",
+		takesArg: true,
+		argLabel: "level",
 	},
 	{
 		name: "/clear",
@@ -114,6 +122,12 @@ export function useSlashCommands(actions: ChatActions) {
 		const modelMatch = text.trim().match(/^\/model\s+(.+)$/i);
 		if (modelMatch) {
 			actions.setModel(modelMatch[1].trim());
+			return true;
+		}
+
+		const thinkMatch = text.trim().match(/^\/think\s+(off|minimal|low|medium|high|xhigh)$/i);
+		if (thinkMatch) {
+			actions.setThinkingLevel(thinkMatch[1].toLowerCase());
 			return true;
 		}
 

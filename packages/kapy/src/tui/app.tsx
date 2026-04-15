@@ -28,6 +28,7 @@ function App() {
 	const handleSlash = useSlashCommands({
 		setMsgs: chat.setMsgs,
 		setModel: chat.setModel,
+		setThinkingLevel: chat.setThinkingLevel,
 		fetchModels: chat.fetchModels,
 		model: chat.model,
 		models: chat.models,
