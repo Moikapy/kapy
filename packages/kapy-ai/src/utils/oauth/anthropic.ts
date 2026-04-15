@@ -1,6 +1,11 @@
 /**
  * Anthropic OAuth flow (Claude Pro/Max)
  *
+ * OAuth credentials are loaded from environment variables:
+ * - KAPY_ANTHROPIC_CLIENT_ID
+ *
+ * See ADR-015 for the full credential management strategy.
+ *
  * NOTE: This module uses Node.js http.createServer for the OAuth callback server.
  * It is only intended for CLI use, not browser environments.
  */
@@ -24,8 +29,7 @@ type NodeApis = {
 let nodeApis: NodeApis | null = null;
 let nodeApisPromise: Promise<NodeApis> | null = null;
 
-const decode = (s: string) => atob(s);
-const CLIENT_ID = decode("OWQxYzI1MGEtZTYxYi00NGQ5LTg4ZWQtNTk0NGQxOTYyZjVl");
+const CLIENT_ID = process.env.KAPY_ANTHROPIC_CLIENT_ID || process.env.ANTHROPIC_CLIENT_ID || "";
 const AUTHORIZE_URL = "https://claude.ai/oauth/authorize";
 const TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 const CALLBACK_HOST = "127.0.0.1";

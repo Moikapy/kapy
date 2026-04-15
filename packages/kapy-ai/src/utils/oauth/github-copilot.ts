@@ -1,5 +1,10 @@
 /**
  * GitHub Copilot OAuth flow
+ *
+ * OAuth credentials are loaded from environment variables:
+ * - KAPY_GITHUB_CLIENT_ID
+ *
+ * See ADR-015 for the full credential management strategy.
  */
 
 import { getModels } from "../../models.js";
@@ -10,8 +15,7 @@ type CopilotCredentials = OAuthCredentials & {
 	enterpriseUrl?: string;
 };
 
-const decode = (s: string) => atob(s);
-const CLIENT_ID = decode("SXYxLmI1MDdhMDhjODdlY2ZlOTg=");
+const CLIENT_ID = process.env.KAPY_GITHUB_CLIENT_ID || process.env.GITHUB_CLIENT_ID || "";
 
 const COPILOT_HEADERS = {
 	"User-Agent": "GitHubCopilotChat/0.35.0",

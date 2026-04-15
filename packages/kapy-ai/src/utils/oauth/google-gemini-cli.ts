@@ -2,6 +2,12 @@
  * Gemini CLI OAuth flow (Google Cloud Code Assist)
  * Standard Gemini models only (gemini-2.0-flash, gemini-2.5-*)
  *
+ * OAuth credentials are loaded from environment variables:
+ * - KAPY_GOOGLE_CLIENT_ID
+ * - KAPY_GOOGLE_CLIENT_SECRET
+ *
+ * See ADR-015 for the full credential management strategy.
+ *
  * NOTE: This module uses Node.js http.createServer for the OAuth callback.
  * It is only intended for CLI use, not browser environments.
  */
@@ -23,9 +29,9 @@ if (typeof process !== "undefined" && (process.versions?.node || process.version
 	});
 }
 
-const decode = (s: string) => atob(s);
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "REDACTED";
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "REDACTED";
+// OAuth credentials loaded from env vars (see ADR-015)
+const CLIENT_ID = process.env.KAPY_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || "";
+const CLIENT_SECRET = process.env.KAPY_GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || "";
 const REDIRECT_URI = "http://localhost:8085/oauth2callback";
 const SCOPES = [
 	"https://www.googleapis.com/auth/cloud-platform",

@@ -2,6 +2,12 @@
  * Antigravity OAuth flow (Gemini 3, Claude, GPT-OSS via Google Cloud)
  * Uses different OAuth credentials than google-gemini-cli for access to additional models.
  *
+ * OAuth credentials are loaded from environment variables:
+ * - KAPY_GOOGLE_CLIENT_ID
+ * - KAPY_GOOGLE_CLIENT_SECRET
+ *
+ * See ADR-015 for the full credential management strategy.
+ *
  * NOTE: This module uses Node.js http.createServer for the OAuth callback.
  * It is only intended for CLI use, not browser environments.
  */
@@ -23,10 +29,9 @@ if (typeof process !== "undefined" && (process.versions?.node || process.version
 	});
 }
 
-// Antigravity OAuth credentials (different from Gemini CLI)
-const decode = (s: string) => atob(s);
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "REDACTED";
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "REDACTED";
+// Antigravity OAuth credentials — loaded from env vars (see ADR-015)
+const CLIENT_ID = process.env.KAPY_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || "";
+const CLIENT_SECRET = process.env.KAPY_GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || "";
 const REDIRECT_URI = "http://localhost:51121/oauth-callback";
 
 // Antigravity requires additional scopes
