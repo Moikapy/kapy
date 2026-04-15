@@ -162,19 +162,25 @@ export function createChat() {
 
 	// Model list from provider registry
 	async function fetchModels() {
+		await session.init();
 		try {
 			const modelInfos = session.providers.getAllModels();
-			setModels(modelInfos.map((m) => m.id).sort());
+			if (modelInfos.length > 0) {
+				setModels(modelInfos.map((m) => m.id).sort());
+				setSidebar(true);
+				return;
+			}
+		} catch {
+			// Provider registry failed, try direct fetch
+		}
+		// Fallback: direct fetch from Ollama
+		try {
+			const r = await fetch("http://localhost:11434/v1/models");
+			const d = await r.json();
+			setModels((d.data || []).map((m: any) => m.id).sort());
 			setSidebar(true);
 		} catch {
-			// Fallback: direct fetch from Ollama
-			try {
-				const r = await fetch("http://localhost:11434/v1/models");
-				const d = await r.json();
-				setModels((d.data || []).map((m: any) => m.id).sort());
-			} catch {
-				setErr("Failed to fetch models");
-			}
+			setErr("Failed to fetch models — is Ollama running?");
 		}
 	}
 
