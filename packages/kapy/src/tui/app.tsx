@@ -118,7 +118,7 @@ function App() {
 					</Show>
 				</box>
 			</box>
-			<StatusFooter model={chat.model} />
+			<StatusFooter model={chat.model} thinkingLevel={chat.thinkingLevel} />
 		</box>
 	);
 }

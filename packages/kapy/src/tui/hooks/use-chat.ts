@@ -38,6 +38,7 @@ export function createChat() {
 	const [err, setErr] = createSignal("");
 	const [model, setModel] = createSignal(DEFAULT_MODEL);
 	const [models, setModels] = createSignal<string[]>([]);
+	const [thinkingLevel, setThinkingLevelSignal] = createSignal(DEFAULT_THINKING_LEVEL);
 
 	// Track streaming message ID for live updates
 	let streamingId: string | null = null;
@@ -180,6 +181,7 @@ export function createChat() {
 		const valid: string[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
 		if (!valid.includes(level)) return;
 		session.agent.state.thinkingLevel = level as any;
+		setThinkingLevelSignal(level);
 	}
 
 	// Model list from provider registry
@@ -251,6 +253,7 @@ export function createChat() {
 		model,
 		setModel,
 		setThinkingLevel,
+		thinkingLevel,
 		models,
 		setModels,
 		send,
