@@ -1,5 +1,5 @@
 import { createCliRenderer } from "@opentui/core";
-import { render, useKeyboard, useTerminalDimensions } from "@opentui/solid";
+import { render, useKeyboard, useTerminalDimensions, useSelectionHandler, useRenderer } from "@opentui/solid";
 import { createEffect, Show, useContext } from "solid-js";
 import { DialogProvider, useDialog } from "./components/dialog-provider.js";
 import { ModalContent, type ModalView } from "./components/modal.js";
@@ -19,6 +19,13 @@ function App() {
 	const dims = useTerminalDimensions();
 	const chat = createChat();
 	const dialog = useDialog();
+	const renderer = useRenderer();
+
+	// Enable copy-on-selection — mouse drag to select, auto-copies via OSC 52
+	useSelectionHandler((selection) => {
+		const text = selection.getSelectedText();
+		if (text) renderer.copyToClipboardOSC52(text);
+	});
 
 	/** Open a modal view inside the dialog system. */
 	function openModal(view: ModalView) {

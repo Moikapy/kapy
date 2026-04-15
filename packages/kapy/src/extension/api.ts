@@ -11,6 +11,7 @@ import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
 import type { ToolRegistry } from "../tool/registry.js";
 import type { KapyExtensionAPI, KapyToolRegistration, ProviderRegistration, ScreenDefinition } from "./types.js";
+import type { BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
 
 export class ExtensionAPI implements KapyExtensionAPI {
 	private registry: CommandRegistry;
@@ -22,6 +23,8 @@ export class ExtensionAPI implements KapyExtensionAPI {
 	private emitter: ExtensionEmitter;
 	private providers: Map<string, ProviderRegistration>;
 	private extensionName: string;
+
+	private beforeToolCallHooks: ((context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>)[];
 
 	constructor(options: {
 		registry: CommandRegistry;
@@ -43,6 +46,7 @@ export class ExtensionAPI implements KapyExtensionAPI {
 		this.emitter = options.emitter;
 		this.providers = options.providers;
 		this.extensionName = options.extensionName;
+		this.beforeToolCallHooks = [];
 	}
 
 	addCommand(definition: CommandDefinition): void;
@@ -96,5 +100,15 @@ export class ExtensionAPI implements KapyExtensionAPI {
 	/** Unregister an LLM provider (pi pattern: pi.unregisterProvider) */
 	unregisterProvider(id: string): void {
 		this.providers.delete(id);
+	}
+
+	/** Register a beforeToolCall hook for permission gating or tool interception */
+	addBeforeToolCall(hook: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>): void {
+		this.beforeToolCallHooks.push(hook);
+	}
+
+	/** Get all registered beforeToolCall hooks */
+	getBeforeToolCallHooks(): ((context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>)[] {
+		return [...this.beforeToolCallHooks];
 	}
 }

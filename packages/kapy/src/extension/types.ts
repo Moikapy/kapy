@@ -6,6 +6,7 @@ import type { ConfigSchema } from "../config/schema.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
 import type { KapyToolRegistration } from "../tool/types.js";
+import type { BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
 
 export type { KapyToolRegistration } from "../tool/types.js";
 
@@ -94,4 +95,9 @@ export interface KapyExtensionAPI {
 
 	/** Unregister an LLM provider (pi.unregisterProvider) */
 	unregisterProvider(id: string): void;
+
+	// === Kapy-specific additions ===
+
+	/** Register a beforeToolCall hook for permission gating or tool interception */
+	addBeforeToolCall(hook: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>): void;
 }

@@ -17,6 +17,7 @@ import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
 import { ToolRegistry } from "../tool/registry.js";
 import { ExtensionAPI } from "./api.js";
+import type { BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
 import type { ExtensionMeta, ExtensionRegister, ProviderRegistration, ScreenDefinition } from "./types.js";
 
 interface LoadedExtension {
@@ -119,6 +120,7 @@ export class ExtensionLoader {
 	private extensionsDir: string;
 	private tools: ToolRegistry;
 	private providers: Map<string, ProviderRegistration>;
+	private beforeToolCallHooks: ((context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>)[];
 
 	constructor(registry: CommandRegistry, extensionsDir?: string) {
 		this.registry = registry;
@@ -129,6 +131,7 @@ export class ExtensionLoader {
 		this.emitter = new ExtensionEmitter();
 		this.tools = new ToolRegistry();
 		this.providers = new Map();
+		this.beforeToolCallHooks = [];
 		this.extensionsDir = extensionsDir ?? join(process.cwd(), ".kapy", "extensions");
 	}
 
@@ -176,6 +179,9 @@ export class ExtensionLoader {
 			});
 
 			const dispose = await register(api);
+
+			// Collect beforeToolCall hooks from the extension API
+			this.beforeToolCallHooks.push(...api.getBeforeToolCallHooks());
 			const loaded: LoadedExtension = { meta, dispose: dispose ?? undefined, source };
 			this.loaded.push(loaded);
 
@@ -259,6 +265,11 @@ export class ExtensionLoader {
 	/** Get all registered screens */
 	getScreens(): ScreenDefinition[] {
 		return this.screens;
+	}
+
+	/** Get all registered beforeToolCall hooks from extensions */
+	getBeforeToolCallHooks(): ((context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>)[] {
+		return [...this.beforeToolCallHooks];
 	}
 
 	/** Get all config schemas */

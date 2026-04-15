@@ -29,11 +29,11 @@ Dependency flow: `kapy → kapy-agent → kapy-ai`. Kapy re-exports both + kapy-
 
 Kapy doesn't run its own agent loop. It wires its harness layers into `@moikapy/kapy-agent`'s hooks:
 
-- **Permissions** → `beforeToolCall` hook (allow/deny/ask)
 - **Ollama** → `registerModel()` at runtime + `baseUrl` with `/v1` suffix
 - **Tool bridge** → `kapyToolToAgentTool()` converts Zod schemas to TypeBox
 - **Context compaction** → `transformContext` hook (via ContextTracker)
 - **Session persistence** → JSONL tree (SessionManager)
+- **Permission gating** → Available via `PermissionEvaluator` + `api.addBeforeToolCall()` in extensions, but NOT enforced by default. Tools run freely like pi.
 
 ## Tech Stack
 
@@ -51,8 +51,9 @@ Kapy doesn't run its own agent loop. It wires its harness layers into `@moikapy/
 1. **`:` separator for subcommands** — flat registry, no nested routing tree. `deploy:aws` not `deploy aws`.
 2. **Extensions as npm packages** — `kapy-extension` keyword, `register()` + `meta` exports.
 3. **Config hierarchy**: `kapy defaults → kapy.config.ts → ~/.kapy/config.json → env vars → CLI flags`
-4. **Forked agent core** — pi-mono's ai and agent packages forked as kapy-ai/kapy-agent. Kapy adds the harness (permissions, sessions, Ollama, context).
-5. **Agent hooks over reimplementing** — permissions via `beforeToolCall`, compaction via `transformContext`, tools via `AgentTool[]`.
+4. **Forked agent core** — pi-mono's ai and agent packages forked as kapy-ai/kapy-agent. Kapy adds the harness (sessions, Ollama, context).
+5. **Agent hooks over reimplementing** — extensions can add `beforeToolCall` hooks for permission gating, compaction via `transformContext`, tools via `AgentTool[]`.
+6. **No permission gating by default** — tools execute freely like pi. Extensions can add permission gating via `api.addBeforeToolCall()`.
 6. **AI agent support** — all commands support `--json` and `--no-input`. Exit codes are structured.
 7. **TUI via OpenTUI** — `kapy tui` launches interactive shell. Extensions register screens via `api.addScreen()`.
 

@@ -9,7 +9,7 @@ export function MessageItem(props: { msg: Msg }): JSX.Element {
 		return (
 			<box border={["left"]} borderColor="#565f89" marginTop={1} flexShrink={0}>
 				<box paddingTop={1} paddingBottom={1} paddingLeft={2} backgroundColor="#1a1a2e">
-					<text fg="#565f89">{m.content}</text>
+					<text fg="#565f89" selectable>{m.content}</text>
 				</box>
 			</box>
 		);
@@ -19,7 +19,7 @@ export function MessageItem(props: { msg: Msg }): JSX.Element {
 		return (
 			<box border={["left"]} borderColor="#00AAFF" marginTop={1} flexShrink={0}>
 				<box paddingTop={1} paddingBottom={1} paddingLeft={2} backgroundColor="#1a1a2e">
-					<text fg="#c0caf5">{m.content}</text>
+					<text fg="#c0caf5" selectable>{m.content}</text>
 				</box>
 			</box>
 		);
@@ -28,7 +28,7 @@ export function MessageItem(props: { msg: Msg }): JSX.Element {
 	if (m.role === "system") {
 		return (
 			<box paddingLeft={3} marginTop={1} flexShrink={0}>
-				<text fg="#7aa2f7">{m.content}</text>
+				<text fg="#7aa2f7" selectable>{m.content}</text>
 			</box>
 		);
 	}
@@ -37,7 +37,7 @@ export function MessageItem(props: { msg: Msg }): JSX.Element {
 		return (
 			<box border={["left"]} borderColor="#e0af68" marginTop={1} flexShrink={0}>
 				<box paddingLeft={2} paddingTop={1} paddingBottom={1} backgroundColor="#2a2a1e">
-					<text fg="#e0af68">{"⚙ "}{m.content}</text>
+					<text fg="#e0af68" selectable>{"⚙ "}{m.content}</text>
 				</box>
 			</box>
 		);
@@ -47,21 +47,21 @@ export function MessageItem(props: { msg: Msg }): JSX.Element {
 		return (
 			<box border={["left"]} borderColor="#565f89" marginTop={1} flexShrink={0}>
 				<box paddingLeft={2} paddingTop={1} paddingBottom={1} backgroundColor="#1a1a2a">
-					<text fg="#a9b1d6">{"↳ "}{m.content}</text>
+					<text fg="#a9b1d6" selectable>{"↳ "}{m.content}</text>
 				</box>
 			</box>
 		);
 	}
 
-	// assistant — reasoning streamed with <em> (italic) in dim color, content in bright green
+	// assistant — reasoning in dim italic, content in bright green
 	return (
 		<box paddingLeft={3} marginTop={1} flexShrink={0}>
 			{(m.reasoning ?? "") !== "" && (
-				<text fg="#565f89">
+				<text fg="#565f89" selectable>
 					<em>{m.reasoning}</em>
 				</text>
 			)}
-			<text fg="#9ece6a">
+			<text fg="#9ece6a" selectable>
 				{m.content}
 				{m.streaming ? "●" : ""}
 			</text>

@@ -2,16 +2,18 @@
  * ChatSession — the glue between kapy-agent, kapy-ai, and kapy's harness.
  *
  * Uses @moikapy/kapy-agent's Agent class for the LLM ↔ tool loop.
- * Kapy provides: permissions, session persistence, Ollama auto-detect,
+ * Kapy provides: session persistence, Ollama auto-detect,
  * context compaction, slash commands, memory store.
  *
  * These integrate via Agent hooks:
- * - beforeToolCall ← PermissionEvaluator
  * - transformContext ← ContextTracker
  * - convertToLlm ← default (user/assistant/toolResult pass-through)
+ *
+ * Permission gating is removed — tools execute freely by default.
+ * Extensions can add beforeToolCall hooks for custom gating.
  */
 
-import type { AgentEvent, AgentMessage, BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
+import type { AgentEvent, AgentMessage } from "@moikapy/kapy-agent";
 import { Agent, GrimoireStore, extractQuery } from "@moikapy/kapy-agent";
 import type { Model } from "@moikapy/kapy-ai";
 import { getModel, registerModel, streamSimple } from "@moikapy/kapy-ai";
@@ -22,7 +24,7 @@ import { ToolRegistry } from "../tool/registry.js";
 import type { KapyToolRegistration } from "../tool/types.js";
 import { kapyToolsToAgentTools } from "./tool-bridge.js";
 import { type ContextMessage, ContextTracker } from "./context-tracker.js";
-import { PermissionEvaluator } from "./permission/evaluator.js";
+
 import { OllamaAdapter } from "./provider/ollama.js";
 import { SessionManager } from "./session/manager.js";
 import { processSlashCommand, type SlashCommandContext } from "./slash-commands.js";
@@ -44,8 +46,6 @@ export interface ChatMessage {
 export interface ChatSessionOptions {
 	/** Auto-detect Ollama on startup? Default: true */
 	autoDetectOllama?: boolean;
-	/** Permission rules */
-	permissionRules?: import("./permission/types.js").PermissionRule[];
 	/** Default model (e.g., "ollama:qwen3:32b") */
 	defaultModel?: string;
 	/** System prompt (overridden by SOUL.md if autoLoadSoul is true) */
@@ -77,7 +77,6 @@ interface RegisteredModel {
 export class ChatSession {
 	readonly agent: Agent;
 	readonly tools: ToolRegistry;
-	readonly permissions: PermissionEvaluator;
 	readonly contextTracker: ContextTracker;
 
 	/** Session manager — handles JSONL persistence and tree structure */
@@ -102,7 +101,6 @@ export class ChatSession {
 
 	constructor(options?: ChatSessionOptions) {
 		this.tools = new ToolRegistry();
-		this.permissions = new PermissionEvaluator(options?.permissionRules ?? []);
 		this.defaultModel = options?.defaultModel;
 		this.contextTracker = new ContextTracker();
 
@@ -193,40 +191,6 @@ export class ChatSession {
 				}
 
 				return result;
-			},
-			beforeToolCall: async (context: BeforeToolCallContext, _signal?: AbortSignal): Promise<BeforeToolCallResult> => {
-				const toolName = context.toolCall.name;
-				const inputStr = JSON.stringify(context.args);
-
-				const action = this.permissions.evaluate(toolName, inputStr);
-
-				if (action === "deny") {
-					return { block: true, reason: "Permission denied: Tool not allowed" };
-				}
-
-				if (action === "ask") {
-					// In interactive mode, prompt the user
-					if (process.stdout.isTTY) {
-						const inputPreview = inputStr.length > 80 ? `${inputStr.slice(0, 77)}...` : inputStr;
-						process.stdout.write(`\n? Allow ${toolName}(${inputPreview})? [y/n] `);
-						const answer = await new Promise<string>((resolve) => {
-							process.stdin.setRawMode(false);
-							process.stdin.once("data", (data) => {
-								resolve(data.toString().trim().toLowerCase());
-							});
-						});
-						if (answer === "y" || answer === "yes") {
-							// Add an allow rule for future calls
-							this.permissions.addRule({ permission: toolName, pattern: "*", action: "allow" });
-							return {};
-						}
-						return { block: true, reason: "Permission denied by user" };
-					}
-					// Non-interactive: default deny
-					return { block: true, reason: "Permission required: Cannot prompt in non-interactive mode" };
-				}
-
-				return {};
 			},
 		});
 

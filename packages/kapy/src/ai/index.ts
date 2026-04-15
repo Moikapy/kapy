@@ -6,12 +6,14 @@
  * - @moikapy/kapy-agent: agent state machine, loop, tool execution, events
  *
  * Kapy-specific layers:
- * - Permission system (beforeToolCall integration)
  * - Session persistence (JSONL tree)
  * - Context compaction (transformContext integration)
  * - Ollama auto-detect (local provider adapter)
  * - Memory store
  * - Slash commands
+ *
+ * Permission gating is available via PermissionEvaluator + beforeToolCall hooks
+ * but NOT enforced by default — tools run freely. Extensions can add gating.
  */
 
 // ── Re-export from forked packages ─────────────────────────────────
@@ -63,6 +65,11 @@ export { ContextTracker } from "./context-tracker.js";
 export { createGrimoireTools } from "./grimoire-tools.js";
 export type { MemoryEntry, MemoryScope } from "./memory.js";
 export { MemoryStore } from "./memory.js";
+/**
+ * Permission types — available for extensions to build custom gating.
+ * Kapy core does NOT enforce permissions — tools run freely.
+ * Extensions can use PermissionEvaluator + beforeToolCall hooks to add gating.
+ */
 export { PermissionEvaluator } from "./permission/evaluator.js";
 export type { PermissionAction, PermissionCheck, PermissionRule } from "./permission/types.js";
 export type {
