@@ -11,7 +11,7 @@
 import type { KeyBinding } from "@opentui/core";
 import type { JSX } from "solid-js";
 import { createEffect, createSignal, on, Show } from "solid-js";
-import { SLASH_COMMANDS } from "../hooks/use-slash-commands.js";
+import { ALL_PALETTE_COMMANDS, SLASH_COMMANDS } from "../hooks/use-slash-commands.js";
 import { CommandPalette, filterCommands } from "./command-palette.js";
 
 export interface MessageInputProps {
@@ -47,7 +47,7 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 		}),
 	);
 
-	const showPalette = () => inputVal().startsWith("/") && filterCommands(inputVal(), SLASH_COMMANDS).length > 0;
+	const showPalette = () => inputVal().startsWith("/") && filterCommands(inputVal(), ALL_PALETTE_COMMANDS).length > 0;
 
 	/** Clear input and reset textarea */
 	function clearInput() {
@@ -123,7 +123,7 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 		<box flexDirection="column" width="100%" maxWidth={props.maxWidth}>
 			{/* Command palette overlay */}
 			<Show when={showPalette()}>
-				<CommandPalette input={inputVal()} selectedIndex={paletteIndex()} commands={SLASH_COMMANDS} />
+				<CommandPalette input={inputVal()} selectedIndex={paletteIndex()} commands={ALL_PALETTE_COMMANDS} />
 			</Show>
 			<box flexShrink={0}>
 				<box border={["left"]} borderColor="#00AAFF" width="100%">
@@ -146,24 +146,24 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 								// Command palette navigation intercepts keys
 								if (showPalette()) {
 									if (evt.name === "up") {
-										const cmds = filterCommands(inputVal(), SLASH_COMMANDS);
+										const cmds = filterCommands(inputVal(), ALL_PALETTE_COMMANDS);
 										setPaletteIndex((i) => (i - 1 + cmds.length) % cmds.length);
 										return;
 									}
 									if (evt.name === "down") {
-										const cmds = filterCommands(inputVal(), SLASH_COMMANDS);
+										const cmds = filterCommands(inputVal(), ALL_PALETTE_COMMANDS);
 										setPaletteIndex((i) => (i + 1) % cmds.length);
 										return;
 									}
 									if (evt.name === "tab") {
 										// Tab → autocomplete only (fill input, don't execute)
-										const cmds = filterCommands(inputVal(), SLASH_COMMANDS);
+										const cmds = filterCommands(inputVal(), ALL_PALETTE_COMMANDS);
 										if (cmds.length > 0) autoCompleteCommand(cmds[paletteIndex()].name);
 										return;
 									}
 									if (evt.name === "return" && !evt.shift) {
 										// Enter → execute the selected command immediately
-										const cmds = filterCommands(inputVal(), SLASH_COMMANDS);
+										const cmds = filterCommands(inputVal(), ALL_PALETTE_COMMANDS);
 										if (cmds.length > 0) {
 											skipNextSubmit = true;
 											executeCommand(cmds[paletteIndex()].name);

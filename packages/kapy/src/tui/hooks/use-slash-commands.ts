@@ -3,7 +3,7 @@
  *
  * Commands that display information (help, models, tools, keys, sessions)
  * open a modal instead of appending system messages.
- * Commands that mutate state (clear, model) act directly.
+ * Commands that mutate state (clear, model, think) act directly.
  */
 
 import type { CommandEntry } from "@moikapy/kapy-components";
@@ -34,6 +34,15 @@ export interface ChatActions {
 /** A slash command definition for the command palette. */
 export type SlashCommand = CommandEntry;
 
+/** Thinking level sub-commands for palette */
+const THINK_LEVELS: SlashCommand[] = [
+	{ name: "/think off", description: "No thinking tokens (fastest)" },
+	{ name: "/think low", description: "Light reasoning" },
+	{ name: "/think medium", description: "Balanced thinking (recommended)" },
+	{ name: "/think high", description: "Deep reasoning" },
+	{ name: "/think xhigh", description: "Maximum thinking budget" },
+];
+
 /** Built-in slash commands available in the TUI. */
 export const SLASH_COMMANDS: SlashCommand[] = [
 	{
@@ -52,18 +61,16 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 		description: "List available models",
 	},
 	{
+		name: "/think",
+		description: "Set thinking level",
+	},
+	{
 		name: "/tools",
 		description: "List registered tools",
 	},
 	{
 		name: "/keys",
 		description: "Show keyboard shortcuts",
-	},
-	{
-		name: "/think",
-		description: "Set thinking level (off/low/medium/high/xhigh)",
-		takesArg: true,
-		argLabel: "level",
 	},
 	{
 		name: "/clear",
@@ -75,6 +82,9 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 		aliases: ["/history"],
 	},
 ];
+
+/** All commands including sub-commands for palette filtering */
+export const ALL_PALETTE_COMMANDS: SlashCommand[] = [...SLASH_COMMANDS, ...THINK_LEVELS];
 
 const _TOOLS_TEXT = "Available tools: read_file, write_file, bash, glob, grep";
 
@@ -125,7 +135,8 @@ export function useSlashCommands(actions: ChatActions) {
 			return true;
 		}
 
-		const thinkMatch = text.trim().match(/^\/think\s+(off|minimal|low|medium|high|xhigh)$/i);
+		// /think <level> — set thinking level directly
+		const thinkMatch = text.trim().match(/^\/think\s+(off|low|medium|high|xhigh)$/i);
 		if (thinkMatch) {
 			actions.setThinkingLevel(thinkMatch[1].toLowerCase());
 			return true;
