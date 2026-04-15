@@ -15,6 +15,7 @@ import type { AgentEvent, AgentMessage, BeforeToolCallContext, BeforeToolCallRes
 import { Agent, GrimoireStore, extractQuery } from "@moikapy/kapy-agent";
 import type { Model } from "@moikapy/kapy-ai";
 import { getModel, registerModel, streamSimple } from "@moikapy/kapy-ai";
+import { streamOllama } from "./stream-ollama.js";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { ToolRegistry } from "../tool/registry.js";
@@ -114,7 +115,11 @@ export class ChatSession {
 			},
 			steeringMode: "one-at-a-time",
 			followUpMode: "one-at-a-time",
-			streamFn: streamSimple,
+			streamFn: (model, context, opts) => {
+				// Use native Ollama SDK for Ollama models (proper think param, thinking streaming)
+				if (model.provider === "ollama") return streamOllama(model, context, opts as any);
+				return streamSimple(model, context, opts);
+			},
 			// Convert kapy messages to LLM-compatible format
 			// Filter out UI-only messages (system status, internal notifications)
 			// and ensure only user/assistant/toolResult reach the LLM
@@ -304,7 +309,7 @@ export class ChatSession {
 						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 						contextWindow: model.contextLength,
 						maxTokens: Math.min(model.contextLength, 4096),
-						compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+						compat: { supportsDeveloperRole: false, supportsReasoningEffort: false, thinkingFormat: "qwen" as const },
 					} as any);
 
 					this.models.push({
@@ -533,12 +538,21 @@ export class ChatSession {
 			maxTokens: 4096,
 			// Ollama doesn't support the "developer" role — force "system" role for system prompts
 			// See: https://github.com/ollama/ollama — OpenAI compat doesn't support developer role
-			...(providerId === "ollama" ? { compat: { supportsDeveloperRole: false, supportsReasoningEffort: false } } : {}),
+			...(providerId === "ollama" ? { compat: { supportsDeveloperRole: false, supportsReasoningEffort: false, thinkingFormat: "qwen" as const } } : {}),
 		} as Model<string>;
 	}
 
 	/** Handle agent events → update internal message list + persist */
 	private handleAgentEvent(event: AgentEvent): void {
+		try {
+		this.handleAgentEventInner(event);
+		} catch (err) {
+			console.error("[kapy] handleAgentEvent error:", err);
+		}
+	}
+
+	/** Inner handler — may throw, caught by outer wrapper */
+	private handleAgentEventInner(event: AgentEvent): void {
 		switch (event.type) {
 			case "message_start": {
 				if (event.message.role === "assistant") {

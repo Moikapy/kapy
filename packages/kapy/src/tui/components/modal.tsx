@@ -7,7 +7,9 @@
  */
 
 import type { JSX } from "solid-js";
-import { For, Show } from "solid-js";
+import { For, Show, createSignal, onMount } from "solid-js";
+import type { SessionInfo } from "../../ai/session/types.js";
+import { ChatSession } from "../../ai/chat-session.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -16,7 +18,7 @@ export type ModalView =
 	| { type: "models"; models: string[]; current: string }
 	| { type: "tools"; tools: string[] }
 	| { type: "keys" }
-	| { type: "sessions" };
+	| { type: "sessions"; sessions?: SessionInfo[] }
 
 export interface ModalContentProps {
 	view: ModalView;
@@ -94,15 +96,33 @@ function KeysContent(): JSX.Element {
 }
 
 function SessionsContent(): JSX.Element {
+	const [sessions, setSessions] = createSignal<SessionInfo[]>([]);
+
+	onMount(async () => {
+		try {
+			const all = await ChatSession.listAllSessions();
+			all.sort((a, b) => b.modified.getTime() - a.modified.getTime());
+			setSessions(all.slice(0, 20));
+		} catch {
+			setSessions([]);
+		}
+	});
+
+	const list = sessions();
 	return (
 		<box flexDirection="column">
 			<text fg="#00AAFF">Sessions</text>
 			<box height={1} />
-			<text fg="#565f89">Previous chat sessions are stored in ~/.kapy/sessions/</text>
-			<text fg="#565f89">Sessions resume automatically on restart.</text>
-			<box height={1} />
-			<text fg="#c0caf5">  /sessions   <text fg="#565f89">List and resume sessions</text></text>
-			<text fg="#c0caf5">  /clear      <text fg="#565f89">Start a fresh session</text></text>
+			{list.length === 0
+				? <text fg="#565f89">No sessions found.</text>
+				: list.map((s) => (
+					<box flexDirection="row" width="100%" paddingBottom={1}>
+						<text fg="#565f89">{s.created.toLocaleDateString()} </text>
+						<text fg="#7aa2f7">{s.firstMessage.slice(0, 50) || s.id}</text>
+						<text fg="#565f89"> ({s.messageCount} msgs)</text>
+					</box>
+				))
+			}
 			<box height={1} />
 			<text fg="#565f89">Esc to close</text>
 		</box>

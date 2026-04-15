@@ -53,6 +53,14 @@
 		"./bedrock-provider": {
 			"types": "./dist/bedrock-provider.d.ts",
 			"import": "./dist/bedrock-provider.js"
+		},
+		"./event-stream": {
+			"types": "./dist/utils/event-stream.d.ts",
+			"import": "./dist/utils/event-stream.js"
+		},
+		"./types": {
+			"types": "./dist/types.d.ts",
+			"import": "./dist/types.js"
 		}
 	},
 	"bin": {

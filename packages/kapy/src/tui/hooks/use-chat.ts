@@ -11,17 +11,55 @@
  */
 
 import { batch, createSignal } from "solid-js";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 import { ChatSession } from "../../ai/chat-session.js";
 import type { AgentEvent } from "@moikapy/kapy-agent";
 import type { SessionInfo } from "../../ai/session/types.js";
-import { bashTool, globTool, grepTool, readFileTool, writeFileTool } from "../../tool/index.js";
+import { bashTool, globTool, grepTool, readFileTool, writeFileTool, webSearchTool, webFetchTool } from "../../tool/index.js";
 import { DEFAULT_MODEL, DEFAULT_THINKING_LEVEL, type Msg, systemPrompt } from "../types.js";
+
+/** Read user preferences from ~/.kapy/config.json */
+function loadUserPrefs(): { model?: string; thinkingLevel?: string } {
+	try {
+		const configPath = join(homedir(), ".kapy", "config.json");
+		if (!existsSync(configPath)) return {};
+		const raw = readFileSync(configPath, "utf-8");
+		const config = JSON.parse(raw);
+		return {
+			model: typeof config.model === "string" ? config.model : undefined,
+			thinkingLevel: typeof config.thinkingLevel === "string" ? config.thinkingLevel : undefined,
+		};
+	} catch {
+		return {};
+	}
+}
+
+/** Save user preferences to ~/.kapy/config.json */
+function savePreferences(modelVal: string, thinkingLevelVal: string) {
+	try {
+		const configPath = join(homedir(), ".kapy", "config.json");
+		let config: Record<string, unknown> = {};
+		if (existsSync(configPath)) {
+			const raw = readFileSync(configPath, "utf-8");
+			config = JSON.parse(raw);
+		}
+		config.model = modelVal;
+		config.thinkingLevel = thinkingLevelVal;
+		writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+	} catch {
+		// Silently fail — prefs are best-effort
+	}
+}
+
+const prefs = loadUserPrefs();
 
 export function createChat() {
 	const session = new ChatSession({
-		defaultModel: DEFAULT_MODEL,
+		defaultModel: prefs.model ?? DEFAULT_MODEL,
 		systemPrompt,
-		thinkingLevel: DEFAULT_THINKING_LEVEL,
+		thinkingLevel: (prefs.thinkingLevel as any) ?? DEFAULT_THINKING_LEVEL,
 		continueRecent: true, // Auto-resume last session
 	});
 
@@ -31,14 +69,16 @@ export function createChat() {
 	session.tools.register(bashTool);
 	session.tools.register(globTool);
 	session.tools.register(grepTool);
+	session.tools.register(webSearchTool);
+	session.tools.register(webFetchTool);
 
 	// Reactive state
 	const [msgs, setMsgs] = createSignal<Msg[]>([]);
 	const [streaming, setStreaming] = createSignal(false);
 	const [err, setErr] = createSignal("");
-	const [model, setModel] = createSignal(DEFAULT_MODEL);
+	const [model, setModel] = createSignal(prefs.model ?? DEFAULT_MODEL);
 	const [models, setModels] = createSignal<string[]>([]);
-	const [thinkingLevel, setThinkingLevelSignal] = createSignal(DEFAULT_THINKING_LEVEL);
+	const [thinkingLevel, setThinkingLevelSignal] = createSignal<"off" | "minimal" | "low" | "medium" | "high" | "xhigh">((prefs.thinkingLevel as any) ?? DEFAULT_THINKING_LEVEL);
 
 	// Track streaming message ID for live updates
 	let streamingId: string | null = null;
@@ -156,19 +196,28 @@ export function createChat() {
 		// Navigate to session view
 		navigate({ type: "session", sid: session.sessions.getSessionId() });
 
-		// Init provider on first send (lazy — avoids import issues)
-		await session.init();
+		try {
+			// Init provider on first send (lazy — avoids import issues)
+			await session.init();
 
-		// Parse model string: "ollama:glm-5.1:cloud" → provider "ollama", model "glm-5.1:cloud"
-		const currentModel = model();
-		const colonIdx = currentModel.indexOf(":");
-		if (colonIdx !== -1) {
-			const providerId = currentModel.slice(0, colonIdx);
-			const modelId = currentModel.slice(colonIdx + 1);
-			session.setModel(providerId, modelId);
+			// Parse model string: "ollama:glm-5.1:cloud" → provider "ollama", model "glm-5.1:cloud"
+			const currentModel = model();
+			const colonIdx = currentModel.indexOf(":");
+			if (colonIdx !== -1) {
+				const providerId = currentModel.slice(0, colonIdx);
+				const modelId = currentModel.slice(colonIdx + 1);
+				session.setModel(providerId, modelId);
+			}
+
+			await session.send(text.trim());
+		} catch (err: unknown) {
+			const message = err instanceof Error ? err.message : String(err);
+			console.error("[kapy] send error:", message);
+			batch(() => {
+				setErr(message);
+				setStreaming(false);
+			});
 		}
-
-		await session.send(text.trim());
 	}
 
 	function abort() {
@@ -176,12 +225,25 @@ export function createChat() {
 		setStreaming(false);
 	}
 
+	/** Change model and persist to config */
+	function changeModel(newModel: string) {
+		setModel(newModel);
+		session.init().then(() => {
+			const colonIdx = newModel.indexOf(":");
+			if (colonIdx !== -1) {
+				session.setModel(newModel.slice(0, colonIdx), newModel.slice(colonIdx + 1));
+			}
+		});
+		savePreferences(model(), thinkingLevel());
+	}
+
 	/** Change thinking level at runtime */
 	function setThinkingLevel(level: string) {
 		const valid: string[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
 		if (!valid.includes(level)) return;
 		session.agent.state.thinkingLevel = level as any;
-		setThinkingLevelSignal(level);
+		setThinkingLevelSignal(level as any);
+		savePreferences(model(), thinkingLevel());
 	}
 
 	// Model list from provider registry
@@ -250,8 +312,8 @@ export function createChat() {
 		setStreaming,
 		err,
 		setErr,
-		model,
-		setModel,
+				model,
+		setModel: changeModel,
 		setThinkingLevel,
 		thinkingLevel,
 		models,
