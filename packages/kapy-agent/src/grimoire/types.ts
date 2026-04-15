@@ -71,6 +71,14 @@ export interface LogEntry {
 	pagesRead?: string[];
 }
 
+/** Result of ingesting a source into the grimoire */
+export interface IngestResult {
+	/** Pages created or updated */
+	pagesUpdated: string[];
+	/** Summary of what was ingested */
+	summary: string;
+}
+
 /** Grimoire statistics */
 export interface GrimoireStats {
 	/** Total pages */

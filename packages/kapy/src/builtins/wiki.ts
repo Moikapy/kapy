@@ -52,7 +52,7 @@ export const wikiCommand: CommandHandler = async (ctx) => {
 				ctx.log(`     ${cat}: ${count}`);
 			}
 		}
-		ctx.log(`\nUsage: kapy wiki <list|read|search|lint|stats|index> [options]`);
+		ctx.log(`\nUsage: kapy wiki <list|read|search|lint|stats|index|ingest> [options]`);
 		return;
 	}
 
@@ -160,9 +160,76 @@ export const wikiCommand: CommandHandler = async (ctx) => {
 			break;
 		}
 
+		case "ingest": {
+			const sourcePath = positional[1];
+			if (!sourcePath) {
+				ctx.error("Usage: kapy wiki ingest <file-path> [--title <title>]");
+				ctx.exitCode = 2;
+				return;
+			}
+
+			const sourceTitle = ctx.args.title as string | undefined;
+
+			try {
+				const result = await store.ingest(sourcePath, sourceTitle);
+				ctx.log(`📖 Ingested: ${result.summary}`);
+				for (const page of result.pagesUpdated) {
+					ctx.log(`   Updated: ${page}`);
+				}
+			} catch (err) {
+				ctx.error(`Ingest failed: ${err instanceof Error ? err.message : String(err)}`);
+				ctx.exitCode = 1;
+			}
+			break;
+		}
+
+		case "init-obsidian": {
+			const obsidianDir = join(store.rootDir, ".obsidian");
+			const { mkdir, writeFile: writeFileAsync } = await import("node:fs/promises");
+
+			await mkdir(obsidianDir, { recursive: true });
+
+			// Minimal Obsidian config for a clean vault experience
+			await writeFileAsync(
+				join(obsidianDir, "app.json"),
+				JSON.stringify({
+					"attachmentFolderPath": "sources/assets",
+					"newFileLocation": "current",
+					"promptDelete": true,
+				}, null, 2),
+			);
+
+			await writeFileAsync(
+				join(obsidianDir, "appearance.json"),
+				JSON.stringify({
+					"baseTheme": "dark",
+					"cssTheme": "",
+				}, null, 2),
+			);
+
+			// Workspace with graph view as default
+			await writeFileAsync(
+				join(obsidianDir, "workspace.json"),
+				JSON.stringify({
+					"active": "graph",
+					"left": { "type": "file-explorer" },
+					"right": { "type": "graph" },
+				}, null, 2),
+			);
+
+			// Ensure sources/assets dir for attachments
+			const { GRIMOIRE_DIR: _gd } = await import("../config/defaults.js");
+			await mkdir(join(store.rootDir, "sources", "assets"), { recursive: true });
+
+			ctx.log(`📖 Obsidian vault initialized at ${store.rootDir}`);
+			ctx.log(`   Open in Obsidian: File → Open Vault → ${store.rootDir}`);
+			ctx.log(`   Attachments will be saved to sources/assets/`);
+			break;
+		}
+
 		default:
 			ctx.error(`Unknown wiki subcommand: ${subcommand}`);
-			ctx.log("Available: list, read, search, lint, stats, index");
+			ctx.log("Available: list, read, search, lint, stats, index, ingest, init-obsidian");
 			ctx.exitCode = 2;
 	}
 };
@@ -173,5 +240,6 @@ export const wikiCommandOptions: CommandOptions = {
 		scope: { type: "string", description: "Grimoire scope: global or project", default: "global" },
 		category: { type: "string", description: "Filter by category" },
 		"top-k": { type: "number", description: "Max search results", default: 5 },
+		title: { type: "string", description: "Title for ingested source" },
 	},
 };

@@ -451,6 +451,73 @@ export class GrimoireStore {
 		return output;
 	}
 
+	// ── Ingest ────────────────────────────────────────────────────────
+
+	/**
+	 * Ingest a raw source into the grimoire.
+	 *
+	 * Reads the source, generates a summary page in sources/,
+	 * and updates the index and log.
+	 *
+	 * @param sourcePath - Path to the raw source file
+	 * @param title - Optional title (defaults to filename)
+	 * @returns Pages created or updated
+	 */
+	async ingest(sourcePath: string, title?: string): Promise<import("./types.js").IngestResult> {
+		const { readFile: readFileAsync } = await import("node:fs/promises");
+		const { basename: baseName } = await import("node:path");
+
+		// Read source
+		let content: string;
+		try {
+			content = await readFileAsync(sourcePath, "utf-8");
+		} catch {
+			throw new Error(`Cannot read source: ${sourcePath}`);
+		}
+
+		const name = title || baseName(sourcePath, ".md");
+		const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+		const pagePath = `sources/${slug}.md`;
+
+		// Extract key info from the source
+		const lines = content.split("\n");
+		const firstHeading = lines.find((l) => l.startsWith("# "))?.replace(/^#\s+/, "") || name;
+		const wordCount = content.split(/\s+/).length;
+
+		// Build the summary page
+		const page = `
+# ${firstHeading}
+
+> Ingested from \`${baseName(sourcePath)}\` on ${nowISO().split("T")[0]}
+>
+> ${wordCount} words | ${lines.length} lines
+
+## Summary
+
+${content.slice(0, 2000)}${content.length > 2000 ? "\n\n... (truncated — see raw source for full content)" : ""}
+`.trimStart();
+
+		await this.write(pagePath, page, { tags: ["ingested", slug] });
+
+		const pagesUpdated = [pagePath];
+
+		// Update index
+		await this.updateIndex();
+
+		// Log the ingest
+		await this.appendLog({
+			timestamp: nowISO(),
+			type: "ingest",
+			summary: `Ingested: ${name}`,
+			pagesUpdated,
+		});
+
+		return {
+			pagesUpdated,
+			summary: `Ingested ${name} → ${pagePath}`,
+		};
+	}
+
 	// ── Lifecycle ────────────────────────────────────────────────────
 
 	/** Ensure the wiki directory exists with starter files. */

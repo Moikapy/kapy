@@ -1,12 +1,14 @@
 /**
  * MessageInput — shared textarea with command palette for kapy TUI.
  *
- * Debug: writes to /tmp/kapy-debug.log for TUI troubleshooting.
+ * NOTE: OpenTUI's Solid textarea does NOT fire onContentChange reliably.
+ * We use a "tick" counter signal that increments on every keydown to force
+ * re-evaluation of computed values like showPalette().
  */
 
 import type { KeyBinding } from "@opentui/core";
 import type { JSX } from "solid-js";
-import { createEffect, createSignal, on, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { ALL_PALETTE_COMMANDS, SLASH_COMMANDS } from "../hooks/use-slash-commands.js";
 import { filterCommands } from "./command-palette.js";
 
@@ -20,62 +22,51 @@ function dbg(...args: any[]) {
 }
 
 export interface MessageInputProps {
-	/** Keyboard bindings for textarea */
 	keyBindings: KeyBinding[];
-	/** Placeholder text */
 	placeholder?: string;
-	/** Global key handler for non-palette keys (Escape, Ctrl+\) */
 	onKeyDown: (evt: any) => void;
-	/** Called when user submits a regular (non-slash, non-exit) message */
 	onSubmit: (text: string) => void;
-	/** Called when user submits a recognized slash command */
 	onSlashCommand: (text: string) => boolean;
-	/** Called when user types "exit" or ":q" */
 	onExit: () => void;
-	/** Callback ref for the textarea element */
 	inputRef: (el: any) => void;
-	/** Max width for the input box (e.g. on home screen) */
 	maxWidth?: number;
 }
 
 export function MessageInput(props: MessageInputProps): JSX.Element {
-	const [inputVal, setInputVal] = createSignal("");
 	const [paletteIndex, setPaletteIndex] = createSignal(0);
-	/** Flag to skip the next onSubmit (when Enter was consumed by palette) */
+	// Tick counter — incremented on every keydown to trigger reactive updates
+	const [tick, setTick] = createSignal(0);
 	let skipNextSubmit = false;
 	let textRef: any;
 
-	// Reset palette selection when input changes
-	createEffect(
-		on(inputVal, () => {
-			setPaletteIndex(0);
-		}),
-	);
+	/** Read current input value directly from textarea ref */
+	function getInputText(): string {
+		tick(); // access tick to make this reactive
+		return textRef?.plainText ?? "";
+	}
 
-	const showPalette = () => {
-		const val = inputVal();
-		const starts = val.startsWith("/");
-		const cmds = starts ? filterCommands(val, ALL_PALETTE_COMMANDS) : [];
-		const show = starts && cmds.length > 0;
-		dbg("showPalette", JSON.stringify(val), "starts:", starts, "cmds:", cmds.length, "show:", show);
-		return show;
-	};
+	/** Check if palette should show (reactive via tick) */
+	function showPalette(): boolean {
+		const val = getInputText();
+		const result = val.startsWith("/") && filterCommands(val, ALL_PALETTE_COMMANDS).length > 0;
+		return result;
+	}
 
 	/** Clear input and reset textarea */
 	function clearInput() {
-		setInputVal("");
 		if (textRef) textRef.clear();
+		setTick(t => t + 1); // trigger re-render
 	}
 
 	/** Fill input with a command from palette — Tab autocomplete only */
 	function autoCompleteCommand(cmd: string) {
 		const suffix = cmd.endsWith(":") || cmd.endsWith(" ") ? "" : " ";
 		const text = cmd + suffix;
-		setInputVal(text);
 		if (textRef) {
 			textRef.clear();
 			textRef.insertText(text);
 		}
+		setTick(t => t + 1); // trigger re-render
 	}
 
 	/** Immediately execute a command from the palette — Enter selection */
@@ -83,11 +74,8 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 		clearInput();
 		const cmdDef = SLASH_COMMANDS.find((c) => c.name === cmd);
 		if (cmdDef?.takesArg) {
-			const text = `${cmd} `;
-			setInputVal(text);
-			if (textRef) {
-				textRef.insertText(text);
-			}
+			if (textRef) textRef.insertText(`${cmd} `);
+			setTick(t => t + 1);
 			return;
 		}
 		props.onSlashCommand(cmd);
@@ -95,24 +83,15 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 
 	/** Process submission — routes to onSlashCommand, onExit, or onSubmit */
 	function handleSubmit() {
-		dbg("handleSubmit", "skip:", skipNextSubmit, "inputVal:", JSON.stringify(inputVal()));
 		if (skipNextSubmit) {
 			skipNextSubmit = false;
 			return;
 		}
 
-		const t = inputVal().trim();
-		if (!t) {
-			if (textRef?.plainText?.trim()) {
-				setInputVal(textRef.plainText);
-				const recovered = textRef.plainText.trim();
-				if (!recovered) return;
-				clearInput();
-				props.onSubmit(recovered);
-				return;
-			}
-			return;
-		}
+		const t = getInputText().trim();
+		dbg("handleSubmit", JSON.stringify(t));
+		if (!t) return;
+
 		if (t === "exit" || t === ":q") {
 			clearInput();
 			props.onExit();
@@ -142,31 +121,29 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 							minHeight={1}
 							maxHeight={4}
 							keyBindings={props.keyBindings}
-							onContentChange={(newText: any) => {
-								const val = String(newText || textRef?.plainText || "");
-								setInputVal(val);
-								dbg("onContentChange", JSON.stringify(val));
-							}}
 							onKeyDown={(evt: any) => {
+								// Increment tick on every key to keep reactive state fresh
+								setTick(t => t + 1);
+
 								// Command palette navigation intercepts keys
 								if (showPalette()) {
 									if (evt.name === "up") {
-										const cmds = filterCommands(inputVal(), ALL_PALETTE_COMMANDS);
+										const cmds = filterCommands(getInputText(), ALL_PALETTE_COMMANDS);
 										setPaletteIndex((i) => (i - 1 + cmds.length) % cmds.length);
 										return;
 									}
 									if (evt.name === "down") {
-										const cmds = filterCommands(inputVal(), ALL_PALETTE_COMMANDS);
+										const cmds = filterCommands(getInputText(), ALL_PALETTE_COMMANDS);
 										setPaletteIndex((i) => (i + 1) % cmds.length);
 										return;
 									}
 									if (evt.name === "tab") {
-										const cmds = filterCommands(inputVal(), ALL_PALETTE_COMMANDS);
+										const cmds = filterCommands(getInputText(), ALL_PALETTE_COMMANDS);
 										if (cmds.length > 0) autoCompleteCommand(cmds[paletteIndex()].name);
 										return;
 									}
 									if (evt.name === "return" && !evt.shift) {
-										const cmds = filterCommands(inputVal(), ALL_PALETTE_COMMANDS);
+										const cmds = filterCommands(getInputText(), ALL_PALETTE_COMMANDS);
 										if (cmds.length > 0) {
 											skipNextSubmit = true;
 											executeCommand(cmds[paletteIndex()].name);
@@ -186,7 +163,7 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 					</box>
 				</box>
 			</box>
-			{/* Palette renders BELOW the input in flow, pushed up by the input area */}
+			{/* Palette renders BELOW the input in flow, reactive via tick */}
 			<Show when={showPalette()}>
 				<box
 					flexShrink={0}
@@ -196,8 +173,7 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 					paddingRight={2}
 					backgroundColor="#1a1b26"
 				>
-					{/* Render UP TO 6 items max so it doesn't push input off screen */}
-					{filterCommands(inputVal(), ALL_PALETTE_COMMANDS).slice(0, 6).map((cmd, i) => (
+					{filterCommands(getInputText(), ALL_PALETTE_COMMANDS).slice(0, 6).map((cmd, i) => (
 						<box width="100%" backgroundColor={i === paletteIndex() ? "#22223a" : "transparent"}>
 							<text fg="#00AAFF">{i === paletteIndex() ? "▸ " : "  "}{cmd.name}</text>
 							<text fg={i === paletteIndex() ? "#c0caf5" : "#565f89"}> — {cmd.description}</text>

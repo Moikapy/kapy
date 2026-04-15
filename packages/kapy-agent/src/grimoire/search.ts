@@ -14,7 +14,7 @@ import type { PageMeta, SearchResult } from "./types.js";
 export function extractQuery(content: string): string {
 	// Strip common prefixes, keep the core question
 	let query = content
-		.replace(/^(how|what|why|when|where|who|which|can you|tell me|show me|explain|describe)\s+/i, "")
+		.replace(/^(how do i|how|what is|what|why|when|where|who|which|can you|tell me|show me|explain|describe)\s+/i, "")
 		.replace(/[?.!]+$/, "")
 		.trim();
 

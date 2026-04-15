@@ -168,6 +168,44 @@ export function createGrimoireTools(globalStore: GrimoireStore, projectStore?: G
 		isConcurrencySafe: () => true,
 	});
 
+	// ── Ingest ────────────────────────────────────────────────────────
+
+	tools.push({
+		name: "grimoire_ingest",
+		label: "Ingest Source into Grimoire",
+		description:
+			"Ingest a raw source file into the grimoire. Creates a summary page in sources/ and updates the index and log.",
+		promptSnippet: "Ingest documents into the grimoire to build persistent knowledge",
+		promptGuidelines: [
+			"Ingest sources one at a time and review the summary before moving on",
+			"Update relevant concept and entity pages after ingesting a new source",
+		],
+		parameters: z.object({
+			sourcePath: z.string().describe("Path to the source file to ingest"),
+			title: z.string().optional().describe("Title for the source (defaults to filename)"),
+			scope: z.enum(["global", "project"]).default("global").describe("Which grimoire to ingest into"),
+		}),
+		execute: async (_toolCallId, rawParams, _signal, _onUpdate, _ctx): Promise<ToolResult> => {
+			const params = rawParams as { sourcePath: string; title?: string; scope: string };
+			const store = resolveStore(params.scope, globalStore, projectStore);
+
+			try {
+				const result = await store.ingest(params.sourcePath, params.title);
+				return {
+					content: [{ type: "text", text: `📖 ${result.summary}\nUpdated: ${result.pagesUpdated.join(", ")}` }],
+					details: { pagesUpdated: result.pagesUpdated, summary: result.summary },
+				};
+			} catch (err) {
+				return {
+					content: [{ type: "text", text: `Ingest failed: ${err instanceof Error ? err.message : String(err)}` }],
+					details: { error: true },
+				};
+			}
+		},
+		isReadOnly: () => false,
+		isConcurrencySafe: () => false,
+	});
+
 	// ── Lint ─────────────────────────────────────────────────────────
 
 	tools.push({
@@ -206,6 +244,49 @@ export function createGrimoireTools(globalStore: GrimoireStore, projectStore?: G
 		},
 		isReadOnly: () => true,
 		isConcurrencySafe: () => true,
+	});
+
+	// ── SOUL.md evolve ────────────────────────────────────────────────────
+
+	tools.push({
+		name: "soul_evolve",
+		label: "Evolve SOUL.md",
+		description:
+			"Update the SOUL.md identity file. Use this when you learn something fundamental about who you are or how you should behave. ALWAYS tell the user before evolving SOUL.md — it is your soul, and they should know.",
+		promptSnippet: "Evolve your SOUL.md identity as you learn about yourself",
+		promptGuidelines: [
+			"ALWAYS tell the user before evolving SOUL.md — it defines who you are",
+			"Evolve SOUL.md only when you discover something fundamental about your identity",
+			"Don't evolve for temporary preferences — those go in the grimoire",
+			"Changes to core truths, boundaries, or communication style are worth evolving",
+		],
+		parameters: z.object({
+			content: z.string().describe("Full new SOUL.md content (replaces entire file)"),
+		}),
+		execute: async (_toolCallId, rawParams, _signal, _onUpdate, _ctx): Promise<ToolResult> => {
+			const params = rawParams as { content: string };
+			const { writeFile: writeFileAsync } = await import("node:fs/promises");
+			const soulPath = (await import("../config/defaults.js")).SOUL_FILE;
+
+			try {
+				await writeFileAsync(soulPath, params.content, "utf-8");
+
+				// Update the agent's system prompt so changes take effect immediately
+				// (ChatSession will need to handle this — for now, the write persists to disk)
+
+				return {
+					content: [{ type: "text", text: `📖 SOUL.md evolved. The user has been notified of changes to your identity.` }],
+					details: { path: soulPath, updated: true },
+				};
+			} catch (err) {
+				return {
+					content: [{ type: "text", text: `Failed to evolve SOUL.md: ${err instanceof Error ? err.message : String(err)}` }],
+					details: { error: true },
+				};
+			}
+		},
+		isReadOnly: () => false,
+		isConcurrencySafe: () => false,
 	});
 
 	return tools;

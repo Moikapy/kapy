@@ -6,7 +6,7 @@
  * Future sessions start with accumulated knowledge instead of a blank slate.
  */
 
-export type { GrimoireScope, LogEntry, LintResult, PageMeta, SearchResult, GrimoireStats } from "./types.js";
+export type { GrimoireScope, LogEntry, IngestResult, LintResult, PageMeta, SearchResult, GrimoireStats } from "./types.js";
 export { GrimoireStore } from "./store.js";
 export type { GrimoireStoreOptions } from "./store.js";
 export { extractQuery, searchPages, searchIndex } from "./search.js";

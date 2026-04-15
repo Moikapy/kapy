@@ -433,6 +433,21 @@ export class ChatSession {
 		} finally {
 			this._isProcessing = false;
 			this.notifyListeners({ type: "agent_end", messages: [] } as AgentEvent);
+
+			// ── Session-end grimoire sync ────────────────────────
+			// Log session activity to the grimoire
+			if (this.grimoireGlobal) {
+				try {
+					await this.grimoireGlobal.appendLog({
+						timestamp: new Date().toISOString(),
+						type: "session",
+						summary: trimmed.slice(0, 120),
+						pagesRead: [], // Will be populated from tool call tracking eventually
+					});
+				} catch {
+					// Log append failed — non-critical
+				}
+			}
 		}
 	}
 
