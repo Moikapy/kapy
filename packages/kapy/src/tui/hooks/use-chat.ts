@@ -6,10 +6,10 @@
  * The TUI components subscribe to signals, never touch ChatSession directly.
  */
 
-import { createSignal, batch } from "solid-js";
-import { ChatSession, type ChatMessage } from "../ai/chat-session.js";
-import { readFileTool, writeFileTool, bashTool, globTool, grepTool } from "../tool/index.js";
-import { systemPrompt, DEFAULT_MODEL, type Msg } from "./types.js";
+import { batch, createSignal } from "solid-js";
+import { type ChatMessage, ChatSession } from "../../ai/chat-session.js";
+import { bashTool, globTool, grepTool, readFileTool, writeFileTool } from "../../tool/index.js";
+import { DEFAULT_MODEL, type Msg, systemPrompt } from "../types.js";
 
 export function createChat() {
 	const session = new ChatSession({
@@ -45,7 +45,7 @@ export function createChat() {
 			case "agent_end":
 				setStreaming(false);
 				// Mark last assistant message as done streaming
-				setMsgs(prev => prev.map(m => m.streaming ? { ...m, streaming: false } : m));
+				setMsgs((prev) => prev.map((m) => (m.streaming ? { ...m, streaming: false } : m)));
 				streamingId = null;
 				break;
 
@@ -53,53 +53,53 @@ export function createChat() {
 				if (event.message.role === "assistant") {
 					streamingId = `msg-${Date.now()}`;
 					batch(() => {
-						setMsgs(prev => [...prev, {
-							id: streamingId!,
-							role: "assistant",
-							content: event.message.content,
-							streaming: true,
-						}]);
+						setMsgs((prev) => [
+							...prev,
+							{
+								id: streamingId!,
+								role: "assistant",
+								content: event.message.content,
+								streaming: true,
+							},
+						]);
 					});
 				}
 				break;
 
 			case "message_update":
 				// Update the streaming assistant message content
-				setMsgs(prev => prev.map(m =>
-					m.streaming && m.role === "assistant"
-						? { ...m, content: event.message.content }
-						: m
-				));
+				setMsgs((prev) =>
+					prev.map((m) => (m.streaming && m.role === "assistant" ? { ...m, content: event.message.content } : m)),
+				);
 				break;
 
 			case "message_end":
 				if (event.message.role === "assistant") {
-					setMsgs(prev => prev.map(m =>
-						m.streaming ? { ...m, content: event.message.content, streaming: false } : m
-					));
+					setMsgs((prev) =>
+						prev.map((m) => (m.streaming ? { ...m, content: event.message.content, streaming: false } : m)),
+					);
 					streamingId = null;
 
 					// Show tool calls as display messages
 					if (event.message.toolCalls && event.message.toolCalls.length > 0) {
 						for (const tc of event.message.toolCalls as Array<{ name: string; args: string }>) {
 							const toolMsg = `⟹ ${tc.name}(${tc.args.length > 80 ? tc.args.slice(0, 77) + "..." : tc.args})`;
-							setMsgs(prev => [...prev, {
-								id: `tc-${Date.now()}-${Math.random()}`,
-								role: "tool_call" as const,
-								content: toolMsg,
-								toolName: tc.name,
-							}]);
+							setMsgs((prev) => [
+								...prev,
+								{
+									id: `tc-${Date.now()}-${Math.random()}`,
+									role: "tool_call" as const,
+									content: toolMsg,
+									toolName: tc.name,
+								},
+							]);
 						}
 					}
 				}
 				break;
 
 			case "reasoning_update":
-				setMsgs(prev => prev.map(m =>
-					m.streaming
-						? { ...m, reasoning: (m.reasoning ?? "") + event.text }
-						: m
-				));
+				setMsgs((prev) => prev.map((m) => (m.streaming ? { ...m, reasoning: (m.reasoning ?? "") + event.text } : m)));
 				break;
 
 			case "turn_end":
@@ -107,11 +107,14 @@ export function createChat() {
 				if (event.toolResults && event.toolResults.length > 0) {
 					batch(() => {
 						for (const tr of event.toolResults) {
-							setMsgs(prev => [...prev, {
-								id: `tool-${Date.now()}-${Math.random()}`,
-								role: tr.role === "tool" ? "tool_result" as const : tr.role as Msg["role"],
-								content: tr.content.length > 200 ? tr.content.slice(0, 197) + "..." : tr.content,
-							}]);
+							setMsgs((prev) => [
+								...prev,
+								{
+									id: `tool-${Date.now()}-${Math.random()}`,
+									role: tr.role === "tool" ? ("tool_result" as const) : (tr.role as Msg["role"]),
+									content: tr.content.length > 200 ? tr.content.slice(0, 197) + "..." : tr.content,
+								},
+							]);
 						}
 					});
 				}
@@ -130,7 +133,7 @@ export function createChat() {
 
 		// Add user message immediately (optimistic)
 		batch(() => {
-			setMsgs(prev => [...prev, { id: `u-${Date.now()}`, role: "user", content: text.trim() }]);
+			setMsgs((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", content: text.trim() }]);
 			setErr("");
 		});
 
@@ -161,7 +164,7 @@ export function createChat() {
 	async function fetchModels() {
 		try {
 			const modelInfos = session.providers.getAllModels();
-			setModels(modelInfos.map(m => m.id).sort());
+			setModels(modelInfos.map((m) => m.id).sort());
 			setSidebar(true);
 		} catch {
 			// Fallback: direct fetch from Ollama
@@ -180,13 +183,20 @@ export function createChat() {
 
 	return {
 		session,
-		msgs, setMsgs,
-		streaming, setStreaming,
-		err, setErr,
-		model, setModel,
-		models, setModels,
-		sidebar, setSidebar,
-		send, abort,
+		msgs,
+		setMsgs,
+		streaming,
+		setStreaming,
+		err,
+		setErr,
+		model,
+		setModel,
+		models,
+		setModels,
+		sidebar,
+		setSidebar,
+		send,
+		abort,
 		fetchModels,
 	};
 }
