@@ -106,7 +106,8 @@ function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Elemen
 			const all = await ChatSession.listAllSessions();
 			all.sort((a, b) => b.modified.getTime() - a.modified.getTime());
 			setSessions(all.slice(0, 20));
-		} catch {
+		} catch (e) {
+			try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} SessionsContent error: ${e}\n`); } catch {}
 			setSessions([]);
 		}
 	});
@@ -119,35 +120,39 @@ function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Elemen
 		if (evt.name === "up") {
 			setIdx((i: number) => Math.max(0, i - 1));
 			evt.preventDefault();
+			return;
 		}
 		if (evt.name === "down") {
 			setIdx((i: number) => Math.min(list.length - 1, i + 1));
 			evt.preventDefault();
+			return;
 		}
 		if (evt.name === "return" || evt.name === "enter") {
 			const s = list[idx()];
 			if (s && props.onLoad) {
+				try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} SessionsContent: loading ${s.path}\n`); } catch {}
 				props.onLoad(s.path);
 			}
 			evt.preventDefault();
+			return;
 		}
 	});
 
-	const list = sessions();
 	return (
 		<box flexDirection="column">
 			<text fg="#00AAFF">Sessions</text>
 			<box height={1} />
-			{list.length === 0
-				? <text fg="#565f89">No sessions found.</text>
-				: list.map((s, i) => (
-					<box flexDirection="row" width="100%" paddingBottom={1} backgroundColor={i === idx() ? "#22223a" : "transparent"}>
-						<text fg={i === idx() ? "#c0caf5" : "#565f89"}>{i === idx() ? "\u25b8 " : "  "}{s.created.toLocaleDateString()} </text>
-						<text fg={i === idx() ? "#7aa2f7" : "#565f89"}>{s.firstMessage.slice(0, 40) || s.id}</text>
-						<text fg="#565f89"> ({s.messageCount} msgs)</text>
-					</box>
-				))
-			}
+			<Show when={sessions().length > 0} fallback={<text fg="#565f89">No sessions found.</text>}>
+				<For each={sessions()}>
+					{(s, i) => (
+						<box flexDirection="row" width="100%" paddingBottom={1} backgroundColor={i() === idx() ? "#22223a" : "transparent"}>
+							<text fg={i() === idx() ? "#c0caf5" : "#565f89"}>{i() === idx() ? "\u25b8 " : "  "}{s.created.toLocaleDateString()} </text>
+							<text fg={i() === idx() ? "#7aa2f7" : "#565f89"}>{s.firstMessage.slice(0, 40) || s.id}</text>
+							<text fg="#565f89"> ({s.messageCount} msgs)</text>
+						</box>
+					)}
+				</For>
+			</Show>
 			<box height={1} />
 			<text fg="#565f89">Up/Down navigate  Enter resume  Esc close</text>
 		</box>
