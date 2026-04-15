@@ -36,6 +36,8 @@ export interface MessageInputProps {
 export function MessageInput(props: MessageInputProps): JSX.Element {
 	const [inputVal, setInputVal] = createSignal("");
 	const [paletteIndex, setPaletteIndex] = createSignal(0);
+	/** Flag to skip the next onSubmit (when Enter was consumed by palette) */
+	let skipNextSubmit = false;
 	let textRef: any;
 
 	// Reset palette selection when input changes
@@ -53,10 +55,12 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 		if (textRef) textRef.clear();
 	}
 
-	/** Fill input with a command from palette selection */
-	function selectCommand(cmd: string) {
+	/** Fill input with a command from palette — Tab autocomplete only */
+	function autoCompleteCommand(cmd: string) {
 		const suffix = cmd.endsWith(":") || cmd.endsWith(" ") ? "" : " ";
 		const text = cmd + suffix;
+		// For commands that take an arg, fill input and let user type the arg
+		// For argumentless commands, just fill — user presses Enter to execute
 		setInputVal(text);
 		if (textRef) {
 			textRef.clear();
@@ -64,27 +68,44 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 		}
 	}
 
+	/** Immediately execute a command from the palette — Enter selection */
+	function executeCommand(cmd: string) {
+		clearInput();
+		// For commands taking an arg, auto-complete + space but don't execute yet
+		const cmdDef = SLASH_COMMANDS.find((c) => c.name === cmd);
+		if (cmdDef?.takesArg) {
+			const text = `${cmd} `;
+			setInputVal(text);
+			if (textRef) {
+				textRef.insertText(text);
+			}
+			return;
+		}
+		// No arg needed — execute immediately
+		props.onSlashCommand(cmd);
+	}
+
 	/** Process submission — routes to onSlashCommand, onExit, or onSubmit */
 	function handleSubmit() {
-		// Double setTimeout to avoid textarea content sync issues
-		setTimeout(
-			() =>
-				setTimeout(() => {
-					const t = inputVal().trim();
-					if (!t) return;
-					if (t === "exit" || t === ":q") {
-						props.onExit();
-						return;
-					}
-					if (t.startsWith("/") && props.onSlashCommand(t)) {
-						clearInput();
-						return;
-					}
-					clearInput();
-					props.onSubmit(t);
-				}, 0),
-			0,
-		);
+		// If Enter was consumed by palette selection, skip this submit
+		if (skipNextSubmit) {
+			skipNextSubmit = false;
+			return;
+		}
+
+		const t = inputVal().trim();
+		if (!t) return;
+		if (t === "exit" || t === ":q") {
+			clearInput();
+			props.onExit();
+			return;
+		}
+		if (t.startsWith("/") && props.onSlashCommand(t)) {
+			clearInput();
+			return;
+		}
+		clearInput();
+		props.onSubmit(t);
 	}
 
 	return (
@@ -123,9 +144,19 @@ export function MessageInput(props: MessageInputProps): JSX.Element {
 										setPaletteIndex((i) => (i + 1) % cmds.length);
 										return;
 									}
-									if (evt.name === "tab" || (evt.name === "return" && !evt.shift)) {
+									if (evt.name === "tab") {
+										// Tab → autocomplete only (fill input, don't execute)
 										const cmds = filterCommands(inputVal(), SLASH_COMMANDS);
-										if (cmds.length > 0) selectCommand(cmds[paletteIndex()].name);
+										if (cmds.length > 0) autoCompleteCommand(cmds[paletteIndex()].name);
+										return;
+									}
+									if (evt.name === "return" && !evt.shift) {
+										// Enter → execute the selected command immediately
+										const cmds = filterCommands(inputVal(), SLASH_COMMANDS);
+										if (cmds.length > 0) {
+											skipNextSubmit = true;
+											executeCommand(cmds[paletteIndex()].name);
+										}
 										return;
 									}
 								}
