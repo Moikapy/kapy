@@ -210,7 +210,8 @@ export class ChatSession {
 						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 						contextWindow: model.contextLength,
 						maxTokens: Math.min(model.contextLength, 4096),
-					});
+						compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+					} as any);
 
 					this.models.push({
 						id: model.id,
@@ -419,7 +420,10 @@ export class ChatSession {
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: info?.contextLength ?? 128_000,
 			maxTokens: 4096,
-		};
+			// Ollama doesn't support the "developer" role — force "system" role for system prompts
+			// See: https://github.com/ollama/ollama — OpenAI compat doesn't support developer role
+			...(providerId === "ollama" ? { compat: { supportsDeveloperRole: false, supportsReasoningEffort: false } } : {}),
+		} as Model<string>;
 	}
 
 	/** Handle agent events → update internal message list + persist */
