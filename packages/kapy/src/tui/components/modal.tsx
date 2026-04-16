@@ -24,6 +24,7 @@ export type ModalView =
 export interface ModalContentProps {
 	view: ModalView;
 	onClose?: () => void;
+	maxHeight?: number;
 }
 
 // ── Content components ─────────────────────────────────────────────
@@ -97,15 +98,16 @@ function KeysContent(): JSX.Element {
 	);
 }
 
-function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Element {
+function SessionsContent(props: { onLoad?: (path: string) => void; maxHeight?: number }): JSX.Element {
 	const [sessions, setSessions] = createSignal<SessionInfo[]>([]);
 	const [idx, setIdx] = createSignal(0);
+	let scrollRef: any;
 
 	onMount(async () => {
 		try {
 			const all = await ChatSession.listAllSessions();
 			all.sort((a, b) => b.modified.getTime() - a.modified.getTime());
-			setSessions(all.slice(0, 20));
+			setSessions(all.slice(0, 50)); // load up to 50, display limited by scroll
 		} catch (e) {
 			setSessions([]);
 		}
@@ -118,11 +120,14 @@ function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Elemen
 
 		if (evt.name === "up") {
 			setIdx((i: number) => Math.max(0, i - 1));
+			// Auto-scroll to keep selected item visible
+			setTimeout(() => scrollRef?.scrollTo?.(idx()), 0);
 			evt.preventDefault();
 			return;
 		}
 		if (evt.name === "down") {
 			setIdx((i: number) => Math.min(list.length - 1, i + 1));
+			setTimeout(() => scrollRef?.scrollTo?.(idx()), 0);
 			evt.preventDefault();
 			return;
 		}
@@ -136,20 +141,25 @@ function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Elemen
 		}
 	});
 
+	// Visible rows = available height minus header(1) + spacing(1) + footer(2)
+	const maxRows = () => Math.max(3, (props.maxHeight ?? 20) - 4);
+
 	return (
 		<box flexDirection="column">
 			<text fg="#00AAFF">Sessions</text>
 			<box height={1} />
 			<Show when={sessions().length > 0} fallback={<text fg="#565f89">No sessions found.</text>}>
-				<For each={sessions()}>
-					{(s, i) => (
-						<box flexDirection="row" width="100%" paddingBottom={1} backgroundColor={i() === idx() ? "#22223a" : "transparent"}>
-							<text fg={i() === idx() ? "#c0caf5" : "#565f89"}>{i() === idx() ? "\u25b8 " : "  "}{s.created.toLocaleDateString()} </text>
-							<text fg={i() === idx() ? "#7aa2f7" : "#565f89"}>{s.firstMessage.slice(0, 40) || s.id}</text>
-							<text fg="#565f89"> ({s.messageCount} msgs)</text>
-						</box>
-					)}
-				</For>
+				<box flexDirection="column" height={maxRows()} overflow="hidden">
+					<For each={sessions()}>
+						{(s, i) => (
+							<box flexDirection="row" width="100%" backgroundColor={i() === idx() ? "#22223a" : "transparent"}>
+								<text fg={i() === idx() ? "#c0caf5" : "#565f89"}>{i() === idx() ? "\u25b8 " : "  "}{s.created.toLocaleDateString()} </text>
+								<text fg={i() === idx() ? "#7aa2f7" : "#565f89"}>{s.firstMessage.slice(0, 40) || s.id}</text>
+								<text fg="#565f89"> ({s.messageCount} msgs)</text>
+							</box>
+						)}
+					</For>
+				</box>
 			</Show>
 			<box height={1} />
 			<text fg="#565f89">Up/Down navigate  Enter resume  Esc close</text>
@@ -157,7 +167,7 @@ function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Elemen
 	);
 }
 
-// ── Main content component ─────────────────────────────────────────
+// Main content component ─────────────────────────────────────────
 
 /** Renders dialog content based on the current ModalView. */
 export function ModalContent(props: ModalContentProps): JSX.Element {
@@ -196,7 +206,7 @@ export function ModalContent(props: ModalContentProps): JSX.Element {
 				<KeysContent />
 			</Show>
 			<Show when={props.view.type === "sessions"}>
-				<SessionsContent onLoad={(path) => { const load = (props.view as any).onLoad; props.onClose?.(); load?.(path); }} />
+				<SessionsContent onLoad={(path) => { const load = (props.view as any).onLoad; props.onClose?.(); load?.(path); }} maxHeight={props.maxHeight} />
 			</Show>
 		</box>
 	);

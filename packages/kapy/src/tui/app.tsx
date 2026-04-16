@@ -147,6 +147,7 @@ function App() {
 					<box
 						width={Math.min(80, dims().width - 4)}
 						maxWidth={dims().width - 4}
+						maxHeight={dims().height - 4}
 						border={["top", "right", "bottom", "left"]}
 						borderColor="#00AAFF"
 						backgroundColor="#1a1b26"
@@ -159,7 +160,7 @@ function App() {
 							e.stopPropagation();
 						}}
 					>
-						<ModalContent view={modalView()!} onClose={() => setModalView(null)} />
+						<ModalContent view={modalView()!} onClose={() => setModalView(null)} maxHeight={dims().height - 6} />
 					</box>
 				</box>
 			</Show>
