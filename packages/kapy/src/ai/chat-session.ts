@@ -517,6 +517,8 @@ export class ChatSession {
 
 	/** Inner handler — may throw, caught by outer wrapper */
 	private handleAgentEventInner(event: AgentEvent): void {
+		if (event.type === "message_end" && (event as any).message?.role === "assistant") {
+		}
 		switch (event.type) {
 			case "message_start": {
 				if (event.message.role === "assistant") {
@@ -548,6 +550,13 @@ export class ChatSession {
 					if (lastAssistant) {
 						lastAssistant.content = this.extractContent(event.message);
 						lastAssistant.isStreaming = false;
+					}
+					// Persist the completed assistant message
+					if (this.sessions.isPersisted()) {
+						const finalContent = this.extractContent(event.message);
+						if (finalContent) {
+							this.sessions.appendMessage({ role: "assistant", content: finalContent });
+						}
 					}
 				} else if (event.message.role === "toolResult") {
 					const content = this.extractContent(event.message);

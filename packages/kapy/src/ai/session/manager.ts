@@ -445,7 +445,9 @@ export class SessionManager {
 
 	/** Persist an entry to the JSONL file. */
 	_persist(entry: SessionEntry): void {
-		if (!this.doPersist || !this.sessionFile) return;
+		if (!this.doPersist || !this.sessionFile) {
+			return;
+		}
 		appendFileSync(this.sessionFile, JSON.stringify(entry) + "\n");
 	}
 

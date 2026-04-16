@@ -9,7 +9,7 @@ export function StatusFooter(props: StatusFooterProps): JSX.Element {
 	const thinkLabel = () => {
 		const level = props.thinkingLevel();
 		if (level === "off") return "";
-		return ` think:${level}`;
+		return ` (${level})`;
 	};
 
 	return (
