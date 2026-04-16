@@ -268,8 +268,8 @@ export function createChat() {
 		}
 	}
 
-	/** Load a previous session by file path */
-	async function loadSession(path: string) {
+	/** Load a previous session by file path and navigate to it */
+	async function loadSession(path: string, navigate?: (r: { type: "home" } | { type: "session"; sid: string }) => void) {
 		await session.init();
 		const sm = await ChatSession.loadSession(path);
 		session.sessions = sm;
@@ -284,6 +284,11 @@ export function createChat() {
 				content: e.content ?? "",
 			}));
 		setMsgs(loadedMsgs);
+
+		// Navigate to session view if callback provided
+		if (navigate) {
+			navigate({ type: "session", sid: sm.getSessionId() });
+		}
 	}
 
 	/** List sessions for the current project */

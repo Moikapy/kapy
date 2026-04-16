@@ -41,7 +41,7 @@ function App() {
 		model: chat.model,
 		models: chat.models,
 		openModal,
-		loadSession: chat.loadSession,
+		loadSession: (path: string) => chat.loadSession(path, route.navigate),
 		listSessions: chat.listSessions,
 		listAllSessions: chat.listAllSessions,
 	});
