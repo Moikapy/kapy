@@ -196,7 +196,7 @@ export function ModalContent(props: ModalContentProps): JSX.Element {
 				<KeysContent />
 			</Show>
 			<Show when={props.view.type === "sessions"}>
-				<SessionsContent onLoad={(path) => { props.onClose?.(); (props.view as any).onLoad?.(path); }} />
+				<SessionsContent onLoad={(path) => { const load = (props.view as any).onLoad; props.onClose?.(); load?.(path); }} />
 			</Show>
 		</box>
 	);

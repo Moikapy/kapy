@@ -145,7 +145,7 @@ function App() {
 					}}
 				>
 					<box
-						width={modalView()?.type === "sessions" ? 80 : modalView()?.type === "models" ? 60 : 50}
+						width={Math.min(80, dims().width - 4)}
 						maxWidth={dims().width - 4}
 						border={["top", "right", "bottom", "left"]}
 						borderColor="#00AAFF"

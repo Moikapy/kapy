@@ -278,11 +278,21 @@ export function createChat() {
 		const entries = sm.getBranch();
 		const loadedMsgs: Msg[] = entries
 			.filter((e) => e.type === "message" && e.role)
-			.map((e) => ({
-				id: e.id,
-				role: e.role as Msg["role"],
-				content: e.content ?? "",
-			}));
+			.map((e) => {
+				// Map session roles to TUI roles
+				const rawRole = e.role as string;
+				let role = rawRole as Msg["role"];
+				if (rawRole === "tool") role = "tool_result";
+				// Skip empty assistant messages (tool-calls only, no visible text)
+				const content = e.content ?? "";
+				if (rawRole === "assistant" && !content) return null;
+				return {
+					id: e.id,
+					role,
+					content,
+				};
+			})
+			.filter(Boolean) as Msg[];
 		setMsgs(loadedMsgs);
 
 		// Navigate to session view if callback provided
