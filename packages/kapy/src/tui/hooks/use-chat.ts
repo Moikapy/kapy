@@ -163,7 +163,7 @@ export function createChat() {
 						{
 							id: `tool-${Date.now()}-${Math.random()}`,
 							role: "tool_result" as const,
-							content: resultContent.length > 200 ? `${resultContent.slice(0, 197)}...` : resultContent,
+							content: resultContent,
 						},
 					]);
 				}
