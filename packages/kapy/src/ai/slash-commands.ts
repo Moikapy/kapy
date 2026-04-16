@@ -46,6 +46,7 @@ export function createBuiltinSlashCommands(): SlashCommandDefinition[] {
 				ctx.output("  /clear    Clear conversation");
 				ctx.output("  /wiki     Browse the grimoire");
 				ctx.output("  /soul     View SOUL.md info");
+				ctx.output("  /telemetry  Telemetry settings");
 				ctx.output("  /quit     Exit kapy");
 			},
 		},
@@ -148,6 +149,36 @@ export function createBuiltinSlashCommands(): SlashCommandDefinition[] {
 				ctx.output("📖 SOUL.md: ~/.kapy/SOUL.md");
 				ctx.output("   Edit this file to shape your agent's identity.");
 				ctx.output("   The agent can also evolve it during sessions.");
+			},
+		},
+		{
+			name: "telemetry",
+			description: "View or toggle telemetry settings",
+			handler(args, ctx) {
+				const sub = args.trim();
+				const { telemetry } = require("../telemetry/index.js");
+				if (sub === "enable" || sub === "on") {
+					void telemetry.enable();
+					ctx.output("Telemetry: enabled");
+					ctx.output("Anonymized bug/perf data will be sent. No content, no file paths, no personal data.");
+					ctx.output("Edit ~/.kapy/config.json to change settings.");
+				} else if (sub === "disable" || sub === "off") {
+					void telemetry.disable();
+					ctx.output("Telemetry: disabled");
+					ctx.output("Edit ~/.kapy/config.json or /telemetry enable to re-enable.");
+				} else {
+					const status = telemetry.isEnabled() ? "enabled" : "disabled";
+					ctx.output(`Telemetry: ${status} (opt-in)`);
+					ctx.output("  /telemetry enable  — opt in to anonymized bug/perf tracking");
+					ctx.output("  /telemetry disable — opt out");
+					ctx.output("");
+					ctx.output("What we track (if enabled):");
+					ctx.output("  - Error types (no content, no stack)");
+					ctx.output("  - Tool names + durations (no args, no results)");
+					ctx.output("  - Model used + response time");
+					ctx.output("  - Session counts/durations");
+					ctx.output("We NEVER track: messages, file contents, personal data");
+				}
 			},
 		},
 	];

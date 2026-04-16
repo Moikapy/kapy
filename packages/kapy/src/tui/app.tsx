@@ -57,6 +57,8 @@ function App() {
 
 		if (evt.ctrl && (evt.name === "c" || evt.name === "d")) {
 			try { _renderer?.destroy(); } catch {}
+			// Flush telemetry before exit
+			try { require("../telemetry/index.js").telemetry.shutdown(); } catch {}
 			setTimeout(() => process.exit(0), 50);
 		}
 	});

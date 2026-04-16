@@ -31,6 +31,7 @@ import { processSlashCommand, type SlashCommandContext } from "./slash-commands.
 import { createGrimoireTools } from "./grimoire-tools.js";
 import { loadSoulMd, ensureSoulMd, buildSystemPrompt } from "./soul.js";
 import { GRIMOIRE_DIR, SOUL_FILE } from "../config/defaults.js";
+import { telemetry, trackSessionStart, trackSessionEnd, trackError, trackModelResponse, trackStreamError } from "../telemetry/index.js";
 
 /** Message shape for TUI rendering */
 export interface ChatMessage {
@@ -95,6 +96,7 @@ export class ChatSession {
 	private listeners = new Set<(event: AgentEvent) => void>();
 	private _messages: ChatMessage[] = [];
 	private _isProcessing = false;
+	private _sessionStartTime = 0;
 	private initialized = false;
 	private sessionId: string;
 	private defaultModel: string | undefined;
@@ -206,6 +208,9 @@ export class ChatSession {
 	async init(): Promise<void> {
 		if (this.initialized) return;
 		this.initialized = true;
+
+		// Initialize telemetry (opt-in only)
+		telemetry.init();
 
 		// Initialize session persistence
 		if (this._resumeSessionPath) {
@@ -367,6 +372,15 @@ export class ChatSession {
 		const trimmed = input.trim();
 		if (!trimmed) return;
 
+		// Track session start (first send only)
+		if (!this._sessionStartTime) {
+			this._sessionStartTime = Date.now();
+			trackSessionStart(
+				(this.agent.state.model as any)?.id ?? "unknown",
+				this.agent.state.thinkingLevel ?? "off",
+			);
+		}
+
 		// Check for slash commands
 		const slashCtx: SlashCommandContext = {
 			agent: this.agent,
@@ -406,8 +420,10 @@ export class ChatSession {
 
 		try {
 			await this.agent.prompt(trimmed);
-		} catch (err) {
-			this.addSystemMessage(`Error: ${err instanceof Error ? err.message : String(err)}`);
+			} catch (err) {
+			const errMsg = err instanceof Error ? err.message : String(err);
+			this.addSystemMessage(`Error: ${errMsg}`);
+			trackError("agent_prompt", errMsg);
 		} finally {
 			this._isProcessing = false;
 			this.notifyListeners({ type: "agent_end", messages: [] } as AgentEvent);
@@ -567,6 +583,17 @@ export class ChatSession {
 							this.sessions.appendMessage({ role: "assistant", content: finalContent });
 						}
 					}
+					// Track model response
+					try {
+						const msg = event.message as any;
+						trackModelResponse(
+							msg.model ?? (this.agent.state.model as any)?.id ?? "unknown",
+							Date.now() - (msg.timestamp ?? Date.now()),
+							msg.usage?.input ?? 0,
+							msg.usage?.output ?? 0,
+							msg.stopReason ?? "unknown",
+						);
+					} catch {}
 				} else if (event.message.role === "toolResult") {
 					const content = this.extractContent(event.message);
 					this._messages.push({

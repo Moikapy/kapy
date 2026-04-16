@@ -9,6 +9,7 @@
 import { AssistantMessageEventStream } from "@moikapy/kapy-ai/event-stream";
 import type { AssistantMessage, AssistantMessageEvent, Context, Message } from "@moikapy/kapy-ai/types";
 import type { Model } from "@moikapy/kapy-ai";
+import { trackStreamError } from "../telemetry/index.js";
 
 /** Map kapy-ai thinking levels to Ollama's think parameter */
 function mapThinkLevel(
@@ -79,7 +80,8 @@ function extractThinking(content: unknown): string {
 function extractToolCalls(content: unknown): any[] {
 	if (Array.isArray(content)) {
 		return content.filter((c: any) => c.type === "toolCall").map((c: any) => ({
-			function: { name: c.name, arguments: JSON.stringify(c.arguments ?? {}) },
+			id: c.id,
+			function: { name: c.name, arguments: c.arguments ?? {} },
 		}));
 	}
 	return [];
@@ -264,6 +266,8 @@ export function streamOllama(
 				message: finalMessage,
 			} as AssistantMessageEvent);
 		} catch (error: any) {
+		// Track stream errors
+		try { trackStreamError(model.id, error.code ?? error.name ?? "stream_error", error.message ?? "Unknown error"); } catch {}
 			stream.push({
 				type: "error",
 				reason: "error" as const,

@@ -17,7 +17,7 @@ export function StatusFooter(props: StatusFooterProps): JSX.Element {
 			<text fg="#565f89">~/kapy</text>
 			<box flexDirection="row" >
 				<text fg="#e9ebf8">{thinkLabel()} </text>
-				<text fg="#9ece6a">{props.model() || "none"}</text>
+				<text fg="#9ece6a">{props.model().split(":")[1] || "none"}</text>
 			</box>
 		</box>
 	);
