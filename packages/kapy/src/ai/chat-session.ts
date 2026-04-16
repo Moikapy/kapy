@@ -227,7 +227,16 @@ export class ChatSession {
 		if (this._autoLoadSoul !== false) {
 			ensureSoulMd(SOUL_FILE);
 			this.soulMd = loadSoulMd(SOUL_FILE);
-			this.agent.state.systemPrompt = this.soulMd;
+			// Inject operational context into system prompt so the agent knows paths
+			const opsContext = [
+				`SOUL.md path: ${SOUL_FILE}`,
+				`Grimoire (global): ${GRIMOIRE_DIR}`,
+				`Grimoire (project): ${join(process.cwd(), ".kapy", "wiki")}`,
+				`Working directory: ${process.cwd()}`,
+				"",
+				"IMPORTANT: When calling tools, always provide arguments as valid JSON objects with string values. Never output raw JSON in your text response — use tool calls instead.",
+			].join("\n");
+			this.agent.state.systemPrompt = buildSystemPrompt(this.soulMd, opsContext);
 		}
 
 		// ── Grimoire ───────────────────────────────────────────────
