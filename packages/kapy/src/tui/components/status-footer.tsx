@@ -13,9 +13,9 @@ export function StatusFooter(props: StatusFooterProps): JSX.Element {
 	};
 
 	return (
-		<box flexDirection="row" justifyContent="space-between" paddingLeft={2} paddingRight={2} flexShrink={0}>
-			<text fg="#565f89">~/kapy{thinkLabel()}</text>
-			<text fg="#565f89">{props.model()}</text>
+		<box flexDirection="row" justifyContent="space-between" paddingLeft={2} paddingRight={2} paddingTop={1} flexShrink={0}>
+			<text fg="#565f89">~/kapy</text>
+			<text fg="#565f89">{thinkLabel()} {props.model()}</text>
 		</box>
 	);
 }

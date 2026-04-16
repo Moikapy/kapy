@@ -22,7 +22,7 @@ function App() {
 	// Modal state — simple signal, no provider needed
 	const [modalView, setModalView] = createSignal<ModalView | null>(null);
 
-	// Enable copy-on-selection
+	// Enable copy-on-selection (mouse drag over selectable text)
 	useSelectionHandler((selection) => {
 		const text = selection.getSelectedText();
 		if (text) renderer.copyToClipboardOSC52(text);
@@ -73,6 +73,15 @@ function App() {
 				return;
 			}
 			if (route.data().type === "session") route.navigate({ type: "home" });
+			return;
+		}
+		// Ctrl+Y: yank (copy) last assistant message
+		if (evt.ctrl && evt.name === "y") {
+			const assistantMsgs = chat.msgs().filter((m: any) => m.role === "assistant" && m.content);
+			const last = assistantMsgs[assistantMsgs.length - 1];
+			if (last?.content) {
+				try { _renderer?.copyToClipboardOSC52(last.content); } catch {}
+			}
 			return;
 		}
 	};
