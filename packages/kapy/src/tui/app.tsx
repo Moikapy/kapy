@@ -29,7 +29,6 @@ function App() {
 
 	/** Open a modal view inside the dialog system. */
 	function openModal(view: ModalView) {
-		try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} openModal called: ${view.type}\n`); } catch {}
 		dialog.replace(() => <ModalContent view={view} onClose={() => dialog.pop()} />);
 	}
 

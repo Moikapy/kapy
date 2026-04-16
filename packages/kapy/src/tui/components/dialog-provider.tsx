@@ -11,8 +11,7 @@
  */
 
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid";
-import { batch, createContext, Show, useContext, type JSX, type ParentProps } from "solid-js";
-import { createStore } from "solid-js/store";
+import { batch, createContext, createSignal, Show, useContext, type JSX, type ParentProps } from "solid-js";
 import { RGBA, type Renderable } from "@opentui/core";
 
 // ── Dialog overlay component ────────────────────────────────────────
@@ -31,8 +30,6 @@ function Dialog(
 	let dismiss = false;
 
 	const width = () => {
-		try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} Dialog RENDER w=${dimensions().width} h=${dimensions().height}
-`); } catch {}
 		if (props.size === "xlarge") return Math.min(116, dimensions().width - 4);
 		if (props.size === "large") return Math.min(88, dimensions().width - 4);
 		return Math.min(60, dimensions().width - 4);
@@ -86,13 +83,8 @@ function Dialog(
 // ── Dialog context + state management ────────────────────────────────
 
 function init() {
-	const [store, setStore] = createStore({
-		stack: [] as {
-			element: JSX.Element;
-			onClose?: () => void;
-		}[],
-		size: "medium" as "medium" | "large" | "xlarge",
-	});
+	const [stack, setStack] = createSignal<{ element: JSX.Element; onClose?: () => void }[]>([]);
+	const [dialogSize, setDialogSize] = createSignal<"medium" | "large" | "xlarge">("medium");
 
 	const renderer = useRenderer();
 
@@ -120,7 +112,7 @@ function init() {
 
 	/** Global keyboard handler: Escape / Ctrl+C closes top dialog. */
 	useKeyboard((evt: any) => {
-		if (store.stack.length === 0) return;
+		if (stack().length === 0) return;
 		if (evt.defaultPrevented) return;
 
 		// Don't close if user is releasing a text selection
@@ -140,10 +132,10 @@ function init() {
 				return;
 			}
 
-			const current = store.stack.at(-1)!;
+			const current = stack().at(-1)!;
 			current.onClose?.();
 			batch(() => {
-				setStore("stack", store.stack.slice(0, -1));
+				setStack(stack().slice(0, -1));
 			});
 			evt.preventDefault();
 			evt.stopPropagation();
@@ -154,60 +146,57 @@ function init() {
 	return {
 		/** Remove all dialogs from the stack. */
 		clear() {
-			for (const item of store.stack) {
+			for (const item of stack()) {
 				item.onClose?.();
 			}
 			batch(() => {
-				setStore("size", "medium");
-				setStore("stack", []);
+				setDialogSize("medium");
+				setStack([]);
 			});
 			refocus();
 		},
 
 		/** Replace the dialog stack with a new dialog. Saves focus first. */
 		replace(element: JSX.Element | (() => JSX.Element), onClose?: () => void) {
-			try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} dialog.replace called stack=${store.stack.length}\n`); } catch {}
-			if (store.stack.length === 0) {
+			if (stack().length === 0) {
 				savedFocus = renderer.currentFocusedRenderable;
 				savedFocus?.blur();
 			}
 			// Close any existing dialogs
-			for (const item of store.stack) {
+			for (const item of stack()) {
 				item.onClose?.();
 			}
-			setStore("size", "medium");
+			setDialogSize("medium");
 			const el = typeof element === "function" ? element() : element;
-			setStore("stack", [{ element: el, onClose }]);
-		try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} dialog.replace done stack=${store.stack.length}
-`); } catch {}
+			setStack([{ element: el, onClose }]);
 		},
 
 		/** Push a new dialog on top of the stack (for future nested dialogs). */
 		push(element: JSX.Element | (() => JSX.Element), onClose?: () => void) {
-			if (store.stack.length === 0) {
+			if (stack().length === 0) {
 				savedFocus = renderer.currentFocusedRenderable;
 				savedFocus?.blur();
 			}
 			const el = typeof element === "function" ? element() : element;
-			setStore("stack", [...store.stack, { element: el, onClose }]);
+			setStack([...stack(), { element: el, onClose }]);
 		},
 
 		/** Pop the top dialog. */
 		pop() {
-			const current = store.stack.at(-1);
+			const current = stack().at(-1);
 			current?.onClose?.();
-			setStore("stack", store.stack.slice(0, -1));
-			if (store.stack.length === 0) refocus();
+			setStack(stack().slice(0, -1));
+			if (stack().length === 0) refocus();
 		},
 
 		get stack() {
-			return store.stack;
+			return stack();
 		},
 		get size() {
-			return store.size;
+			return dialogSize();
 		},
-		setSize(size: "medium" | "large" | "xlarge") {
-			setStore("size", size);
+		setSize(s: "medium" | "large" | "xlarge") {
+			setDialogSize(s);
 		},
 	};
 }
@@ -224,14 +213,22 @@ export function DialogProvider(props: ParentProps) {
 		<ctx.Provider value={value}>
 			<box position="relative" width="100%" height="100%">
 				{props.children}
-				{/* Dialog overlay renders here — outside the route switch, works on all screens */}
-				<Show when={value.stack.length > 0}>
-					<Dialog onClose={() => value.clear()} size={value.size}>
-						{value.stack.at(-1)!.element}
-					</Dialog>
-				</Show>
+				<DialogStackOverlay value={value} />
 			</box>
 		</ctx.Provider>
+	);
+}
+
+/** Renders the dialog overlay. Separate component so signals are tracked in its own scope. */
+function DialogStackOverlay(props: { value: DialogContext }) {
+	const stack = () => props.value.stack;
+
+	return (
+		<Show when={stack().length > 0}>
+			<Dialog onClose={() => props.value.clear()} size={props.value.size}>
+				{stack().at(-1)!.element}
+			</Dialog>
+		</Show>
 	);
 }
 

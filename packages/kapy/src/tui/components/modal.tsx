@@ -98,18 +98,15 @@ function KeysContent(): JSX.Element {
 }
 
 function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Element {
-	try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} SessionsContent RENDERED\n`); } catch {}
 	const [sessions, setSessions] = createSignal<SessionInfo[]>([]);
 	const [idx, setIdx] = createSignal(0);
 
 	onMount(async () => {
 		try {
 			const all = await ChatSession.listAllSessions();
-			try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} SessionsContent loaded ${all.length} sessions\n`); } catch {}
 			all.sort((a, b) => b.modified.getTime() - a.modified.getTime());
 			setSessions(all.slice(0, 20));
 		} catch (e) {
-			try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} SessionsContent error: ${e}\n`); } catch {}
 			setSessions([]);
 		}
 	});
@@ -132,7 +129,6 @@ function SessionsContent(props: { onLoad?: (path: string) => void }): JSX.Elemen
 		if (evt.name === "return" || evt.name === "enter") {
 			const s = list[idx()];
 			if (s && props.onLoad) {
-				try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} SessionsContent: loading ${s.path}\n`); } catch {}
 				props.onLoad(s.path);
 			}
 			evt.preventDefault();
