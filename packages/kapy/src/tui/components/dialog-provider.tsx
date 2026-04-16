@@ -31,6 +31,8 @@ function Dialog(
 	let dismiss = false;
 
 	const width = () => {
+		try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} Dialog RENDER w=${dimensions().width} h=${dimensions().height}
+`); } catch {}
 		if (props.size === "xlarge") return Math.min(116, dimensions().width - 4);
 		if (props.size === "large") return Math.min(88, dimensions().width - 4);
 		return Math.min(60, dimensions().width - 4);
@@ -176,6 +178,8 @@ function init() {
 			setStore("size", "medium");
 			const el = typeof element === "function" ? element() : element;
 			setStore("stack", [{ element: el, onClose }]);
+		try { require("fs").appendFileSync("/tmp/kapy-debug.log", `${new Date().toISOString().slice(11,23)} dialog.replace done stack=${store.stack.length}
+`); } catch {}
 		},
 
 		/** Push a new dialog on top of the stack (for future nested dialogs). */
