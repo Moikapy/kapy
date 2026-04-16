@@ -528,9 +528,7 @@ export class ChatSession {
 						timestamp: Date.now(),
 						isStreaming: true,
 					});
-					if (this.sessions.isPersisted()) {
-						this.sessions.appendMessage({ role: "assistant", content });
-					}
+					// Don't persist at message_start — content is incomplete/empty
 				}
 				break;
 			}

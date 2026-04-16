@@ -283,9 +283,17 @@ export function createChat() {
 				const rawRole = e.role as string;
 				let role = rawRole as Msg["role"];
 				if (rawRole === "tool") role = "tool_result";
-				// Skip empty assistant messages (tool-calls only, no visible text)
 				const content = e.content ?? "";
+				// Show as system notification for tool results, skip empty assistant
 				if (rawRole === "assistant" && !content) return null;
+				if (rawRole === "tool") {
+					// Show tool results as tool_result with preview
+					return {
+						id: e.id,
+						role: "tool_result" as Msg["role"],
+						content: content.length > 200 ? `${content.slice(0, 197)}...` : content,
+					};
+				}
 				return {
 					id: e.id,
 					role,
