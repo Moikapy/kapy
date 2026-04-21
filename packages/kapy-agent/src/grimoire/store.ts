@@ -18,11 +18,11 @@
  * - Index: regenerate the content catalog
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, unlinkSync } from "node:fs";
-import { appendFile, readdir, stat, readFile, writeFile, mkdir, unlink } from "node:fs/promises";
-import { join, dirname, extname, basename } from "node:path";
-import type { GrimoireScope, LogEntry, LintResult, PageMeta, SearchResult, GrimoireStats } from "./types.js";
-import { searchPages, searchIndex } from "./search.js";
+import { existsSync, readFileSync } from "node:fs";
+import { appendFile, mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { searchIndex, searchPages } from "./search.js";
+import type { GrimoireScope, GrimoireStats, LintResult, LogEntry, PageMeta, SearchResult } from "./types.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -271,7 +271,7 @@ export class GrimoireStore {
 			lines.push("");
 		}
 
-		await this.write(INDEX_FILE, lines.join("\n") + "\n");
+		await this.write(INDEX_FILE, `${lines.join("\n")}\n`);
 	}
 
 	/** Read the log.md chronicle. */
@@ -282,7 +282,7 @@ export class GrimoireStore {
 	/** Append an entry to the log. */
 	async appendLog(entry: LogEntry): Promise<void> {
 		const prefix = `## [${entry.timestamp}] ${entry.type}`;
-		const lines: string[] = [prefix + " | " + entry.summary];
+		const lines: string[] = [`${prefix} | ${entry.summary}`];
 
 		if (entry.pagesUpdated && entry.pagesUpdated.length > 0) {
 			lines.push(`- Updated: ${entry.pagesUpdated.join(", ")}`);
@@ -297,7 +297,7 @@ export class GrimoireStore {
 		// Ensure root dir exists
 		await mkdir(this.rootDir, { recursive: true });
 
-		await appendFile(logPath, lines.join("\n") + "\n", "utf-8");
+		await appendFile(logPath, `${lines.join("\n")}\n`, "utf-8");
 	}
 
 	// ── Maintenance ──────────────────────────────────────────────────
@@ -476,7 +476,10 @@ export class GrimoireStore {
 		}
 
 		const name = title || baseName(sourcePath, ".md");
-		const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+		const slug = name
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/(^-|-$)/g, "");
 		const pagePath = `sources/${slug}.md`;
 
 		// Extract key info from the source

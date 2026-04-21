@@ -138,7 +138,7 @@ class TelemetryClient {
 		const sanitized: Record<string, unknown> = {};
 		for (const [key, value] of Object.entries(properties)) {
 			if (typeof value === "string" && value.length > 200) {
-				sanitized[key] = value.slice(0, 197) + "...";
+				sanitized[key] = `${value.slice(0, 197)}...`;
 			} else {
 				sanitized[key] = value;
 			}
@@ -271,9 +271,9 @@ async function persistTelemetryConfig(enabled: boolean): Promise<void> {
 			config = JSON.parse(raw);
 		}
 		// Merge telemetry config
-		const existing = typeof config.telemetry === "object" ? config.telemetry as Record<string, unknown> : {};
+		const existing = typeof config.telemetry === "object" ? (config.telemetry as Record<string, unknown>) : {};
 		config.telemetry = { ...existing, enabled };
-		writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", "utf-8");
+		writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
 	} catch {
 		// Silently fail — never block user interaction
 	}

@@ -5,9 +5,9 @@
  * Skipped if Ollama is not running (CI-safe).
  */
 
-import { describe, test, expect, beforeAll } from "bun:test";
-import { ChatSession } from "../../src/ai/chat-session.js";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { z } from "zod";
+import { ChatSession } from "../../src/ai/chat-session.js";
 
 let ollamaAvailable = false;
 

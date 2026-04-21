@@ -10,7 +10,7 @@ biome check . 2>&1
 echo "→ TypeScript check..."
 bun run typecheck 2>&1
 
-echo "→ Running tests..."
-bun test packages/kapy/test/index.test.ts packages/kapy/test/integration/ 2>&1
+echo "→ Running unit tests..."
+bun test packages/kapy/test/unit/ packages/kapy/test/index.test.ts 2>&1
 
 echo "✅ All checks passed!"

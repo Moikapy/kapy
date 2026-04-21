@@ -3,6 +3,7 @@
  * middleware, screens, config, tools, and providers.
  */
 
+import type { BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
 import type { CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
 import type { CommandRegistry } from "../command/registry.js";
 import type { ConfigSchema } from "../config/schema.js";
@@ -11,7 +12,6 @@ import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
 import type { ToolRegistry } from "../tool/registry.js";
 import type { KapyExtensionAPI, KapyToolRegistration, ProviderRegistration, ScreenDefinition } from "./types.js";
-import type { BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
 
 export class ExtensionAPI implements KapyExtensionAPI {
 	private registry: CommandRegistry;
@@ -24,7 +24,10 @@ export class ExtensionAPI implements KapyExtensionAPI {
 	private providers: Map<string, ProviderRegistration>;
 	private extensionName: string;
 
-	private beforeToolCallHooks: ((context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>)[];
+	private beforeToolCallHooks: ((
+		context: BeforeToolCallContext,
+		signal?: AbortSignal,
+	) => Promise<BeforeToolCallResult>)[];
 
 	constructor(options: {
 		registry: CommandRegistry;
@@ -103,12 +106,17 @@ export class ExtensionAPI implements KapyExtensionAPI {
 	}
 
 	/** Register a beforeToolCall hook for permission gating or tool interception */
-	addBeforeToolCall(hook: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>): void {
+	addBeforeToolCall(
+		hook: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>,
+	): void {
 		this.beforeToolCallHooks.push(hook);
 	}
 
 	/** Get all registered beforeToolCall hooks */
-	getBeforeToolCallHooks(): ((context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>)[] {
+	getBeforeToolCallHooks(): ((
+		context: BeforeToolCallContext,
+		signal?: AbortSignal,
+	) => Promise<BeforeToolCallResult>)[] {
 		return [...this.beforeToolCallHooks];
 	}
 }

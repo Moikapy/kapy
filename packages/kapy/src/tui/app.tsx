@@ -1,16 +1,17 @@
-import { createCliRenderer, RGBA, type Renderable } from "@opentui/core";
-import { render, useKeyboard, useTerminalDimensions, useSelectionHandler, useRenderer } from "@opentui/solid";
+import { setTheme, ThemeProvider, useThemeColors } from "@moikapy/kapy-components";
+import { createCliRenderer, RGBA } from "@opentui/core";
+import { render, useKeyboard, useRenderer, useSelectionHandler, useTerminalDimensions } from "@opentui/solid";
 import { createEffect, createSignal, Show, useContext } from "solid-js";
 import { ModalContent, type ModalView } from "./components/modal.js";
 import { StatusFooter } from "./components/status-footer.js";
 import { createChat } from "./hooks/use-chat.js";
 import { useSlashCommands } from "./hooks/use-slash-commands.js";
+import { useTuiSettings } from "./hooks/use-tui-settings.js";
 import { RouteContext, RouteProvider } from "./router.js";
 import { KEY_BINDINGS } from "./types.js";
 import { ChatScreen } from "./views/chat-screen.js";
 import { HomeScreen } from "./views/home-screen.js";
 
-// Module-level renderer ref so useKeyboard can call destroy on exit
 let _renderer: any = null;
 
 function App() {
@@ -18,17 +19,16 @@ function App() {
 	const dims = useTerminalDimensions();
 	const chat = createChat();
 	const renderer = useRenderer();
+	const c = useThemeColors();
+	const _settings = useTuiSettings();
 
-	// Modal state — simple signal, no provider needed
 	const [modalView, setModalView] = createSignal<ModalView | null>(null);
 
-	// Enable copy-on-selection (mouse drag over selectable text)
 	useSelectionHandler((selection) => {
 		const text = selection.getSelectedText();
 		if (text) renderer.copyToClipboardOSC52(text);
 	});
 
-	/** Open a modal view. */
 	function openModal(view: ModalView) {
 		setModalView(view);
 	}
@@ -44,10 +44,24 @@ function App() {
 		loadSession: (path: string) => chat.loadSession(path, route.navigate),
 		listSessions: chat.listSessions,
 		listAllSessions: chat.listAllSessions,
+		compact: async () => {
+			try {
+				await chat.session.forceCompact();
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				console.error("[kapy] Compaction failed:", msg);
+			}
+		},
+		getSessionTree: () => {
+			try {
+				return chat.session.sessions.getEntries();
+			} catch {
+				return [];
+			}
+		},
 	});
 
 	useKeyboard((evt: any) => {
-		// Escape closes modal if open
 		if (evt.name === "escape" && modalView() !== null) {
 			setModalView(null);
 			evt.preventDefault();
@@ -56,9 +70,12 @@ function App() {
 		}
 
 		if (evt.ctrl && (evt.name === "c" || evt.name === "d")) {
-			try { _renderer?.destroy(); } catch {}
-			// Flush telemetry before exit
-			try { require("../telemetry/index.js").telemetry.shutdown(); } catch {}
+			try {
+				_renderer?.destroy();
+			} catch {}
+			try {
+				require("../telemetry/index.js").telemetry.shutdown();
+			} catch {}
 			setTimeout(() => process.exit(0), 50);
 		}
 	});
@@ -77,12 +94,13 @@ function App() {
 			if (route.data().type === "session") route.navigate({ type: "home" });
 			return;
 		}
-		// Ctrl+Y: yank (copy) last assistant message
 		if (evt.ctrl && evt.name === "y") {
 			const assistantMsgs = chat.msgs().filter((m: any) => m.role === "assistant" && m.content);
 			const last = assistantMsgs[assistantMsgs.length - 1];
 			if (last?.content) {
-				try { _renderer?.copyToClipboardOSC52(last.content); } catch {}
+				try {
+					_renderer?.copyToClipboardOSC52(last.content);
+				} catch {}
 			}
 			return;
 		}
@@ -91,17 +109,18 @@ function App() {
 	const onSubmit = (text: string) => chat.send(text, route.navigate);
 	const onSlashCommand = (text: string) => handleSlash(text);
 	const onExit = () => {
-		try { _renderer?.destroy(); } catch {}
+		try {
+			_renderer?.destroy();
+		} catch {}
 		setTimeout(() => process.exit(0), 50);
 	};
 	let _homeRef: any;
 	let _sessRef: any;
 
-	/** Track text selection for click-to-dismiss */
 	let dismissOnMouseUp = false;
 
 	return (
-		<box width={dims().width} height={dims().height} backgroundColor="#1a1b26" flexDirection="column">
+		<box width={dims().width} height={dims().height} backgroundColor={c().bg} flexDirection="column">
 			<box flexDirection="row" flexGrow={1} minHeight={0}>
 				<box flexGrow={1} minWidth={0}>
 					<Show when={route.data().type === "home"}>
@@ -111,7 +130,12 @@ function App() {
 							onSlashCommand={onSlashCommand}
 							onExit={onExit}
 							onKeyDown={onKey}
-							inputRef={(r: any) => { _homeRef = r; }}
+							inputRef={(r: any) => {
+								_homeRef = r;
+							}}
+							model={chat.model()}
+							thinkingLevel={chat.thinkingLevel()}
+							streaming={chat.streaming()}
 						/>
 					</Show>
 					<Show when={route.data().type === "session"}>
@@ -125,15 +149,20 @@ function App() {
 							onSlashCommand={onSlashCommand}
 							onExit={onExit}
 							onKeyDown={onKey}
-							scrollRef={(r: any) => { scrollRef = r; }}
-							inputRef={(r: any) => { _sessRef = r; }}
+							scrollRef={(r: any) => {
+								scrollRef = r;
+							}}
+							inputRef={(r: any) => {
+								_sessRef = r;
+							}}
+							model={chat.model()}
+							thinkingLevel={chat.thinkingLevel()}
 						/>
 					</Show>
 				</box>
 			</box>
-			<StatusFooter model={chat.model} thinkingLevel={chat.thinkingLevel} />
+			<StatusFooter thinkingLevel={chat.thinkingLevel} contextUsage={chat.contextUsage} />
 
-			{/* Dialog overlay — renders on top of everything when modal is active */}
 			<Show when={modalView() !== null}>
 				<box
 					width={dims().width}
@@ -160,8 +189,8 @@ function App() {
 						maxWidth={dims().width - 4}
 						maxHeight={dims().height - 4}
 						border={["top", "right", "bottom", "left"]}
-						borderColor="#00AAFF"
-						backgroundColor="#1a1b26"
+						borderColor={c().borderDim}
+						backgroundColor={c().bgPanel}
 						paddingTop={1}
 						paddingBottom={1}
 						paddingLeft={2}
@@ -176,6 +205,19 @@ function App() {
 				</box>
 			</Show>
 		</box>
+	);
+}
+
+function ThemedApp() {
+	const settings = useTuiSettings();
+
+	const savedTheme = settings.theme();
+	setTheme(savedTheme, settings.setTheme);
+
+	return (
+		<ThemeProvider>
+			<App />
+		</ThemeProvider>
 	);
 }
 
@@ -197,16 +239,27 @@ export async function launchChatTUI(): Promise<void> {
 	_renderer = renderer;
 
 	const cleanup = () => {
-		try { renderer.destroy(); } catch {}
+		try {
+			renderer.destroy();
+		} catch {}
 	};
-	process.on("SIGHUP", () => { cleanup(); setTimeout(() => process.exit(0), 50); });
-	process.on("SIGINT", () => { cleanup(); setTimeout(() => process.exit(0), 50); });
-	process.on("SIGTERM", () => { cleanup(); setTimeout(() => process.exit(0), 50); });
+	process.on("SIGHUP", () => {
+		cleanup();
+		setTimeout(() => process.exit(0), 50);
+	});
+	process.on("SIGINT", () => {
+		cleanup();
+		setTimeout(() => process.exit(0), 50);
+	});
+	process.on("SIGTERM", () => {
+		cleanup();
+		setTimeout(() => process.exit(0), 50);
+	});
 
 	await render(
 		() => (
 			<RouteProvider>
-				<App />
+				<ThemedApp />
 			</RouteProvider>
 		),
 		renderer,

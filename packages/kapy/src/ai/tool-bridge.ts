@@ -6,9 +6,9 @@
  */
 
 import type { AgentTool, AgentToolResult } from "@moikapy/kapy-agent";
+import { Type } from "@sinclair/typebox";
 import type { KapyToolRegistration, ToolResult } from "../tool/types.js";
 import { zodToJsonSchema } from "../tool/zod-to-json-schema.js";
-import { Type } from "@sinclair/typebox";
 
 /**
  * Convert a KapyToolRegistration to an AgentTool for use with kapy-agent.
@@ -32,7 +32,7 @@ export function kapyToolToAgentTool(tool: KapyToolRegistration): AgentTool {
 		description: tool.description,
 		parameters,
 		prepareArguments: tool.prepareArguments
-			? (args: unknown) => tool.prepareArguments!(args as Record<string, unknown>)
+			? (args: unknown) => tool.prepareArguments?.(args as Record<string, unknown>)
 			: undefined,
 		execute: async (toolCallId, params, signal, onUpdate) => {
 			const result = await tool.execute(

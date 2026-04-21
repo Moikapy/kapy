@@ -13,25 +13,26 @@
  * Extensions can add beforeToolCall hooks for custom gating.
  */
 
-import type { AgentEvent, AgentMessage } from "@moikapy/kapy-agent";
-import { Agent, GrimoireStore, extractQuery } from "@moikapy/kapy-agent";
-import type { Model } from "@moikapy/kapy-ai";
-import { getModel, registerModel, streamSimple } from "@moikapy/kapy-ai";
-import { streamOllama } from "./stream-ollama.js";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import type { AgentEvent, AgentMessage } from "@moikapy/kapy-agent";
+import { Agent, extractQuery, GrimoireStore } from "@moikapy/kapy-agent";
+import type { Model } from "@moikapy/kapy-ai";
+import { getModel, registerModel, streamSimple } from "@moikapy/kapy-ai";
+import { GRIMOIRE_DIR, SOUL_FILE } from "../config/defaults.js";
+import { telemetry, trackError, trackModelResponse, trackSessionStart } from "../telemetry/index.js";
 import { ToolRegistry } from "../tool/registry.js";
 import type { KapyToolRegistration } from "../tool/types.js";
-import { kapyToolsToAgentTools } from "./tool-bridge.js";
-import { type ContextMessage, ContextTracker } from "./context-tracker.js";
-
+import { type CompactionResult, compact } from "./compaction.js";
+import { ContextTracker, estimateContextTokens, shouldCompact } from "./context-tracker.js";
+import { createGrimoireTools } from "./grimoire-tools.js";
+import { isContextOverflow } from "./overflow.js";
 import { OllamaAdapter } from "./provider/ollama.js";
 import { SessionManager } from "./session/manager.js";
 import { processSlashCommand, type SlashCommandContext } from "./slash-commands.js";
-import { createGrimoireTools } from "./grimoire-tools.js";
-import { loadSoulMd, ensureSoulMd, buildSystemPrompt } from "./soul.js";
-import { GRIMOIRE_DIR, SOUL_FILE } from "../config/defaults.js";
-import { telemetry, trackSessionStart, trackSessionEnd, trackError, trackModelResponse, trackStreamError } from "../telemetry/index.js";
+import { buildSystemPrompt, ensureSoulMd, loadSoulMd } from "./soul.js";
+import { streamOllama } from "./stream-ollama.js";
+import { kapyToolsToAgentTools } from "./tool-bridge.js";
 
 /** Message shape for TUI rendering */
 export interface ChatMessage {
@@ -57,12 +58,14 @@ export interface ChatSessionOptions {
 	continueRecent?: boolean;
 	/** Path to specific session file to resume */
 	resumeSession?: string;
-	/** Custom session directory override */
+	/** Customize session directory */
 	sessionDir?: string;
 	/** Load SOUL.md as system prompt? Default: true */
 	autoLoadSoul?: boolean;
 	/** Initialize grimoire stores? Default: true */
 	autoInitGrimoire?: boolean;
+	/** Custom instructions appended to compaction summaries */
+	compactionInstructions?: string;
 }
 
 /** Model info for the internal registry */
@@ -100,10 +103,12 @@ export class ChatSession {
 	private initialized = false;
 	private sessionId: string;
 	private defaultModel: string | undefined;
+	private compactionInstructions: string | undefined;
 
 	constructor(options?: ChatSessionOptions) {
 		this.tools = new ToolRegistry();
 		this.defaultModel = options?.defaultModel;
+		this.compactionInstructions = options?.compactionInstructions;
 		this.contextTracker = new ContextTracker();
 
 		this.agent = new Agent({
@@ -120,63 +125,31 @@ export class ChatSession {
 				if (model.provider === "ollama") return streamOllama(model, context, opts as any);
 				return streamSimple(model, context, opts);
 			},
-			// Convert kapy messages to LLM-compatible format
-			// Filter out UI-only messages (system status, internal notifications)
-			// and ensure only user/assistant/toolResult reach the LLM
-			convertToLlm: (messages) => {
-				return messages.filter(
-					(m) => m.role === "user" || m.role === "assistant" || m.role === "toolResult",
-				);
-			},
-			// Compact context when approaching context limits + inject grimoire knowledge
+			// Compact context only via Grimoire injection (no inline compaction — handled post-loop)
 			transformContext: async (messages, _signal) => {
 				const model = this.agent.state.model;
 				if (!model) return messages;
 
 				let result = messages;
 
-				// ── Context compaction ─────────────────────────────────
-				const contextLength = model.contextWindow || 128_000;
-				const contextMsgs = messages.map((m) => ({
-					role: typeof m.role === "string" ? m.role : "user",
-					content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-				}));
-
-				if (this.contextTracker.shouldCompact(contextMsgs, contextLength)) {
-					const compacted = this.contextTracker.compact(contextMsgs);
-					result = compacted.map((cm) => ({
-						...messages.find((m) => {
-							const mContent = typeof m.content === "string" ? m.content : "";
-							return mContent === cm.content;
-						}) || { role: cm.role, content: cm.content, timestamp: Date.now() },
-					})) as typeof messages;
-				}
-
 				// ── Grimoire context injection ─────────────────────────
 				// Search grimoire for relevant knowledge and inject as system context
 				if (this.grimoireGlobal || this.grimoireProject) {
 					const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
 					if (lastUserMsg) {
-						const query = typeof lastUserMsg.content === "string"
-							? extractQuery(lastUserMsg.content)
-							: "";
+						const query = typeof lastUserMsg.content === "string" ? extractQuery(lastUserMsg.content) : "";
 						if (query) {
 							try {
 								// Search both scopes, merge results
-								const globalResults = this.grimoireGlobal
-									? await this.grimoireGlobal.search(query, 3)
-									: [];
-								const projectResults = this.grimoireProject
-									? await this.grimoireProject.search(query, 2)
-									: [];
-								const allResults = [...globalResults, ...projectResults]
-									.sort((a, b) => b.score - a.score)
-									.slice(0, 5);
+								const globalResults = this.grimoireGlobal ? await this.grimoireGlobal.search(query, 3) : [];
+								const projectResults = this.grimoireProject ? await this.grimoireProject.search(query, 2) : [];
+								const allResults = [...globalResults, ...projectResults].sort((a, b) => b.score - a.score).slice(0, 5);
 
 								if (allResults.length > 0) {
-									const store = allResults[0].score >= (globalResults[0]?.score ?? 0)
-										? this.grimoireGlobal!
-										: this.grimoireProject!;
+									const store =
+										allResults[0].score >= (globalResults[0]?.score ?? 0)
+											? this.grimoireGlobal!
+											: this.grimoireProject!;
 									const grimoireContext = store.summarizeForContext(allResults, 500);
 									const ctxMessage = {
 										role: "system" as const,
@@ -258,10 +231,7 @@ export class ChatSession {
 			}
 
 			// Register grimoire tools
-			const grimoireTools = createGrimoireTools(
-				this.grimoireGlobal,
-				this.grimoireProject ?? undefined,
-			);
+			const grimoireTools = createGrimoireTools(this.grimoireGlobal, this.grimoireProject ?? undefined);
 			for (const tool of grimoireTools) {
 				this.tools.register(tool);
 			}
@@ -353,12 +323,10 @@ export class ChatSession {
 
 	/** Get current context usage */
 	getContextUsage(): import("./context-tracker.js").ContextUsage {
-		const msgs: ContextMessage[] = (this.agent.state.messages ?? []).map((m: AgentMessage) => ({
-			role: typeof m.role === "string" ? m.role : "user",
-			content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-		}));
-		const maxTokens = 128_000;
-		return this.contextTracker.getUsage(msgs, maxTokens);
+		const msgs: AgentMessage[] = this.agent.state.messages ?? [];
+		const model = this.agent.state.model as Model<string> | undefined;
+		const maxTokens = (model as any)?.contextWindow ?? 128_000;
+		return this.contextTracker.getUsageFromAgent(msgs, maxTokens);
 	}
 
 	/** Subscribe to chat events (message updates, processing state) */
@@ -375,10 +343,7 @@ export class ChatSession {
 		// Track session start (first send only)
 		if (!this._sessionStartTime) {
 			this._sessionStartTime = Date.now();
-			trackSessionStart(
-				(this.agent.state.model as any)?.id ?? "unknown",
-				this.agent.state.thinkingLevel ?? "off",
-			);
+			trackSessionStart((this.agent.state.model as any)?.id ?? "unknown", this.agent.state.thinkingLevel ?? "off");
 		}
 
 		// Check for slash commands
@@ -387,6 +352,7 @@ export class ChatSession {
 			providers: this,
 			tools: this.tools,
 			sessions: this.sessions,
+			chatSession: this,
 			output: (text) => this.addSystemMessage(text),
 		};
 
@@ -420,7 +386,7 @@ export class ChatSession {
 
 		try {
 			await this.agent.prompt(trimmed);
-			} catch (err) {
+		} catch (err) {
 			const errMsg = err instanceof Error ? err.message : String(err);
 			this.addSystemMessage(`Error: ${errMsg}`);
 			trackError("agent_prompt", errMsg);
@@ -527,14 +493,16 @@ export class ChatSession {
 			maxTokens: 4096,
 			// Ollama doesn't support the "developer" role — force "system" role for system prompts
 			// See: https://github.com/ollama/ollama — OpenAI compat doesn't support developer role
-			...(providerId === "ollama" ? { compat: { supportsDeveloperRole: false, supportsReasoningEffort: false, thinkingFormat: "qwen" as const } } : {}),
+			...(providerId === "ollama"
+				? { compat: { supportsDeveloperRole: false, supportsReasoningEffort: false, thinkingFormat: "qwen" as const } }
+				: {}),
 		} as Model<string>;
 	}
 
 	/** Handle agent events → update internal message list + persist */
 	private handleAgentEvent(event: AgentEvent): void {
 		try {
-		this.handleAgentEventInner(event);
+			this.handleAgentEventInner(event);
 		} catch (err) {
 			console.error("[kapy] handleAgentEvent error:", err);
 		}
@@ -542,8 +510,6 @@ export class ChatSession {
 
 	/** Inner handler — may throw, caught by outer wrapper */
 	private handleAgentEventInner(event: AgentEvent): void {
-		if (event.type === "message_end" && (event as any).message?.role === "assistant") {
-		}
 		switch (event.type) {
 			case "message_start": {
 				if (event.message.role === "assistant") {
@@ -555,7 +521,6 @@ export class ChatSession {
 						timestamp: Date.now(),
 						isStreaming: true,
 					});
-					// Don't persist at message_start — content is incomplete/empty
 				}
 				break;
 			}
@@ -594,6 +559,9 @@ export class ChatSession {
 							msg.stopReason ?? "unknown",
 						);
 					} catch {}
+
+					// ── Post-loop compaction check ────────────────────
+					this._checkCompaction(event.message);
 				} else if (event.message.role === "toolResult") {
 					const content = this.extractContent(event.message);
 					this._messages.push({
@@ -611,12 +579,150 @@ export class ChatSession {
 			case "tool_execution_start":
 			case "tool_execution_update":
 			case "tool_execution_end":
-				// Tool execution events — future: show progress
 				break;
 		}
 
 		// Forward to any listeners
 		this.notifyListeners(event);
+	}
+
+	forceCompact(): Promise<void> {
+		const model = this.agent.state.model as Model<string> | undefined;
+		if (!model) return Promise.reject(new Error("No model set"));
+		const contextWindow = (model as any).contextWindow ?? 128_000;
+		const msgs = this.agent.state.messages ?? [];
+		const contextTokens = estimateContextTokens(msgs);
+		if (contextTokens < contextWindow * 0.4) {
+			this.addSystemMessage("Context is well within limits — no compaction needed.");
+			return Promise.resolve();
+		}
+		const previousSummary = this._getPreviousSummary();
+		this.addSystemMessage("Compacting context...");
+		return this._runCompaction(msgs, model, contextWindow, contextTokens, previousSummary);
+	}
+
+	/** Check if compaction is needed after an assistant message completes */
+	private _overflowRecoveryAttempted = false;
+	private _compactionWarned = false;
+
+	private _checkCompaction(message: AgentMessage): void {
+		const model = this.agent.state.model as Model<string> | undefined;
+		if (!model) return;
+
+		const contextWindow = (model as any).contextWindow ?? 128_000;
+		const msgs = this.agent.state.messages ?? [];
+		const contextTokens = estimateContextTokens(msgs);
+		const fraction = contextWindow > 0 ? contextTokens / contextWindow : 0;
+
+		// ── Warning when approaching limits ────────────────────
+		if (fraction >= 0.6 && fraction < 0.8 && !this._compactionWarned) {
+			this._compactionWarned = true;
+			this.addSystemMessage(
+				`⚠ Context is ${Math.round(fraction * 100)}% full. Use /compact to free space before it hits the limit.`,
+			);
+		}
+
+		// ── Overflow detection: auto-compact + retry once ──────────
+		if (isContextOverflow(message as any, contextWindow)) {
+			if (this._overflowRecoveryAttempted) {
+				this.addSystemMessage("Context window exceeded. Please shorten your message or use /compact.");
+				return;
+			}
+			this._overflowRecoveryAttempted = true;
+
+			// Remove the error message and retry
+			this._messages = this._messages.filter(
+				(m) => m.id !== this._messages.find((m2) => m2.role === "assistant" && m2.isStreaming)?.id,
+			);
+			const previousSummary = this._getPreviousSummary();
+			this._runCompaction(msgs, model, contextWindow, contextTokens, previousSummary);
+			this.agent.continue();
+			return;
+		}
+
+		// ── Threshold compaction ─────────────────────────────────
+		if (shouldCompact(contextTokens, contextWindow)) {
+			const previousSummary = this._getPreviousSummary();
+			this._runCompaction(msgs, model, contextWindow, contextTokens, previousSummary);
+		}
+
+		this._overflowRecoveryAttempted = false;
+		this._compactionWarned = false;
+	}
+
+	/** Get the most recent compaction summary from session entries */
+	private _getPreviousSummary(): string | undefined {
+		const entries = this.sessions.getEntries();
+		for (let i = entries.length - 1; i >= 0; i--) {
+			const entry = entries[i];
+			if (entry.type === "compaction" && entry.summary) {
+				return entry.summary;
+			}
+		}
+		return undefined;
+	}
+
+	/** Run compaction and inject summary into agent state */
+	private async _runCompaction(
+		msgs: AgentMessage[],
+		model: Model<string>,
+		_contextWindow: number,
+		contextTokens: number,
+		previousSummary?: string,
+	): Promise<void> {
+		let result: CompactionResult;
+		try {
+			result = await compact({
+				messages: msgs,
+				model,
+				contextTracker: this.contextTracker,
+				sessions: this.sessions,
+				previousSummary,
+				customInstructions: this.compactionInstructions,
+			});
+		} catch (err) {
+			console.error("[kapy] Compaction failed:", err);
+			this.addSystemMessage(`Compaction failed: ${err instanceof Error ? err.message : String(err)}`);
+			return;
+		}
+
+		if (!result.summary || result.cutIndex === 0) return;
+
+		// Prune old tool outputs
+		const pruned = this.contextTracker.pruneToolOutputs(msgs);
+
+		// Inject summary as system message at the front
+		const summaryMsg = {
+			role: "user" as const,
+			content: result.summary,
+			timestamp: Date.now(),
+		};
+
+		// Rebuild agent messages: summary + kept messages after cut point
+		const kept = pruned.slice(result.cutIndex);
+		this.agent.state.messages = [summaryMsg, ...kept];
+
+		const keptTokens = estimateContextTokens(kept);
+
+		// Add compaction divider to display
+		this._messages.push({
+			id: `compaction-${Date.now()}`,
+			role: "compaction" as any,
+			content: `Context compacted (${contextTokens.toLocaleString()} tokens → ~${keptTokens.toLocaleString()}). ${msgs.length - kept.length} earlier messages summarized.`,
+			timestamp: Date.now(),
+		});
+
+		this.addSystemMessage(
+			`Compacted: ${contextTokens.toLocaleString()} tokens → ~${keptTokens.toLocaleString()} tokens (${msgs.length - kept.length} messages summarized).`,
+		);
+
+		// Notify TUI listeners
+		this.notifyListeners({
+			type: "message_end" as any,
+			message: { role: "assistant", content: "", timestamp: Date.now() } as any,
+		});
+
+		// Note: compaction entry is already persisted by compact() above — no duplicate write needed
 	}
 
 	/** Extract text content from an AgentMessage (handles content arrays) */

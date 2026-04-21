@@ -66,7 +66,6 @@ export class CommandContext {
 	private _startTime: number;
 	private _userExitCode: number | null = null;
 	private _abortExitCode: number = 0;
-	// biome-ignore lint/correctness/noUnusedPrivateClassMembers: tracks active spinner for potential cleanup
 	private _spinner: Spinner | null = null;
 	private _teardownCallbacks: TeardownCallback[] = [];
 	private _abortController: AbortController | null = null;

@@ -2,7 +2,7 @@
  * Tests for slash command system — /help, /model, /compact, etc.
  */
 
-import { beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { Agent } from "@moikapy/kapy-agent";
 import { SessionManager } from "../../../src/ai/session/manager.js";
 import {

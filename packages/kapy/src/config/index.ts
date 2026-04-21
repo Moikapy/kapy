@@ -4,8 +4,8 @@ export {
 	defaults,
 	EXTENSIONS_DIR,
 	ensureKapyDirs,
-	getDefaultConfig,
 	GRIMOIRE_DIR,
+	getDefaultConfig,
 	KAPY_HOME,
 	SOUL_FILE,
 } from "./defaults.js";

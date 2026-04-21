@@ -35,13 +35,15 @@ export const DEFAULT_THINKING_LEVEL: "off" | "low" | "medium" | "high" | "xhigh"
 // Load project context from AGENTS.md (walks up from cwd)
 function loadProjectCtx(): string {
 	try {
-		const fs = require("fs");
-		const path = require("path");
+		const fs = require("node:fs");
+		const path = require("node:path");
 		const cwd = process.cwd();
 		for (const d of [cwd, path.dirname(cwd), path.dirname(path.dirname(cwd))]) {
-			try { return fs.readFileSync(path.join(d, "AGENTS.md"), "utf-8"); } catch { }
+			try {
+				return fs.readFileSync(path.join(d, "AGENTS.md"), "utf-8");
+			} catch {}
 		}
-	} catch { }
+	} catch {}
 	return "";
 }
 
@@ -50,13 +52,18 @@ export const systemPrompt = projectCtx ? `${SYSTEM_MESSAGE}\n\n# Project Context
 
 // Message type for TUI rendering.
 // Maps from ChatSession.ChatMessage + AgentEvent types to displayable items.
+export type ToolStatus = "pending" | "running" | "completed" | "error" | "denied";
+
 export interface Msg {
 	id: string;
-	role: "user" | "assistant" | "system" | "tool_call" | "tool_result";
+	role: "user" | "assistant" | "system" | "tool_call" | "tool_result" | "compaction" | "context_group";
 	content: string;
 	streaming?: boolean;
 	reasoning?: string;
 	toolName?: string;
-	/** Message is queued and waiting for the current agent run to finish */
+	toolStatus?: ToolStatus;
 	queued?: boolean;
+	durationMs?: number;
+	model?: string;
+	items?: Msg[];
 }

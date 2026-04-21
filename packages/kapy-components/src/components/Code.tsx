@@ -1,21 +1,30 @@
-/**
- * Code — syntax-highlighted code display component.
- *
- * Wraps OpenTUI's <code> primitive with kapy styling defaults.
- */
+import type { SyntaxStyle } from "@opentui/core";
 import type { JSX } from "solid-js";
+import { useThemeColors } from "../theme.js";
 
 export interface CodeProps {
-	/** Code content */
 	code: string;
-	/** Programming language for syntax highlighting */
 	language?: string;
+	syntaxStyle?: SyntaxStyle;
+	streaming?: boolean;
+	conceal?: boolean;
+	drawUnstyledText?: boolean;
+	fg?: string;
+	selectable?: boolean;
 }
 
-/** Render a code block with syntax highlighting */
 export function Code(props: CodeProps): JSX.Element {
+	const c = useThemeColors();
 	return (
-		// @ts-expect-error — syntaxStyle has a runtime default but the type marks it required
-		<code content={props.code} filetype={props.language ?? "typescript"} />
+		<code
+			content={props.code}
+			filetype={props.language ?? "typescript"}
+			syntaxStyle={props.syntaxStyle}
+			streaming={props.streaming ?? false}
+			conceal={props.conceal ?? true}
+			drawUnstyledText={props.drawUnstyledText ?? false}
+			fg={props.fg ?? c().text}
+			selectable={props.selectable ?? true}
+		/>
 	);
 }

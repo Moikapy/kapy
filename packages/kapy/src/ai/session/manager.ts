@@ -13,9 +13,9 @@
  */
 
 import { existsSync } from "node:fs";
-import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import type { FileEntry, NewSessionOptions, SessionEntry, SessionHeader, SessionInfo } from "./types.js";
 import { CURRENT_SESSION_VERSION } from "./types.js";
 
@@ -23,7 +23,7 @@ import { CURRENT_SESSION_VERSION } from "./types.js";
 
 /** Encode cwd into a safe directory name: /home/user/code → --home-user-code-- */
 function encodeCwd(cwd: string): string {
-	return "--" + cwd.replace(/\//g, "--") + "--";
+	return `--${cwd.replace(/\//g, "--")}--`;
 }
 
 /** Generate 8-char hex ID */
@@ -60,7 +60,7 @@ export function parseSessionEntries(content: string): FileEntry[] {
 export function findMostRecentSession(sessionDir: string): string | null {
 	if (!existsSync(sessionDir)) return null;
 	// Synchronous check is intentional — we already checked existsSync
-	const files = require("fs")
+	const files = require("node:fs")
 		.readdirSync(sessionDir)
 		.filter((f: string) => f.endsWith(".jsonl"))
 		.sort()
@@ -109,7 +109,7 @@ export class SessionManager {
 			cwd,
 		};
 
-		writeFileSync(filePath, JSON.stringify(header) + "\n");
+		writeFileSync(filePath, `${JSON.stringify(header)}\n`);
 
 		const sm = new SessionManager(filePath, dir, cwd, true);
 		sm.sessionId = id;
@@ -448,7 +448,7 @@ export class SessionManager {
 		if (!this.doPersist || !this.sessionFile) {
 			return;
 		}
-		appendFileSync(this.sessionFile, JSON.stringify(entry) + "\n");
+		appendFileSync(this.sessionFile, `${JSON.stringify(entry)}\n`);
 	}
 
 	/** Internal: append entry to in-memory store and persist. */
@@ -463,7 +463,7 @@ export class SessionManager {
 	private _rewriteFile(): void {
 		if (!this.doPersist || !this.sessionFile || !this.header) return;
 		const lines = [JSON.stringify(this.header), ...this.entries.map((e) => JSON.stringify(e))];
-		writeFileSync(this.sessionFile, lines.join("\n") + "\n");
+		writeFileSync(this.sessionFile, `${lines.join("\n")}\n`);
 	}
 
 	/** Switch to a different session file (for resume/branch). */
@@ -490,7 +490,7 @@ export class SessionManager {
 		this.leafId = null;
 
 		if (this.doPersist && this.sessionFile) {
-			writeFileSync(this.sessionFile, JSON.stringify(header) + "\n");
+			writeFileSync(this.sessionFile, `${JSON.stringify(header)}\n`);
 		}
 
 		return this.sessionFile;

@@ -6,15 +6,13 @@
  * can be used as agent.streamFn for Ollama models.
  */
 
+import type { Model } from "@moikapy/kapy-ai";
 import { AssistantMessageEventStream } from "@moikapy/kapy-ai/event-stream";
 import type { AssistantMessage, AssistantMessageEvent, Context, Message } from "@moikapy/kapy-ai/types";
-import type { Model } from "@moikapy/kapy-ai";
 import { trackStreamError } from "../telemetry/index.js";
 
 /** Map kapy-ai thinking levels to Ollama's think parameter */
-function mapThinkLevel(
-	thinkingLevel: string | undefined,
-): boolean | "low" | "medium" | "high" {
+function mapThinkLevel(thinkingLevel: string | undefined): boolean | "low" | "medium" | "high" {
 	if (!thinkingLevel || thinkingLevel === "off") return false;
 	// GPT-OSS supports "low"/"medium"/"high" — other models just use boolean
 	if (thinkingLevel === "low" || thinkingLevel === "medium" || thinkingLevel === "high") {
@@ -65,24 +63,32 @@ function toOllamaMessages(messages: Message[], systemPrompt?: string): any[] {
 function extractText(content: unknown): string {
 	if (typeof content === "string") return content;
 	if (Array.isArray(content)) {
-		return content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+		return content
+			.filter((c: any) => c.type === "text")
+			.map((c: any) => c.text)
+			.join("");
 	}
 	return "";
 }
 
 function extractThinking(content: unknown): string {
 	if (Array.isArray(content)) {
-		return content.filter((c: any) => c.type === "thinking").map((c: any) => c.thinking).join("");
+		return content
+			.filter((c: any) => c.type === "thinking")
+			.map((c: any) => c.thinking)
+			.join("");
 	}
 	return "";
 }
 
 function extractToolCalls(content: unknown): any[] {
 	if (Array.isArray(content)) {
-		return content.filter((c: any) => c.type === "toolCall").map((c: any) => ({
-			id: c.id,
-			function: { name: c.name, arguments: c.arguments ?? {} },
-		}));
+		return content
+			.filter((c: any) => c.type === "toolCall")
+			.map((c: any) => ({
+				id: c.id,
+				function: { name: c.name, arguments: c.arguments ?? {} },
+			}));
 	}
 	return [];
 }
@@ -144,7 +150,14 @@ export function streamOllama(
 				api: "openai-completions" as const,
 				provider: model.provider,
 				model: model.id,
-				usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+				usage: {
+					input: 0,
+					output: 0,
+					cacheRead: 0,
+					cacheWrite: 0,
+					totalTokens: 0,
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+				},
 				stopReason: "stop",
 				timestamp: Date.now(),
 			};
@@ -168,14 +181,24 @@ export function streamOllama(
 						stream.push({ type: "thinking_start", contentIndex: 0, partial } as AssistantMessageEvent);
 					}
 					thinkingContent += chunk.message.thinking;
-					stream.push({ type: "thinking_delta", contentIndex: 0, delta: chunk.message.thinking, partial } as AssistantMessageEvent);
+					stream.push({
+						type: "thinking_delta",
+						contentIndex: 0,
+						delta: chunk.message.thinking,
+						partial,
+					} as AssistantMessageEvent);
 				}
 
 				// Content tokens
 				if (chunk.message?.content) {
 					// End thinking section if transitioning to content
 					if (thinkingStarted && !textStarted) {
-						stream.push({ type: "thinking_end", contentIndex: 0, content: thinkingContent, partial } as AssistantMessageEvent);
+						stream.push({
+							type: "thinking_end",
+							contentIndex: 0,
+							content: thinkingContent,
+							partial,
+						} as AssistantMessageEvent);
 						thinkingStarted = false;
 					}
 					if (!textStarted) {
@@ -183,23 +206,37 @@ export function streamOllama(
 						stream.push({ type: "text_start", contentIndex: 0, partial } as AssistantMessageEvent);
 					}
 					textContent += chunk.message.content;
-					stream.push({ type: "text_delta", contentIndex: 0, delta: chunk.message.content, partial } as AssistantMessageEvent);
+					stream.push({
+						type: "text_delta",
+						contentIndex: 0,
+						delta: chunk.message.content,
+						partial,
+					} as AssistantMessageEvent);
 				}
 
 				// Tool calls (Ollama SDK: tc.function.name, tc.function.arguments as object)
 				if (chunk.message?.tool_calls) {
-					for (const tc of chunk.message.tool_calls as Array<{ id?: string; function: { name: string; arguments: Record<string, any> | string } }>) {
+					for (const tc of chunk.message.tool_calls as Array<{
+						id?: string;
+						function: { name: string; arguments: Record<string, any> | string };
+					}>) {
 						// Close text if open
 						if (textStarted) {
-							stream.push({ type: "text_end", contentIndex: 0, content: textContent, partial } as AssistantMessageEvent);
+							stream.push({
+								type: "text_end",
+								contentIndex: 0,
+								content: textContent,
+								partial,
+							} as AssistantMessageEvent);
 							textStarted = false;
 						}
 
 						const tcIndex = toolCalls.length;
 						const tcId = tc.id ?? `call_${tcIndex}_${Date.now()}`;
-						const parsedArgs: Record<string, any> = typeof tc.function.arguments === "string"
-							? JSON.parse(tc.function.arguments)
-							: (tc.function.arguments ?? {});
+						const parsedArgs: Record<string, any> =
+							typeof tc.function.arguments === "string"
+								? JSON.parse(tc.function.arguments)
+								: (tc.function.arguments ?? {});
 
 						stream.push({ type: "toolcall_start", contentIndex: tcIndex, partial } as AssistantMessageEvent);
 						stream.push({
@@ -231,7 +268,12 @@ export function streamOllama(
 			if (textStarted) {
 				stream.push({ type: "text_end", contentIndex: 0, content: textContent, partial } as AssistantMessageEvent);
 			} else if (thinkingStarted) {
-				stream.push({ type: "thinking_end", contentIndex: 0, content: thinkingContent, partial } as AssistantMessageEvent);
+				stream.push({
+					type: "thinking_end",
+					contentIndex: 0,
+					content: thinkingContent,
+					partial,
+				} as AssistantMessageEvent);
 			}
 
 			// Build final message
@@ -266,8 +308,10 @@ export function streamOllama(
 				message: finalMessage,
 			} as AssistantMessageEvent);
 		} catch (error: any) {
-		// Track stream errors
-		try { trackStreamError(model.id, error.code ?? error.name ?? "stream_error", error.message ?? "Unknown error"); } catch {}
+			// Track stream errors
+			try {
+				trackStreamError(model.id, error.code ?? error.name ?? "stream_error", error.message ?? "Unknown error");
+			} catch {}
 			stream.push({
 				type: "error",
 				reason: "error" as const,
@@ -277,7 +321,14 @@ export function streamOllama(
 					api: "openai-completions" as const,
 					provider: model.provider,
 					model: model.id,
-					usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+					usage: {
+						input: 0,
+						output: 0,
+						cacheRead: 0,
+						cacheWrite: 0,
+						totalTokens: 0,
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+					},
 					stopReason: "error" as const,
 					errorMessage: error.message,
 					timestamp: Date.now(),

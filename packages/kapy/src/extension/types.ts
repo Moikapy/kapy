@@ -1,12 +1,13 @@
 /**
  * Extension types — meta, register, and API surface.
  */
+
+import type { BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
 import type { AgentHints, CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
 import type { ConfigSchema } from "../config/schema.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
 import type { KapyToolRegistration } from "../tool/types.js";
-import type { BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
 
 export type { KapyToolRegistration } from "../tool/types.js";
 
@@ -99,5 +100,7 @@ export interface KapyExtensionAPI {
 	// === Kapy-specific additions ===
 
 	/** Register a beforeToolCall hook for permission gating or tool interception */
-	addBeforeToolCall(hook: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>): void;
+	addBeforeToolCall(
+		hook: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>,
+	): void;
 }

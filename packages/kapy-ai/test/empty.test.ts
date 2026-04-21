@@ -463,13 +463,9 @@ describe("AI Providers Empty Message Tests", () => {
 			await testEmptyStringMessage(llm, { apiKey: anthropicOAuthToken });
 		});
 
-		it.skipIf(!anthropicOAuthToken)(
-			"should handle whitespace-only content",
-			{ retry: 3, timeout: 30000 },
-			async () => {
-				await testWhitespaceOnlyMessage(llm, { apiKey: anthropicOAuthToken });
-			},
-		);
+		it.skipIf(!anthropicOAuthToken)("should handle whitespace-only content", { retry: 3, timeout: 30000 }, async () => {
+			await testWhitespaceOnlyMessage(llm, { apiKey: anthropicOAuthToken });
+		});
 
 		it.skipIf(!anthropicOAuthToken)(
 			"should handle empty assistant message in conversation",

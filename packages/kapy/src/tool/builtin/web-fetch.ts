@@ -5,7 +5,7 @@
  * Converts HTML to readable text or markdown without external dependencies.
  */
 import { z } from "zod";
-import type { KapyToolRegistration, ToolResult, ToolExecutionContext } from "../types.js";
+import type { KapyToolRegistration, ToolExecutionContext, ToolResult } from "../types.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -143,12 +143,10 @@ function htmlToMarkdown(html: string): string {
 		// Blockquotes
 		md = md.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, content) => {
 			const text = content.replace(/<[^>]*>/g, "").trim();
-			return (
-				decodeHtml(text)
-					.split("\n")
-					.map((line: string) => `> ${line}`)
-					.join("\n") + "\n\n"
-			);
+			return `${decodeHtml(text)
+				.split("\n")
+				.map((line: string) => `> ${line}`)
+				.join("\n")}\n\n`;
 		});
 
 		// Paragraphs and line breaks
@@ -200,14 +198,8 @@ export const webFetchTool: KapyToolRegistration = {
 			.enum(["text", "markdown", "html"])
 			.optional()
 			.describe("Output format: text (plain), markdown, or html (default: text)"),
-		maxLength: z
-			.number()
-			.optional()
-			.describe("Maximum characters to return (default: 5000)"),
-		timeout: z
-			.number()
-			.optional()
-			.describe("Request timeout in milliseconds (default: 30000, max: 60000)"),
+		maxLength: z.number().optional().describe("Maximum characters to return (default: 5000)"),
+		timeout: z.number().optional().describe("Request timeout in milliseconds (default: 30000, max: 60000)"),
 	}),
 	async execute(
 		_callId: string,
@@ -241,8 +233,7 @@ export const webFetchTool: KapyToolRegistration = {
 			const response = await fetch(url, {
 				headers: {
 					"User-Agent": USER_AGENT,
-					Accept:
-						"text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5",
+					Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5",
 					"Accept-Language": "en-US,en;q=0.5",
 				},
 				signal: controller.signal,
@@ -294,8 +285,7 @@ export const webFetchTool: KapyToolRegistration = {
 			const rawText = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
 
 			let content: string;
-			const isHtml =
-				contentType.includes("text/html") || contentType.includes("application/xhtml");
+			const isHtml = contentType.includes("text/html") || contentType.includes("application/xhtml");
 
 			switch (format) {
 				case "html":
@@ -309,14 +299,12 @@ export const webFetchTool: KapyToolRegistration = {
 						content = htmlToMarkdown(rawText);
 					} else {
 						// Non-HTML: wrap in code block
-						content = "```\n" + rawText.slice(0, maxLength) + "\n```";
+						content = `\`\`\`\n${rawText.slice(0, maxLength)}\n\`\`\``;
 					}
 					if (content.length > maxLength) {
-						content = content.slice(0, maxLength) + "\n\n[Truncated]";
+						content = `${content.slice(0, maxLength)}\n\n[Truncated]`;
 					}
 					break;
-
-				case "text":
 				default:
 					if (isHtml) {
 						content = htmlToText(rawText);
@@ -324,7 +312,7 @@ export const webFetchTool: KapyToolRegistration = {
 						content = rawText;
 					}
 					if (content.length > maxLength) {
-						content = content.slice(0, maxLength) + "\n\n[Truncated]";
+						content = `${content.slice(0, maxLength)}\n\n[Truncated]`;
 					}
 					break;
 			}

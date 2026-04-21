@@ -5,9 +5,9 @@
  * OAuth tokens are automatically refreshed if expired and saved back to auth.json.
  */
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { homedir } from "os";
-import { dirname, join } from "path";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { getOAuthApiKey } from "../src/utils/oauth/index.js";
 import type { OAuthCredentials, OAuthProvider } from "../src/utils/oauth/types.js";
 

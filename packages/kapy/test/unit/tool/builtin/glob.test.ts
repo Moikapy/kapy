@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "fs";
-import { join } from "path";
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { globTool } from "../../../../src/tool/builtin/glob.js";
 import type { ToolExecutionContext } from "../../../../src/tool/types.js";
 

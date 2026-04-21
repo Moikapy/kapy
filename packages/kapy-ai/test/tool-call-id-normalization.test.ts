@@ -105,9 +105,7 @@ describe("Tool Call ID Normalization - Live Handoff", () => {
 			);
 
 			// Should NOT fail with "call_id too long" error
-			expect(openrouterResponse.stopReason, `OpenRouter error: ${openrouterResponse.errorMessage}`).not.toBe(
-				"error",
-			);
+			expect(openrouterResponse.stopReason, `OpenRouter error: ${openrouterResponse.errorMessage}`).not.toBe("error");
 			expect(openrouterResponse.errorMessage).toBeUndefined();
 		},
 		60000,

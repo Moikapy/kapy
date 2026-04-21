@@ -21,8 +21,8 @@ export type { ScrollBoxProps } from "./components/ScrollBox.js";
 export { ScrollBox } from "./components/ScrollBox.js";
 export type { SelectOption, SelectProps } from "./components/Select.js";
 export { Select } from "./components/Select.js";
-export type { SpinnerProps } from "./components/Spinner.js";
-export { Spinner } from "./components/Spinner.js";
+export type { SpinnerProps } from "./components/Spinner.primitive.js";
+export { Spinner } from "./components/Spinner.primitive.js";
 export type { SidebarProps, SidebarScreen } from "./layout/Sidebar.js";
 // Layout
 export { Sidebar } from "./layout/Sidebar.js";
@@ -30,4 +30,18 @@ export type { StatusBarProps } from "./layout/StatusBar.js";
 export { StatusBar } from "./layout/StatusBar.js";
 
 // Theme
-export { colors, spacing, typography } from "./theme.js";
+export {
+	colors,
+	currentThemeName,
+	listAvailableThemes,
+	onThemeChange,
+	setTheme,
+	spacing,
+	THEME_NAMES,
+	THEMES,
+	type ThemeColors,
+	ThemeProvider,
+	tint,
+	typography,
+	useThemeColors,
+} from "./theme.js";

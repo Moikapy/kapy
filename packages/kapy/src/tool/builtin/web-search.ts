@@ -5,7 +5,7 @@
  * Rate-limits itself to avoid hammering DDG.
  */
 import { z } from "zod";
-import type { KapyToolRegistration, ToolResult, ToolExecutionContext } from "../types.js";
+import type { KapyToolRegistration, ToolExecutionContext, ToolResult } from "../types.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -73,19 +73,14 @@ function parseDDGResults(html: string): SearchResult[] {
 				const snippetMatch = block.match(
 					/(?:<a[^>]*class="result__snippet"[^>]*>([\s\S]{0,500}?)<\/a>|<td[^>]*class="result__snippet"[^>]*>([\s\S]{0,500}?)<\/td>)/i,
 				);
-				const snippet = snippetMatch
-					? decodeHtml(stripTags(snippetMatch[1] || snippetMatch[2] || ""))
-					: "";
+				const snippet = snippetMatch ? decodeHtml(stripTags(snippetMatch[1] || snippetMatch[2] || "")) : "";
 
 				// Skip ad results, redirect URLs, and incomplete entries
 				if (!url || url.startsWith("http://0.0.0") || !title) continue;
 				if (url.includes("duckduckgo.com")) continue;
 
 				results.push({ title, url, snippet });
-			} catch {
-				// Skip malformed results silently
-				continue;
-			}
+			} catch {}
 		}
 
 		// Fallback: try a broader match if the structured parser found nothing
@@ -101,15 +96,11 @@ function parseDDGResults(html: string): SearchResult[] {
 					// Try to find a nearby snippet
 					const afterIdx = broadRegex.lastIndex;
 					const nearby = html.slice(afterIdx, Math.min(afterIdx + 500, html.length));
-					const snippetMatch = nearby.match(
-						/<a[^>]*class="result__snippet"[^>]*>([\s\S]{0,500}?)<\/a>/i,
-					);
+					const snippetMatch = nearby.match(/<a[^>]*class="result__snippet"[^>]*>([\s\S]{0,500}?)<\/a>/i);
 					const snippet = snippetMatch ? decodeHtml(stripTags(snippetMatch[1])) : "";
 
 					results.push({ title, url, snippet });
-				} catch {
-					continue;
-				}
+				} catch {}
 			}
 		}
 	} catch {
@@ -135,10 +126,7 @@ export const webSearchTool: KapyToolRegistration = {
 	],
 	parameters: z.object({
 		query: z.string().describe("The search query"),
-		limit: z
-			.number()
-			.optional()
-			.describe("Maximum number of results to return (default: 10, max: 20)"),
+		limit: z.number().optional().describe("Maximum number of results to return (default: 10, max: 20)"),
 	}),
 	async execute(
 		_callId: string,
@@ -148,7 +136,7 @@ export const webSearchTool: KapyToolRegistration = {
 		_ctx: ToolExecutionContext,
 	): Promise<ToolResult> {
 		const query = params.query as string;
-		const limit = Math.min(Math.max(((params.limit as number) ?? DEFAULT_LIMIT), 1), MAX_LIMIT);
+		const limit = Math.min(Math.max((params.limit as number) ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
 
 		if (!query || query.trim().length < 2) {
 			return {
@@ -200,7 +188,12 @@ export const webSearchTool: KapyToolRegistration = {
 			const buffer = await response.arrayBuffer();
 			if (buffer.byteLength > MAX_HTML_SIZE) {
 				return {
-					content: [{ type: "text", text: `Search response too large (${(buffer.byteLength / 1024).toFixed(0)}KB). Try a more specific query.` }],
+					content: [
+						{
+							type: "text",
+							text: `Search response too large (${(buffer.byteLength / 1024).toFixed(0)}KB). Try a more specific query.`,
+						},
+					],
 					details: { error: "response_too_large", size: buffer.byteLength, query },
 				};
 			}
@@ -219,12 +212,7 @@ export const webSearchTool: KapyToolRegistration = {
 			}
 
 			// Format results for the LLM
-			const formatted = results
-				.map(
-					(r, i) =>
-						`${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.snippet}`,
-				)
-				.join("\n\n");
+			const formatted = results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.snippet}`).join("\n\n");
 
 			return {
 				content: [{ type: "text", text: formatted }],

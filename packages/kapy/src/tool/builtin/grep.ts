@@ -2,7 +2,7 @@
  * grep tool — search file contents for patterns.
  */
 import { z } from "zod";
-import type { KapyToolRegistration, ToolResult, ToolExecutionContext } from "../types.js";
+import type { KapyToolRegistration, ToolExecutionContext, ToolResult } from "../types.js";
 
 const MAX_RESULTS = 50;
 const MAX_LINE_LEN = 500;
@@ -10,7 +10,8 @@ const MAX_LINE_LEN = 500;
 export const grepTool: KapyToolRegistration = {
 	name: "grep",
 	label: "Grep",
-	description: "Search file contents for a text pattern or regex. Returns matching lines with file paths and line numbers.",
+	description:
+		"Search file contents for a text pattern or regex. Returns matching lines with file paths and line numbers.",
 	promptSnippet: "grep: search file contents for patterns",
 	promptGuidelines: [
 		"Use grep to find where functions, variables, or patterns appear in the codebase.",
@@ -30,8 +31,8 @@ export const grepTool: KapyToolRegistration = {
 		_onUpdate: (r: ToolResult) => void,
 		ctx: ToolExecutionContext,
 	): Promise<ToolResult> {
-		const fs = await import("fs");
-		const path = await import("path");
+		const fs = await import("node:fs");
+		const path = await import("node:path");
 		const searchDir = path.resolve(ctx.cwd, (params.path as string) ?? ".");
 		const pattern = params.pattern as string;
 		const ignoreCase = (params.ignoreCase as boolean) ?? false;
@@ -39,15 +40,24 @@ export const grepTool: KapyToolRegistration = {
 
 		const flags = ignoreCase ? "i" : "";
 		let regex: RegExp;
-		try { regex = new RegExp(pattern, flags); } catch { regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), flags); }
+		try {
+			regex = new RegExp(pattern, flags);
+		} catch {
+			regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), flags);
+		}
 
 		// Optional file pattern filter
 		let fileRegex: RegExp | null = null;
 		if (filePattern) {
 			try {
-				const glob = filePattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+				const glob = filePattern
+					.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+					.replace(/\*/g, ".*")
+					.replace(/\?/g, ".");
 				fileRegex = new RegExp(`^${glob}$`, ignoreCase ? "i" : "");
-			} catch { /* skip filter */ }
+			} catch {
+				/* skip filter */
+			}
 		}
 
 		const results: string[] = [];
@@ -59,16 +69,25 @@ export const grepTool: KapyToolRegistration = {
 
 			// Skip binary-ish files
 			const ext = path.extname(filePath).toLowerCase();
-			if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".eot", ".map", ".lock"].includes(ext)) return;
+			if (
+				[".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".eot", ".map", ".lock"].includes(
+					ext,
+				)
+			)
+				return;
 
 			let content: string;
-			try { content = await fs.promises.readFile(filePath, "utf-8"); } catch { return; }
+			try {
+				content = await fs.promises.readFile(filePath, "utf-8");
+			} catch {
+				return;
+			}
 
 			const lines = content.split("\n");
 			for (let i = 0; i < lines.length; i++) {
 				if (results.length >= MAX_RESULTS) break;
 				if (regex.test(lines[i])) {
-					const line = lines[i].length > MAX_LINE_LEN ? lines[i].slice(0, MAX_LINE_LEN) + "..." : lines[i];
+					const line = lines[i].length > MAX_LINE_LEN ? `${lines[i].slice(0, MAX_LINE_LEN)}...` : lines[i];
 					results.push(`${relPath}:${i + 1}: ${line.trim()}`);
 				}
 			}
@@ -77,8 +96,11 @@ export const grepTool: KapyToolRegistration = {
 		async function walk(dir: string, depth: number): Promise<void> {
 			if (results.length >= MAX_RESULTS || depth > 20) return;
 			let entries;
-			try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); }
-			catch { return; }
+			try {
+				entries = await fs.promises.readdir(dir, { withFileTypes: true });
+			} catch {
+				return;
+			}
 
 			for (const entry of entries) {
 				if (results.length >= MAX_RESULTS) break;
@@ -95,7 +117,11 @@ export const grepTool: KapyToolRegistration = {
 
 		// If path is a file, search it directly
 		let isFile = false;
-		try { isFile = (await fs.promises.stat(searchDir)).isFile(); } catch { /* not found, treat as dir */ }
+		try {
+			isFile = (await fs.promises.stat(searchDir)).isFile();
+		} catch {
+			/* not found, treat as dir */
+		}
 
 		if (isFile) {
 			await searchFile(searchDir, path.basename(searchDir));
@@ -103,9 +129,7 @@ export const grepTool: KapyToolRegistration = {
 			await walk(searchDir, 0);
 		}
 
-		const text = results.length === 0
-			? `No matches for "${pattern}"`
-			: results.join("\n");
+		const text = results.length === 0 ? `No matches for "${pattern}"` : results.join("\n");
 
 		return {
 			content: [{ type: "text", text }],

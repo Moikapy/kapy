@@ -1,18 +1,10 @@
-/**
- * ModalContent — dialog content views for the kapy TUI.
- *
- * These are content components rendered inside the DialogProvider overlay.
- * The DialogProvider handles the absolute-positioned backdrop, borders,
- * and close behavior. These components just render the inner content.
- */
-
-import type { JSX } from "solid-js";
-import { For, Show, createSignal, onMount } from "solid-js";
+import { currentThemeName, listAvailableThemes, setTheme, useThemeColors } from "@moikapy/kapy-components";
 import { useKeyboard } from "@opentui/solid";
-import type { SessionInfo } from "../../ai/session/types.js";
+import type { JSX } from "solid-js";
+import { createSignal, For, onMount, Show } from "solid-js";
 import { ChatSession } from "../../ai/chat-session.js";
-
-// ── Types ──────────────────────────────────────────────────────────
+import type { SessionInfo } from "../../ai/session/types.js";
+import { useTuiSettings } from "../hooks/use-tui-settings.js";
 
 export type ModalView =
 	| { type: "help" }
@@ -20,6 +12,8 @@ export type ModalView =
 	| { type: "tools"; tools: string[] }
 	| { type: "keys" }
 	| { type: "sessions"; sessions?: SessionInfo[]; onLoad?: (path: string) => void }
+	| { type: "tree"; entries: { id: string; parentId: string | null; type: string; role?: string; content?: string }[] }
+	| { type: "themes" };
 
 export interface ModalContentProps {
 	view: ModalView;
@@ -27,78 +21,137 @@ export interface ModalContentProps {
 	maxHeight?: number;
 }
 
-// ── Content components ─────────────────────────────────────────────
+function HeaderRow(props: { title: string; onClose?: () => void }): JSX.Element {
+	const c = useThemeColors();
+	return (
+		<box flexDirection="row" justifyContent="space-between" paddingBottom={1}>
+			<text fg={c().text}>
+				<b>{props.title}</b>
+			</text>
+			<text fg={c().muted}>esc</text>
+		</box>
+	);
+}
 
 function HelpContent(): JSX.Element {
+	const c = useThemeColors();
 	return (
 		<box flexDirection="column">
-			<text fg="#00AAFF">Commands</text>
+			<text fg={c().text}>
+				{" "}
+				/help <text fg={c().muted}>Show this help</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/model X <text fg={c().muted}>Switch to model X</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/models <text fg={c().muted}>List available models</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/tools <text fg={c().muted}>List registered tools</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/keys <text fg={c().muted}>Show keyboard shortcuts</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/clear <text fg={c().muted}>Clear chat history</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/thinking <text fg={c().muted}>Toggle thinking display</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/theme <text fg={c().muted}>Switch color theme</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/tree <text fg={c().muted}>View session tree</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/details <text fg={c().muted}>Toggle tool result details</text>
+			</text>
+			<text fg={c().text}>
+				{" "}
+				/compact <text fg={c().muted}>Compact conversation context</text>
+			</text>
 			<box height={1} />
-			<text fg="#c0caf5">  /help       <text fg="#565f89">Show this help</text></text>
-			<text fg="#c0caf5">  /model X     <text fg="#565f89">Switch to model X</text></text>
-			<text fg="#c0caf5">  /models      <text fg="#565f89">List available models</text></text>
-			<text fg="#c0caf5">  /tools       <text fg="#565f89">List registered tools</text></text>
-			<text fg="#c0caf5">  /keys        <text fg="#565f89">Show keyboard shortcuts</text></text>
-			<text fg="#c0caf5">  /clear       <text fg="#565f89">Clear chat history</text></text>
-			<box height={1} />
-			<text fg="#c0caf5">  exit         <text fg="#565f89">Quit kapy</text></text>
-			<box height={1} />
-			<text fg="#565f89">Press Esc to close</text>
+			<text fg={c().text}>
+				{" "}
+				exit <text fg={c().muted}>Quit kapy</text>
+			</text>
 		</box>
 	);
 }
 
 function ModelsContent(props: { models: string[]; current: string }): JSX.Element {
+	const c = useThemeColors();
 	return (
 		<box flexDirection="column">
-			<text fg="#00AAFF">Models</text>
-			<box height={1} />
 			<For each={props.models}>
-				{(m: string) => (
-					<text fg={m === props.current ? "#c0caf5" : "#565f89"}>
-						{m === props.current ? "▸ " : "  "}{m}
-					</text>
-				)}
+				{(m: string) => {
+					const active = m === props.current;
+					return (
+						<box width="100%" backgroundColor={active ? c().bgElement : undefined} paddingLeft={1} paddingRight={1}>
+							<text fg={active ? c().text : c().muted}>
+								{active ? "● " : "  "}
+								{m}
+							</text>
+						</box>
+					);
+				}}
 			</For>
 			<box height={1} />
-			<text fg="#565f89">Use /model X to switch · Esc to close</text>
+			<text fg={c().muted}>
+				<text fg={c().text}>↑ ↓</text> navigate <text fg={c().text}>enter</text> select <text fg={c().text}>esc</text>{" "}
+				close
+			</text>
 		</box>
 	);
 }
 
 function ToolsContent(props: { tools: string[] }): JSX.Element {
+	const c = useThemeColors();
 	return (
 		<box flexDirection="column">
-			<text fg="#00AAFF">Tools</text>
-			<box height={1} />
-			<For each={props.tools}>
-				{(t: string) => (
-					<text fg="#c0caf5">  {t}</text>
-				)}
-			</For>
-			<box height={1} />
-			<text fg="#565f89">Esc to close</text>
+			<For each={props.tools}>{(t: string) => <text fg={c().text}> {t}</text>}</For>
 		</box>
 	);
 }
 
 function KeysContent(): JSX.Element {
+	const c = useThemeColors();
+	const keys = [
+		["Ctrl+C / Ctrl+D", "Quit"],
+		["Esc", "Abort / Close dialog"],
+		["↑ / ↓", "Navigate palette"],
+		["Tab", "Autocomplete command"],
+		["Enter", "Execute / Send"],
+		["Ctrl+Y", "Copy last assistant message"],
+	];
 	return (
 		<box flexDirection="column">
-			<text fg="#00AAFF">Keyboard Shortcuts</text>
-			<box height={1} />
-			<text fg="#c0caf5">  Ctrl+C / Ctrl+D  <text fg="#565f89">Quit</text></text>
-			<text fg="#c0caf5">  Esc               <text fg="#565f89">Abort / Close dialog</text></text>
-			<text fg="#c0caf5">  ↑ / ↓             <text fg="#565f89">Navigate palette</text></text>
-			<text fg="#c0caf5">  Tab               <text fg="#565f89">Autocomplete command</text></text>
-			<text fg="#c0caf5">  Enter             <text fg="#565f89">Execute / Send</text></text>
-			<box height={1} />
-			<text fg="#565f89">Esc to close</text>
+			<For each={keys}>
+				{([key, desc]) => (
+					<text fg={c().text}>
+						{" "}
+						{key.padEnd(18)}
+						<text fg={c().muted}>{desc}</text>
+					</text>
+				)}
+			</For>
 		</box>
 	);
 }
 
 function SessionsContent(props: { onLoad?: (path: string) => void; maxHeight?: number }): JSX.Element {
+	const c = useThemeColors();
 	const [sessions, setSessions] = createSignal<SessionInfo[]>([]);
 	const [idx, setIdx] = createSignal(0);
 	let scrollRef: any;
@@ -107,20 +160,18 @@ function SessionsContent(props: { onLoad?: (path: string) => void; maxHeight?: n
 		try {
 			const all = await ChatSession.listAllSessions();
 			all.sort((a, b) => b.modified.getTime() - a.modified.getTime());
-			setSessions(all.slice(0, 50)); // load up to 50, display limited by scroll
-		} catch (e) {
+			setSessions(all.slice(0, 50));
+		} catch (_e) {
 			setSessions([]);
 		}
 	});
 
-	// Keyboard navigation: up/down to move, Enter to load session
 	useKeyboard((evt: any) => {
 		const list = sessions();
 		if (list.length === 0) return;
 
 		if (evt.name === "up") {
 			setIdx((i: number) => Math.max(0, i - 1));
-			// Auto-scroll to keep selected item visible
 			setTimeout(() => scrollRef?.scrollTo?.(idx()), 0);
 			evt.preventDefault();
 			return;
@@ -141,53 +192,246 @@ function SessionsContent(props: { onLoad?: (path: string) => void; maxHeight?: n
 		}
 	});
 
-	// Visible rows = available height minus header(1) + spacing(1) + footer(2)
 	const maxRows = () => Math.max(3, (props.maxHeight ?? 20) - 4);
 
 	return (
 		<box flexDirection="column">
-			<text fg="#00AAFF">Sessions</text>
-			<box height={1} />
-			<Show when={sessions().length > 0} fallback={<text fg="#565f89">No sessions found.</text>}>
-				<box flexDirection="column" height={maxRows()} overflow="hidden">
+			<Show when={sessions().length > 0} fallback={<text fg={c().muted}>No sessions found.</text>}>
+				<scrollbox ref={scrollRef} maxHeight={maxRows()}>
 					<For each={sessions()}>
-						{(s, i) => (
-							<box flexDirection="row" width="100%" backgroundColor={i() === idx() ? "#22223a" : "transparent"}>
-								<text fg={i() === idx() ? "#c0caf5" : "#565f89"}>{i() === idx() ? "\u25b8 " : "  "}{s.created.toLocaleDateString()} </text>
-								<text fg={i() === idx() ? "#7aa2f7" : "#565f89"}>{s.firstMessage.slice(0, 40) || s.id}</text>
-								<text fg="#565f89"> ({s.messageCount} msgs)</text>
-							</box>
-						)}
+						{(s, i) => {
+							const active = i() === idx();
+							return (
+								<box
+									width="100%"
+									backgroundColor={active ? c().bgElement : undefined}
+									paddingLeft={1}
+									paddingRight={1}
+									flexDirection="row"
+								>
+									<text fg={active ? c().text : c().muted}>
+										{active ? "● " : "  "}
+										{s.created.toLocaleDateString()}{" "}
+									</text>
+									<text fg={active ? c().primary : c().muted}>{s.firstMessage.slice(0, 40) || s.id}</text>
+									<text fg={c().muted}> ({s.messageCount} msgs)</text>
+								</box>
+							);
+						}}
 					</For>
-				</box>
+				</scrollbox>
 			</Show>
 			<box height={1} />
-			<text fg="#565f89">Up/Down navigate  Enter resume  Esc close</text>
+			<text fg={c().muted}>
+				<text fg={c().text}>↑ ↓</text> navigate <text fg={c().text}>enter</text> resume <text fg={c().text}>esc</text>{" "}
+				close
+			</text>
 		</box>
 	);
 }
 
-// Main content component ─────────────────────────────────────────
+function ThemesContent(props: { onClose?: () => void }): JSX.Element {
+	const c = useThemeColors();
+	const settings = useTuiSettings();
+	const themes = listAvailableThemes();
+	const initialIdx = (() => {
+		const cur = currentThemeName;
+		const i = themes.indexOf(cur);
+		return i >= 0 ? i : 0;
+	})();
+	const [idx, setIdx] = createSignal(initialIdx);
 
-/** Renders dialog content based on the current ModalView. */
+	useKeyboard((evt: any) => {
+		if (evt.name === "up") {
+			setIdx((i: number) => Math.max(0, i - 1));
+			evt.preventDefault();
+			return;
+		}
+		if (evt.name === "down") {
+			setIdx((i: number) => Math.min(themes.length - 1, i + 1));
+			evt.preventDefault();
+			return;
+		}
+		if (evt.name === "return" || evt.name === "enter") {
+			const name = themes[idx()];
+			setTheme(name, settings.setTheme);
+			props.onClose?.();
+			evt.preventDefault();
+			return;
+		}
+	});
+
+	return (
+		<box flexDirection="column">
+			<For each={themes}>
+				{(name, i) => {
+					const active = name === currentThemeName;
+					const selected = i() === idx();
+					return (
+						<box width="100%" backgroundColor={selected ? c().bgElement : undefined} paddingLeft={1} paddingRight={1}>
+							<text fg={active ? c().primary : selected ? c().text : c().muted}>
+								{active ? "● " : selected ? "▸ " : "  "}
+								{name}
+							</text>
+							<Show when={active}>
+								<text fg={c().muted}> (active)</text>
+							</Show>
+						</box>
+					);
+				}}
+			</For>
+			<box height={1} />
+			<text fg={c().muted}>
+				<text fg={c().text}>↑ ↓</text> navigate <text fg={c().text}>enter</text> apply <text fg={c().text}>esc</text>{" "}
+				close
+			</text>
+		</box>
+	);
+}
+
+interface TreeEntry {
+	id: string;
+	parentId: string | null;
+	type: string;
+	role?: string;
+	content?: string;
+}
+
+interface TreeNode {
+	entry: TreeEntry;
+	children: TreeNode[];
+	depth: number;
+}
+
+function buildTree(entries: TreeEntry[]): TreeNode[] {
+	const map = new Map<string, TreeNode>();
+	const roots: TreeNode[] = [];
+	for (const e of entries) {
+		map.set(e.id, { entry: e, children: [], depth: 0 });
+	}
+	for (const e of entries) {
+		const node = map.get(e.id)!;
+		if (e.parentId && map.has(e.parentId)) {
+			map.get(e.parentId)?.children.push(node);
+		} else {
+			roots.push(node);
+		}
+	}
+	function setDepth(nodes: TreeNode[], d: number) {
+		for (const n of nodes) {
+			n.depth = d;
+			setDepth(n.children, d + 1);
+		}
+	}
+	setDepth(roots, 0);
+	return roots;
+}
+
+function flattenTree(nodes: TreeNode[]): TreeNode[] {
+	const result: TreeNode[] = [];
+	for (const n of nodes) {
+		result.push(n);
+		result.push(...flattenTree(n.children));
+	}
+	return result;
+}
+
+function entryIcon(entry: TreeEntry): { icon: string; colorKey: string } {
+	if (entry.type === "message") {
+		if (entry.role === "user") return { icon: "▶", colorKey: "primary" };
+		if (entry.role === "assistant") return { icon: "◁", colorKey: "success" };
+		if (entry.role === "tool") return { icon: "⚙", colorKey: "warning" };
+	}
+	if (entry.type === "compaction") return { icon: "⊟", colorKey: "muted" };
+	if (entry.type === "model_change") return { icon: "↻", colorKey: "muted" };
+	if (entry.type === "label") return { icon: "🏷", colorKey: "muted" };
+	return { icon: "●", colorKey: "muted" };
+}
+
+function entryPreview(content?: string): string {
+	if (!content) return "";
+	const s = content.replace(/\n/g, " ").trim();
+	return s.length > 60 ? `${s.slice(0, 57)}...` : s;
+}
+
+function TreeContent(props: { entries: TreeEntry[]; onClose?: () => void }): JSX.Element {
+	const c = useThemeColors();
+	const flat = () => flattenTree(buildTree(props.entries));
+	const [idx, setIdx] = createSignal(0);
+
+	useKeyboard((evt: any) => {
+		if (evt.name === "up") {
+			setIdx((i: number) => Math.max(0, i - 1));
+			evt.preventDefault();
+			return;
+		}
+		if (evt.name === "down") {
+			setIdx((i: number) => Math.min(flat().length - 1, i + 1));
+			evt.preventDefault();
+			return;
+		}
+		if (evt.name === "return" || evt.name === "enter") {
+			props.onClose?.();
+			evt.preventDefault();
+			return;
+		}
+	});
+
+	return (
+		<box flexDirection="column">
+			<For each={flat()}>
+				{(node, i) => {
+					const { icon, colorKey } = entryIcon(node.entry);
+					const fg = () => (c() as any)[colorKey] ?? c().muted;
+					const selected = i() === idx();
+					const indent = "  ".repeat(node.depth);
+					return (
+						<box width="100%" backgroundColor={selected ? c().bgElement : undefined} paddingLeft={1} paddingRight={1}>
+							<text fg={selected ? c().text : c().muted}>
+								{indent}
+								{icon} <text fg={fg()}>{node.entry.type}</text>
+								<Show when={node.entry.role}>
+									<text fg={c().textMuted}>/{node.entry.role}</text>
+								</Show>{" "}
+								<text fg={c().textMuted}>{entryPreview(node.entry.content)}</text>
+							</text>
+						</box>
+					);
+				}}
+			</For>
+			<box height={1} />
+			<text fg={c().muted}>
+				<text fg={c().text}>↑ ↓</text> navigate <text fg={c().text}>enter</text> close <text fg={c().text}>esc</text>{" "}
+				close
+			</text>
+		</box>
+	);
+}
+
 export function ModalContent(props: ModalContentProps): JSX.Element {
+	const _c = useThemeColors();
 	const title = (): string => {
 		switch (props.view.type) {
-			case "help": return "Help";
-			case "models": return "Models";
-			case "tools": return "Tools";
-			case "keys": return "Keys";
-			case "sessions": return "Sessions";
+			case "help":
+				return "Commands";
+			case "models":
+				return "Models";
+			case "tools":
+				return "Tools";
+			case "keys":
+				return "Keys";
+			case "sessions":
+				return "Sessions";
+			case "themes":
+				return "Themes";
+			case "tree":
+				return "Session Tree";
 		}
 	};
 
 	return (
-		<box flexDirection="column" width="100%">
-			<box flexDirection="row" justifyContent="space-between">
-				<text fg="#00AAFF">{title()}</text>
-				<text fg="#565f89">× Esc</text>
-			</box>
-			<box height={1} />
+		<box flexDirection="column" width="100%" paddingLeft={2} paddingRight={2} paddingBottom={1}>
+			<HeaderRow title={title()!} onClose={props.onClose} />
 			<Show when={props.view.type === "help"}>
 				<HelpContent />
 			</Show>
@@ -198,15 +442,26 @@ export function ModalContent(props: ModalContentProps): JSX.Element {
 				/>
 			</Show>
 			<Show when={props.view.type === "tools"}>
-				<ToolsContent
-					tools={(props.view as { type: "tools"; tools: string[] }).tools}
-				/>
+				<ToolsContent tools={(props.view as { type: "tools"; tools: string[] }).tools} />
 			</Show>
 			<Show when={props.view.type === "keys"}>
 				<KeysContent />
 			</Show>
 			<Show when={props.view.type === "sessions"}>
-				<SessionsContent onLoad={(path) => { const load = (props.view as any).onLoad; props.onClose?.(); load?.(path); }} maxHeight={props.maxHeight} />
+				<SessionsContent
+					onLoad={(path) => {
+						const load = (props.view as any).onLoad;
+						props.onClose?.();
+						load?.(path);
+					}}
+					maxHeight={props.maxHeight}
+				/>
+			</Show>
+			<Show when={props.view.type === "themes"}>
+				<ThemesContent onClose={props.onClose} />
+			</Show>
+			<Show when={props.view.type === "tree"}>
+				<TreeContent entries={(props.view as { type: "tree"; entries: TreeEntry[] }).entries} onClose={props.onClose} />
 			</Show>
 		</box>
 	);

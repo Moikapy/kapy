@@ -2,14 +2,15 @@
  * bash tool — execute shell commands.
  */
 import { z } from "zod";
-import type { KapyToolRegistration, ToolResult, ToolExecutionContext } from "../types.js";
+import type { KapyToolRegistration, ToolExecutionContext, ToolResult } from "../types.js";
 
 const MAX_OUTPUT = 50_000; // 50KB max output
 
 export const bashTool: KapyToolRegistration = {
 	name: "bash",
 	label: "Bash",
-	description: "Execute a bash shell command. Returns stdout, stderr, and exit code. Use for running builds, tests, git commands, and other shell operations.",
+	description:
+		"Execute a bash shell command. Returns stdout, stderr, and exit code. Use for running builds, tests, git commands, and other shell operations.",
 	promptSnippet: "bash: execute shell commands",
 	promptGuidelines: [
 		"Use bash for running shell commands: builds, tests, git, package managers.",
@@ -28,7 +29,7 @@ export const bashTool: KapyToolRegistration = {
 		_onUpdate: (r: ToolResult) => void,
 		ctx: ToolExecutionContext,
 	): Promise<ToolResult> {
-		const { spawn } = require("child_process") as typeof import("child_process");
+		const { spawn } = require("node:child_process") as typeof import("child_process");
 		const cwd = (params.cwd as string) ?? ctx.cwd;
 		const timeout = ((params.timeout as number) ?? 120) * 1000;
 		const command = params.command as string;
@@ -55,14 +56,20 @@ export const bashTool: KapyToolRegistration = {
 				if (stderr.length < MAX_OUTPUT) stderr += data.toString();
 			});
 
-			const cleanup = () => { clearTimeout(timer); if (signal) signal.removeEventListener("abort", onAbort); };
-			const onAbort = () => { proc.kill("SIGTERM"); stderr += "\n[Aborted]"; };
+			const cleanup = () => {
+				clearTimeout(timer);
+				if (signal) signal.removeEventListener("abort", onAbort);
+			};
+			const onAbort = () => {
+				proc.kill("SIGTERM");
+				stderr += "\n[Aborted]";
+			};
 			if (signal) signal.addEventListener("abort", onAbort, { once: true });
 
 			proc.on("close", (code: number) => {
 				cleanup();
 				const truncated = stdout.length >= MAX_OUTPUT;
-				const out = truncated ? stdout.slice(0, MAX_OUTPUT) + "\n[Output truncated]" : stdout;
+				const out = truncated ? `${stdout.slice(0, MAX_OUTPUT)}\n[Output truncated]` : stdout;
 				const result: string[] = [];
 				if (out) result.push(out);
 				if (stderr) result.push(`[stderr]\n${stderr}`);

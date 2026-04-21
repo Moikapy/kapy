@@ -20,7 +20,7 @@ describe("TUI Theme Context (logic)", () => {
 	};
 
 	it("defaults to dark mode", () => {
-		const [mode, setMode] = createSignal<"dark" | "light">("dark");
+		const [mode, _setMode] = createSignal<"dark" | "light">("dark");
 		expect(mode()).toBe("dark");
 	});
 

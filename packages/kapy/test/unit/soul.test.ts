@@ -4,11 +4,11 @@
  * Covers loading, template initialization, and system prompt building.
  */
 
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { loadSoulMd, ensureSoulMd, buildSystemPrompt, DEFAULT_SOUL_TEMPLATE } from "../../src/ai/soul.js";
+import { join } from "node:path";
+import { buildSystemPrompt, DEFAULT_SOUL_TEMPLATE, ensureSoulMd, loadSoulMd } from "../../src/ai/soul.js";
 
 let testDir: string;
 

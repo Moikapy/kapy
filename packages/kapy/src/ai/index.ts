@@ -57,14 +57,20 @@ export {
 // ── Kapy-specific modules ──────────────────────────────────────────
 
 export { callTool } from "./call-tool.js";
-export { kapyToolToAgentTool, kapyToolsToAgentTools } from "./tool-bridge.js";
 export type { ChatMessage, ChatSessionOptions } from "./chat-session.js";
 export { ChatSession } from "./chat-session.js";
+export { type CompactionResult, compact } from "./compaction.js";
 export type { ContextMessage, ContextUsage } from "./context-tracker.js";
-export { ContextTracker } from "./context-tracker.js";
+export {
+	ContextTracker,
+	DEFAULT_COMPACTION_SETTINGS,
+	estimateContextTokens,
+	shouldCompact,
+} from "./context-tracker.js";
 export { createGrimoireTools } from "./grimoire-tools.js";
 export type { MemoryEntry, MemoryScope } from "./memory.js";
 export { MemoryStore } from "./memory.js";
+export { isContextOverflow } from "./overflow.js";
 /**
  * Permission types — available for extensions to build custom gating.
  * Kapy core does NOT enforce permissions — tools run freely.
@@ -85,5 +91,5 @@ export { SessionManager } from "./session/manager.js";
 export type { AppendMessageOptions, SessionEntry } from "./session/types.js";
 export type { SlashCommandContext, SlashCommandDefinition, SlashCommandProvider } from "./slash-commands.js";
 export { createBuiltinSlashCommands, processSlashCommand } from "./slash-commands.js";
-export { buildSystemPrompt, ensureSoulMd, loadSoulMd } from "./soul.js";
-export { DEFAULT_SOUL_TEMPLATE } from "./soul.js";
+export { buildSystemPrompt, DEFAULT_SOUL_TEMPLATE, ensureSoulMd, loadSoulMd } from "./soul.js";
+export { kapyToolsToAgentTools, kapyToolToAgentTool } from "./tool-bridge.js";

@@ -2,12 +2,13 @@
  * write_file tool — writes content to a file on the local filesystem.
  */
 import { z } from "zod";
-import type { KapyToolRegistration, ToolResult, ToolExecutionContext } from "../types.js";
+import type { KapyToolRegistration, ToolExecutionContext, ToolResult } from "../types.js";
 
 export const writeFileTool: KapyToolRegistration = {
 	name: "write_file",
 	label: "Write File",
-	description: "Write content to a file on the local filesystem. Creates the file if it doesn't exist, overwrites if it does. Creates parent directories as needed.",
+	description:
+		"Write content to a file on the local filesystem. Creates the file if it doesn't exist, overwrites if it does. Creates parent directories as needed.",
 	promptSnippet: "write_file: write content to a local file",
 	promptGuidelines: [
 		"Use write_file to create new files or overwrite existing ones.",
@@ -25,8 +26,8 @@ export const writeFileTool: KapyToolRegistration = {
 		_onUpdate: (r: ToolResult) => void,
 		ctx: ToolExecutionContext,
 	): Promise<ToolResult> {
-		const fs = await import("fs");
-		const path = await import("path");
+		const fs = await import("node:fs");
+		const path = await import("node:path");
 		const filePath = path.resolve(ctx.cwd, params.path as string);
 		const content = params.content as string;
 
@@ -35,7 +36,8 @@ export const writeFileTool: KapyToolRegistration = {
 			const dir = path.dirname(filePath);
 			await fs.promises.mkdir(dir, { recursive: true });
 
-			if (signal?.aborted) return { content: [{ type: "text", text: "Aborted" }], details: { path: filePath, aborted: true } };
+			if (signal?.aborted)
+				return { content: [{ type: "text", text: "Aborted" }], details: { path: filePath, aborted: true } };
 
 			await fs.promises.writeFile(filePath, content, "utf-8");
 			const lines = content.split("\n").length;
@@ -45,7 +47,10 @@ export const writeFileTool: KapyToolRegistration = {
 				details: { path: filePath, lines, bytes: content.length },
 			};
 		} catch (e: any) {
-			return { content: [{ type: "text", text: `Error: ${e.message}` }], details: { path: filePath, error: e.message } };
+			return {
+				content: [{ type: "text", text: `Error: ${e.message}` }],
+				details: { path: filePath, error: e.message },
+			};
 		}
 	},
 	isReadOnly: () => false,

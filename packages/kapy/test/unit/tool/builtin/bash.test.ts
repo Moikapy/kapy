@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { bashTool } from "../../../../src/tool/builtin/bash.js";
 import type { ToolExecutionContext } from "../../../../src/tool/types.js";
 

@@ -1,3 +1,12 @@
+export {
+	bashTool,
+	globTool,
+	grepTool,
+	readFileTool,
+	webFetchTool,
+	webSearchTool,
+	writeFileTool,
+} from "./builtin/index.js";
 export { ToolRegistry } from "./registry.js";
 export type {
 	ImageContent,
@@ -8,4 +17,3 @@ export type {
 	ToolUpdateCallback,
 } from "./types.js";
 export { zodToJsonSchema } from "./zod-to-json-schema.js";
-export { readFileTool, writeFileTool, bashTool, globTool, grepTool, webSearchTool, webFetchTool } from "./builtin/index.js";

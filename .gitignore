@@ -41,3 +41,6 @@ docs/
 # Codebase wiki
 .codebase-wiki/
 .wiki/
+
+# Unrelated projects
+rss/

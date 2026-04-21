@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.11/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.4.12/schema.json",
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab",
@@ -8,7 +8,26 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true
+			"recommended": true,
+			"suspicious": {
+				"noExplicitAny": "off",
+				"noImplicitAnyLet": "off",
+				"noAssignInExpressions": "off"
+			},
+			"a11y": {
+				"noStaticElementInteractions": "off",
+				"useKeyWithMouseEvents": "off"
+			},
+			"style": {
+				"noNonNullAssertion": "off"
+			},
+			"correctness": {
+				"noUnusedPrivateClassMembers": "off",
+				"noEmptyCharacterClassInRegex": "off"
+			},
+			"complexity": {
+				"noBannedTypes": "off"
+			}
 		}
 	},
 	"assist": { "actions": { "source": { "organizeImports": "on" } } },

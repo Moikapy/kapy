@@ -10,10 +10,10 @@
  *   kapy wiki index [--scope global|project]
  */
 
-import type { CommandHandler, CommandOptions } from "../command/parser.js";
-import { GRIMOIRE_DIR, KAPY_HOME } from "../config/defaults.js";
-import { GrimoireStore } from "@moikapy/kapy-agent";
 import { join } from "node:path";
+import { GrimoireStore } from "@moikapy/kapy-agent";
+import type { CommandHandler, CommandOptions } from "../command/parser.js";
+import { GRIMOIRE_DIR } from "../config/defaults.js";
 
 /** Get the grimoire store for the requested scope */
 function getStore(scope: "global" | "project"): GrimoireStore {
@@ -192,29 +192,41 @@ export const wikiCommand: CommandHandler = async (ctx) => {
 			// Minimal Obsidian config for a clean vault experience
 			await writeFileAsync(
 				join(obsidianDir, "app.json"),
-				JSON.stringify({
-					"attachmentFolderPath": "sources/assets",
-					"newFileLocation": "current",
-					"promptDelete": true,
-				}, null, 2),
+				JSON.stringify(
+					{
+						attachmentFolderPath: "sources/assets",
+						newFileLocation: "current",
+						promptDelete: true,
+					},
+					null,
+					2,
+				),
 			);
 
 			await writeFileAsync(
 				join(obsidianDir, "appearance.json"),
-				JSON.stringify({
-					"baseTheme": "dark",
-					"cssTheme": "",
-				}, null, 2),
+				JSON.stringify(
+					{
+						baseTheme: "dark",
+						cssTheme: "",
+					},
+					null,
+					2,
+				),
 			);
 
 			// Workspace with graph view as default
 			await writeFileAsync(
 				join(obsidianDir, "workspace.json"),
-				JSON.stringify({
-					"active": "graph",
-					"left": { "type": "file-explorer" },
-					"right": { "type": "graph" },
-				}, null, 2),
+				JSON.stringify(
+					{
+						active: "graph",
+						left: { type: "file-explorer" },
+						right: { type: "graph" },
+					},
+					null,
+					2,
+				),
 			);
 
 			// Ensure sources/assets dir for attachments

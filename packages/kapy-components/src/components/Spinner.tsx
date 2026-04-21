@@ -1,29 +1,19 @@
-/**
- * Spinner — progress spinner component.
- *
- * Displays an animated spinner with status text using Solid signals
- * for reactive frame cycling.
- */
 import type { JSX } from "solid-js";
 import { createSignal, onCleanup, onMount } from "solid-js";
-import { colors } from "../theme.js";
+import { useThemeColors } from "../theme.js";
 
 const DEFAULT_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 export interface SpinnerProps {
-	/** Spinner text/label */
 	text?: string;
-	/** Foreground color */
 	fg?: string;
-	/** Custom animation frames */
 	frames?: string[];
-	/** Whether the spinner is spinning */
 	spinning?: boolean;
 }
 
-/** Animated spinner with status text */
 export function Spinner(props: SpinnerProps): JSX.Element {
-	const fg = () => props.fg ?? colors.primary;
+	const c = useThemeColors();
+	const fg = () => props.fg ?? c().primary;
 	const frames = () => props.frames ?? DEFAULT_FRAMES;
 	const [frameIdx, setFrameIdx] = createSignal(0);
 
@@ -41,7 +31,8 @@ export function Spinner(props: SpinnerProps): JSX.Element {
 
 	return (
 		<text fg={fg()}>
-			{frames()[frameIdx()]} {props.text ?? "Loading..."}
+			{frames()[frameIdx()]}
+			{props.text ? ` ${props.text}` : ""}
 		</text>
 	);
 }

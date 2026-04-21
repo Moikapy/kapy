@@ -10,7 +10,7 @@ import { createSignal } from "solid-js";
 
 describe("TUI Route Context (logic)", () => {
 	it("starts at home route", () => {
-		const [data, setData] = createSignal<{ type: "home" | "session"; sessionID?: string }>({
+		const [data, _setData] = createSignal<{ type: "home" | "session"; sessionID?: string }>({
 			type: "home",
 		});
 		expect(data().type).toBe("home");

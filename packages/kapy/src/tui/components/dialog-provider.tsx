@@ -10,9 +10,10 @@
  * - Works on ALL screens (home + session) because it renders at Provider level
  */
 
+import { useThemeColors } from "@moikapy/kapy-components";
+import { type Renderable, RGBA } from "@opentui/core";
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid";
-import { batch, createContext, createSignal, Show, useContext, type JSX, type ParentProps } from "solid-js";
-import { RGBA, type Renderable } from "@opentui/core";
+import { batch, createContext, createSignal, type JSX, type ParentProps, Show, useContext } from "solid-js";
 
 // ── Dialog overlay component ────────────────────────────────────────
 
@@ -24,6 +25,7 @@ function Dialog(
 ) {
 	const dimensions = useTerminalDimensions();
 	const renderer = useRenderer();
+	const c = useThemeColors();
 
 	/** Track whether a text selection is active on mouse-down.
 	 *  If so, don't close on mouse-up (user is selecting text, not clicking backdrop). */
@@ -67,8 +69,8 @@ function Dialog(
 				width={width()}
 				maxWidth={dimensions().width - 2}
 				border={["top", "right", "bottom", "left"]}
-				borderColor="#00AAFF"
-				backgroundColor="#1a1b26"
+				borderColor={c().borderDim}
+				backgroundColor={c().bgPanel}
 				paddingTop={1}
 				paddingBottom={1}
 				paddingLeft={2}
@@ -116,10 +118,7 @@ function init() {
 		if (evt.defaultPrevented) return;
 
 		// Don't close if user is releasing a text selection
-		if (
-			(evt.name === "escape" || (evt.ctrl && evt.name === "c")) &&
-			renderer.getSelection()?.getSelectedText()
-		) {
+		if ((evt.name === "escape" || (evt.ctrl && evt.name === "c")) && renderer.getSelection()?.getSelectedText()) {
 			return;
 		}
 
@@ -226,7 +225,7 @@ function DialogStackOverlay(props: { value: DialogContext }) {
 	return (
 		<Show when={stack().length > 0}>
 			<Dialog onClose={() => props.value.clear()} size={props.value.size}>
-				{stack().at(-1)!.element}
+				{stack().at(-1)?.element}
 			</Dialog>
 		</Show>
 	);

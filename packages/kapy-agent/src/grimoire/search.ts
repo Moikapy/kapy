@@ -6,7 +6,7 @@
  * At scale (~500+ pages), upgrade to BM25 or qmd.
  */
 
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { PageMeta, SearchResult } from "./types.js";
 
@@ -62,7 +62,7 @@ function termFrequencyScore(docTokens: string[], queryTokens: string[]): number 
 
 /** Find best snippet around a match in content */
 function findSnippet(content: string, queryTokens: string[], maxLen = 200): string {
-	const lower = content.toLowerCase();
+	const _lower = content.toLowerCase();
 	const lines = content.split("\n");
 
 	// Find the line with the most query term matches
@@ -79,12 +79,12 @@ function findSnippet(content: string, queryTokens: string[], maxLen = 200): stri
 	}
 
 	// Extract snippet around best line
-	let start = Math.max(0, bestLine - 1);
-	let end = Math.min(lines.length, bestLine + 3);
+	const start = Math.max(0, bestLine - 1);
+	const end = Math.min(lines.length, bestLine + 3);
 	let snippet = lines.slice(start, end).join("\n").trim();
 
 	if (snippet.length > maxLen) {
-		snippet = snippet.slice(0, maxLen - 3) + "...";
+		snippet = `${snippet.slice(0, maxLen - 3)}...`;
 	}
 
 	return snippet || lines[0]?.slice(0, maxLen) || "";
@@ -148,9 +148,7 @@ export async function searchPages(
 				results.push({
 					path: page.path,
 					score: Math.min(1, score / (queryTokens.length * 3)), // normalize to 0-1
-					snippet: matchedFields.includes("content")
-						? findSnippet(content, queryTokens)
-						: page.summary || "",
+					snippet: matchedFields.includes("content") ? findSnippet(content, queryTokens) : page.summary || "",
 					matchedFields,
 				});
 			}
@@ -186,7 +184,7 @@ export function searchIndex(indexContent: string, query: string, topK = 5): Sear
 		if (score > 0) {
 			// Extract link path from markdown link if present
 			const linkMatch = line.match(/\[\[([^\]]+)\]\]|\[([^\]]+)\]\(([^)]+)\)/);
-			const path = linkMatch ? (linkMatch[1] || linkMatch[3] || "") : "";
+			const path = linkMatch ? linkMatch[1] || linkMatch[3] || "" : "";
 
 			results.push({
 				path,

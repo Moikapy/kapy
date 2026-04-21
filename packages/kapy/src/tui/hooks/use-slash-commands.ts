@@ -1,40 +1,27 @@
-/**
- * Slash command handler for the kapy TUI.
- *
- * Commands that display information (help, models, tools, keys, sessions)
- * open a modal instead of appending system messages.
- * Commands that mutate state (clear, model, think) act directly.
- */
-
 import type { CommandEntry } from "@moikapy/kapy-components";
+import { setTheme } from "@moikapy/kapy-components";
+import type { SessionInfo } from "../../ai/session/types.js";
 import type { ModalView } from "../components/modal.js";
 import type { Msg } from "../types.js";
-import type { SessionInfo } from "../../ai/session/types.js";
+import { useTuiSettings } from "./use-tui-settings.js";
 
-/** Actions slash commands can trigger. */
 export interface ChatActions {
 	setMsgs: (fn: (prev: Msg[]) => Msg[]) => void;
 	setModel: (model: string) => void;
 	fetchModels: () => void;
 	openModal: (view: ModalView) => void;
-	/** Load a session by file path */
 	loadSession: (path: string) => Promise<void>;
-	/** List available sessions for current cwd */
 	listSessions: () => Promise<SessionInfo[]>;
-	/** List all sessions across all projects */
 	listAllSessions: () => Promise<SessionInfo[]>;
-	/** Set thinking/reasoning level */
 	setThinkingLevel: (level: string) => void;
-	/** Current model string for highlighting in /models */
 	model: () => string;
-	/** Available model list (populated after fetchModels) */
 	models: () => string[];
+	compact: () => void;
+	getSessionTree: () => { id: string; parentId: string | null; type: string; role?: string; content?: string }[];
 }
 
-/** A slash command definition for the command palette. */
 export type SlashCommand = CommandEntry;
 
-/** Thinking level sub-commands for palette */
 const THINK_LEVELS: SlashCommand[] = [
 	{ name: "/think off", description: "No thinking tokens (fastest)" },
 	{ name: "/think low", description: "Light reasoning" },
@@ -43,7 +30,6 @@ const THINK_LEVELS: SlashCommand[] = [
 	{ name: "/think xhigh", description: "Maximum thinking budget" },
 ];
 
-/** Built-in slash commands available in the TUI. */
 export const SLASH_COMMANDS: SlashCommand[] = [
 	{
 		name: "/help",
@@ -81,18 +67,29 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 		description: "List and resume previous sessions",
 		aliases: ["/history"],
 	},
+	{
+		name: "/details",
+		description: "Toggle tool result details",
+	},
+	{
+		name: "/compact",
+		description: "Compact conversation context",
+	},
+	{
+		name: "/tree",
+		description: "View session branching tree",
+	},
+	{
+		name: "/theme",
+		description: "Switch color theme",
+	},
 ];
 
-/** All commands including sub-commands for palette filtering */
 export const ALL_PALETTE_COMMANDS: SlashCommand[] = [...SLASH_COMMANDS, ...THINK_LEVELS];
 
-const _TOOLS_TEXT = "Available tools: read_file, write_file, bash, glob, grep";
-
-/**
- * Returns a slash command handler bound to the given chat actions.
- * Call as: `const handleSlash = useSlashCommands(chat)`
- */
 export function useSlashCommands(actions: ChatActions) {
+	const settings = useTuiSettings();
+
 	return (text: string): boolean => {
 		const cmd = text.trim().toLowerCase();
 
@@ -102,7 +99,6 @@ export function useSlashCommands(actions: ChatActions) {
 		}
 		if (cmd === "/models") {
 			actions.fetchModels();
-			// Small delay to let fetchModels populate, then open modal
 			setTimeout(() => {
 				actions.openModal({
 					type: "models",
@@ -114,6 +110,14 @@ export function useSlashCommands(actions: ChatActions) {
 		}
 		if (cmd === "/help") {
 			actions.openModal({ type: "help" });
+			actions.setMsgs((prev) => [
+				...prev,
+				{
+					id: `sys-${Date.now()}`,
+					role: "system" as const,
+					content: "Slash commands working! Try /models, /tools, /keys, /clear, /details, /compact, /tree, /theme",
+				},
+			]);
 			return true;
 		}
 		if (cmd === "/tools") {
@@ -135,10 +139,40 @@ export function useSlashCommands(actions: ChatActions) {
 			return true;
 		}
 
-		// /think <level> — set thinking level directly
 		const thinkMatch = text.trim().match(/^\/think\s+(off|low|medium|high|xhigh)$/i);
 		if (thinkMatch) {
 			actions.setThinkingLevel(thinkMatch[1].toLowerCase());
+			return true;
+		}
+
+		if (cmd === "/details") {
+			settings.toggleDetails();
+			return true;
+		}
+
+		if (cmd === "/compact") {
+			actions.compact();
+			return true;
+		}
+
+		if (cmd === "/tree") {
+			const entries = actions.getSessionTree();
+			actions.openModal({ type: "tree", entries });
+			return true;
+		}
+
+		const themeMatch = text.trim().match(/^\/theme\s+(\S+)$/i);
+		if (themeMatch) {
+			const name = themeMatch[1].toLowerCase();
+			const ok = setTheme(name, settings.setTheme);
+			if (!ok) {
+				actions.openModal({ type: "themes" });
+			}
+			return true;
+		}
+
+		if (cmd === "/theme") {
+			actions.openModal({ type: "themes" });
 			return true;
 		}
 

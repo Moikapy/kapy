@@ -1,28 +1,18 @@
-/**
- * StatusBar — bottom status bar for kapy TUI.
- *
- * Displays context information, key hints, and extension info
- * at the bottom of the TUI screen with left/center/right sections.
- */
 import type { JSX } from "solid-js";
+import { useThemeColors } from "../theme.js";
 
 export interface StatusBarProps {
-	/** Left section content */
 	left?: string;
-	/** Center section content */
 	center?: string;
-	/** Right section content (key hints) */
 	right?: string;
-	/** Background color */
 	bg?: string;
-	/** Foreground color */
 	fg?: string;
 }
 
-/** Bottom status bar with left/center/right layout */
 export function StatusBar(props: StatusBarProps): JSX.Element {
-	const bgColor = () => props.bg ?? "#222233";
-	const fgColor = () => props.fg ?? "#888888";
+	const c = useThemeColors();
+	const bgColor = () => props.bg ?? c().bgAlt;
+	const fgColor = () => props.fg ?? c().muted;
 
 	return (
 		<box

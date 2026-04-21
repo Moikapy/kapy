@@ -5,13 +5,13 @@
  * Uses /tmp for isolated test directories.
  */
 
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { extractQuery, searchIndex } from "../../src/grimoire/search.js";
 import { GrimoireStore } from "../../src/grimoire/store.js";
-import type { LogEntry, LintResult, PageMeta, SearchResult } from "../../src/grimoire/types.js";
-import { extractQuery, searchPages, searchIndex } from "../../src/grimoire/search.js";
+import type { LogEntry, SearchResult } from "../../src/grimoire/types.js";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -22,7 +22,7 @@ function createStore(scope: "global" | "project" = "global", dir?: string): Grim
 	return new GrimoireStore({ scope, rootDir });
 }
 
-function writeTmpFile(store: GrimoireStore, path: string, content: string) {
+function _writeTmpFile(store: GrimoireStore, path: string, content: string) {
 	return store.write(path, content);
 }
 
@@ -369,9 +369,7 @@ describe("GrimoireStore — lint", () => {
 		await store.ensure();
 
 		const issues = await store.lint();
-		const orphans = issues.filter(
-			(i) => i.type === "orphan" && (i.path === "index.md" || i.path === "log.md"),
-		);
+		const orphans = issues.filter((i) => i.type === "orphan" && (i.path === "index.md" || i.path === "log.md"));
 		expect(orphans.length).toBe(0);
 	});
 });
@@ -414,7 +412,10 @@ describe("GrimoireStore — ingest", () => {
 
 		const { writeFile: writeFileAsync } = await import("node:fs/promises");
 		const sourcePath = join(testDir, "test-source.md");
-		await writeFileAsync(sourcePath, "# Test Article\n\nThis is an article about TypeScript patterns.\n\n## Key Points\n\n- Type safety\n- Pattern matching\n");
+		await writeFileAsync(
+			sourcePath,
+			"# Test Article\n\nThis is an article about TypeScript patterns.\n\n## Key Points\n\n- Type safety\n- Pattern matching\n",
+		);
 
 		const result = await store.ingest(sourcePath, "Test Article");
 

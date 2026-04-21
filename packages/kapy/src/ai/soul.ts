@@ -10,7 +10,6 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 
 /** Default SOUL.md template for a fresh kapy install */
 export const DEFAULT_SOUL_TEMPLATE = `# SOUL.md — Your Agent

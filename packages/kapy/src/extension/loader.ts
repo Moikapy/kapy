@@ -8,6 +8,7 @@
 
 import { stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import type { BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
 import { CommandContext } from "../command/context.js";
 import type { CommandRegistry } from "../command/registry.js";
 import type { ConfigSchema } from "../config/schema.js";
@@ -17,7 +18,6 @@ import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
 import { ToolRegistry } from "../tool/registry.js";
 import { ExtensionAPI } from "./api.js";
-import type { BeforeToolCallContext, BeforeToolCallResult } from "@moikapy/kapy-agent";
 import type { ExtensionMeta, ExtensionRegister, ProviderRegistration, ScreenDefinition } from "./types.js";
 
 interface LoadedExtension {
@@ -120,7 +120,10 @@ export class ExtensionLoader {
 	private extensionsDir: string;
 	private tools: ToolRegistry;
 	private providers: Map<string, ProviderRegistration>;
-	private beforeToolCallHooks: ((context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>)[];
+	private beforeToolCallHooks: ((
+		context: BeforeToolCallContext,
+		signal?: AbortSignal,
+	) => Promise<BeforeToolCallResult>)[];
 
 	constructor(registry: CommandRegistry, extensionsDir?: string) {
 		this.registry = registry;
@@ -268,7 +271,10 @@ export class ExtensionLoader {
 	}
 
 	/** Get all registered beforeToolCall hooks from extensions */
-	getBeforeToolCallHooks(): ((context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult>)[] {
+	getBeforeToolCallHooks(): ((
+		context: BeforeToolCallContext,
+		signal?: AbortSignal,
+	) => Promise<BeforeToolCallResult>)[] {
 		return [...this.beforeToolCallHooks];
 	}
 

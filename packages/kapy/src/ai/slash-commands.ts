@@ -6,6 +6,7 @@
 
 import type { Agent } from "@moikapy/kapy-agent";
 import type { ToolRegistry } from "../tool/registry.js";
+import type { ChatSession } from "./chat-session.js";
 import type { SessionManager } from "./session/manager.js";
 
 /** Provider interface — implemented by ChatSession */
@@ -19,8 +20,8 @@ export interface SlashCommandContext {
 	tools: ToolRegistry;
 	sessions: SessionManager;
 	output: (text: string) => void;
-	/** Open a dialog by type */
 	openDialog?: (type: string) => void;
+	chatSession?: ChatSession;
 }
 
 export interface SlashCommandDefinition {
@@ -78,10 +79,16 @@ export function createBuiltinSlashCommands(): SlashCommandDefinition[] {
 		{
 			name: "compact",
 			description: "Compact session context",
-			handler(_args, ctx) {
-				ctx.output("Compacting context...");
-				// Future: call context transformer
-				ctx.output("Context compacted.");
+			async handler(_args, ctx) {
+				if (!ctx.chatSession) {
+					ctx.output("Compaction requires an active session.");
+					return;
+				}
+				try {
+					await ctx.chatSession.forceCompact();
+				} catch (err) {
+					ctx.output(`Compaction failed: ${err instanceof Error ? err.message : String(err)}`);
+				}
 			},
 		},
 		{

@@ -46,8 +46,8 @@ describe("OllamaAdapter tool calling", () => {
 			tools,
 		};
 		expect(options.tools).toBeDefined();
-		expect(options.tools!.length).toBe(1);
-		expect(options.tools![0].function.name).toBe("test_tool");
+		expect(options.tools?.length).toBe(1);
+		expect(options.tools?.[0].function.name).toBe("test_tool");
 	});
 
 	test("StreamChunk type supports reasoning", () => {

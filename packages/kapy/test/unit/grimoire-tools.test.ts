@@ -5,13 +5,13 @@
  * against a real GrimoireStore in /tmp.
  */
 
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createGrimoireTools } from "../../src/ai/grimoire-tools.js";
+import { join } from "node:path";
 import { GrimoireStore } from "@moikapy/kapy-agent";
-import type { KapyToolRegistration, ToolResult } from "../../src/tool/types.js";
+import { createGrimoireTools } from "../../src/ai/grimoire-tools.js";
+import type { KapyToolRegistration } from "../../src/tool/types.js";
 
 let testDir: string;
 let globalStore: GrimoireStore;

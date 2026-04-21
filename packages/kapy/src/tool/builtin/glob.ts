@@ -2,14 +2,15 @@
  * glob tool — find files matching a glob pattern.
  */
 import { z } from "zod";
-import type { KapyToolRegistration, ToolResult, ToolExecutionContext } from "../types.js";
+import type { KapyToolRegistration, ToolExecutionContext, ToolResult } from "../types.js";
 
 const MAX_RESULTS = 200;
 
 export const globTool: KapyToolRegistration = {
 	name: "glob",
 	label: "Glob",
-	description: "Find files matching a glob pattern. Returns list of matched file paths relative to the working directory.",
+	description:
+		"Find files matching a glob pattern. Returns list of matched file paths relative to the working directory.",
 	promptSnippet: "glob: find files by pattern",
 	promptGuidelines: [
 		"Use glob to discover files: source code, configs, test files.",
@@ -26,8 +27,8 @@ export const globTool: KapyToolRegistration = {
 		_onUpdate: (r: ToolResult) => void,
 		ctx: ToolExecutionContext,
 	): Promise<ToolResult> {
-		const fs = await import("fs");
-		const path = await import("path");
+		const fs = await import("node:fs");
+		const path = await import("node:path");
 		const baseDir = path.resolve(ctx.cwd, (params.cwd as string) ?? ".");
 		const pattern = params.pattern as string;
 
@@ -52,12 +53,19 @@ export const globTool: KapyToolRegistration = {
 		async function walk(dir: string, depth: number): Promise<void> {
 			if (results.length >= MAX_RESULTS || depth > 20) return;
 			let entries;
-			try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); }
-			catch { return; }
+			try {
+				entries = await fs.promises.readdir(dir, { withFileTypes: true });
+			} catch {
+				return;
+			}
 
 			for (const entry of entries) {
 				if (results.length >= MAX_RESULTS) break;
-				if (entry.isDirectory() && ["node_modules", ".git", ".bun", "dist", ".next", "__pycache__"].includes(entry.name)) continue;
+				if (
+					entry.isDirectory() &&
+					["node_modules", ".git", ".bun", "dist", ".next", "__pycache__"].includes(entry.name)
+				)
+					continue;
 
 				const full = path.join(dir, entry.name);
 				const rel = path.relative(baseDir, full);
@@ -74,9 +82,7 @@ export const globTool: KapyToolRegistration = {
 
 		await walk(baseDir, 0);
 
-		const text = results.length === 0
-			? `No files matching "${pattern}"`
-			: results.sort().join("\n");
+		const text = results.length === 0 ? `No files matching "${pattern}"` : results.sort().join("\n");
 
 		return {
 			content: [{ type: "text", text }],

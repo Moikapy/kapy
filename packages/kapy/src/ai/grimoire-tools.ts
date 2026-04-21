@@ -9,8 +9,8 @@
  * - Project: .kapy/wiki/ — codebase-specific knowledge
  */
 
-import { z } from "zod";
 import type { GrimoireStore } from "@moikapy/kapy-agent";
+import { z } from "zod";
 import type { KapyToolRegistration, ToolResult } from "../tool/types.js";
 
 /** Resolve the store for a given scope */
@@ -115,9 +115,7 @@ export function createGrimoireTools(globalStore: GrimoireStore, projectStore?: G
 				};
 			}
 
-			const output = results
-				.map((r) => `**${r.path}** (score: ${r.score.toFixed(2)})\n${r.snippet}`)
-				.join("\n\n");
+			const output = results.map((r) => `**${r.path}** (score: ${r.score.toFixed(2)})\n${r.snippet}`).join("\n\n");
 
 			return {
 				content: [{ type: "text", text: output }],
@@ -275,12 +273,16 @@ export function createGrimoireTools(globalStore: GrimoireStore, projectStore?: G
 				// (ChatSession will need to handle this — for now, the write persists to disk)
 
 				return {
-					content: [{ type: "text", text: `📖 SOUL.md evolved. The user has been notified of changes to your identity.` }],
+					content: [
+						{ type: "text", text: `📖 SOUL.md evolved. The user has been notified of changes to your identity.` },
+					],
 					details: { path: soulPath, updated: true },
 				};
 			} catch (err) {
 				return {
-					content: [{ type: "text", text: `Failed to evolve SOUL.md: ${err instanceof Error ? err.message : String(err)}` }],
+					content: [
+						{ type: "text", text: `Failed to evolve SOUL.md: ${err instanceof Error ? err.message : String(err)}` },
+					],
 					details: { error: true },
 				};
 			}

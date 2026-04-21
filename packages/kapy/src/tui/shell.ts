@@ -8,8 +8,9 @@
  * and uses Solid components. This is the legacy imperative version for
  * `kapy tui` command which renders extension screens.
  */
-import { launchChatTUI } from "./app.js";
+
 import type { CommandContext } from "../command/context.js";
+import { launchChatTUI } from "./app.js";
 
 export interface TUIOptions {
 	screens: any[];
@@ -22,7 +23,7 @@ export interface TUIOptions {
  * When screens are registered (extension screens), this could launch the
  * imperative TUI. For now, always launches the agent-first chat TUI.
  */
-export async function launchTUI(options: TUIOptions, ctx: CommandContext): Promise<void> {
+export async function launchTUI(_options: TUIOptions, ctx: CommandContext): Promise<void> {
 	if (ctx.noInput || ctx.json) {
 		ctx.error("TUI requires an interactive terminal. Use commands without --json or --no-input.");
 		return;

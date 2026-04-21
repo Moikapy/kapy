@@ -22,8 +22,8 @@
  * Fixtures are generated fresh on each run.
  */
 
+import { writeFileSync } from "node:fs";
 import { Type } from "@sinclair/typebox";
-import { writeFileSync } from "fs";
 import { beforeAll, describe, expect, it } from "vitest";
 import { getModel } from "../src/models.js";
 import { completeSimple, getEnvApiKey } from "../src/stream.js";
@@ -381,9 +381,7 @@ describe.skipIf(!hasAnyApiKey())("Cross-Provider Handoff", () => {
 					continue;
 				}
 
-				const model: Model<Api> = targetPair.apiOverride
-					? { ...baseModel, api: targetPair.apiOverride }
-					: baseModel;
+				const model: Model<Api> = targetPair.apiOverride ? { ...baseModel, api: targetPair.apiOverride } : baseModel;
 				const supportsReasoning = model.reasoning === true;
 
 				console.log(

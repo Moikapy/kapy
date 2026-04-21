@@ -2,7 +2,7 @@
  * read_file tool — reads file contents from the local filesystem.
  */
 import { z } from "zod";
-import type { KapyToolRegistration, ToolResult, ToolExecutionContext } from "../types.js";
+import type { KapyToolRegistration, ToolExecutionContext, ToolResult } from "../types.js";
 
 const MAX_SIZE = 1024 * 1024; // 1MB max
 
@@ -27,17 +27,33 @@ export const readFileTool: KapyToolRegistration = {
 		_onUpdate: (r: ToolResult) => void,
 		ctx: ToolExecutionContext,
 	): Promise<ToolResult> {
-		const fs = await import("fs");
-		const path = await import("path");
+		const fs = await import("node:fs");
+		const path = await import("node:path");
 		const filePath = path.resolve(ctx.cwd, params.path as string);
 
 		try {
 			const stat = await fs.promises.stat(filePath);
 			if (stat.isDirectory()) {
-				return { content: [{ type: "text", text: `Error: "${params.path}" is a directory, not a file. Use glob to list directory contents.` }], details: { path: filePath, isDirectory: true } };
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Error: "${params.path}" is a directory, not a file. Use glob to list directory contents.`,
+						},
+					],
+					details: { path: filePath, isDirectory: true },
+				};
 			}
 			if (stat.size > MAX_SIZE) {
-				return { content: [{ type: "text", text: `Error: File too large (${(stat.size / 1024).toFixed(0)}KB). Use offset/limit to read portions.` }], details: { path: filePath, size: stat.size } };
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Error: File too large (${(stat.size / 1024).toFixed(0)}KB). Use offset/limit to read portions.`,
+						},
+					],
+					details: { path: filePath, size: stat.size },
+				};
 			}
 
 			const raw = await fs.promises.readFile(filePath, "utf-8");
@@ -51,16 +67,28 @@ export const readFileTool: KapyToolRegistration = {
 			// Add line numbers
 			const numbered = selected.map((line, i) => `${startLine + i + 1}: ${line}`).join("\n");
 
-			if (signal?.aborted) return { content: [{ type: "text", text: "Aborted" }], details: { path: filePath, aborted: true } };
+			if (signal?.aborted)
+				return { content: [{ type: "text", text: "Aborted" }], details: { path: filePath, aborted: true } };
 
 			return {
 				content: [{ type: "text", text: numbered || "(empty file)" }],
 				details: { path: filePath, totalLines: lines.length, shownLines: selected.length, startLine: startLine + 1 },
 			};
 		} catch (e: any) {
-			if (e.code === "ENOENT") return { content: [{ type: "text", text: `Error: File not found: ${params.path}` }], details: { path: filePath, notFound: true } };
-			if (e.code === "EACCES") return { content: [{ type: "text", text: `Error: Permission denied: ${params.path}` }], details: { path: filePath, permissionDenied: true } };
-			return { content: [{ type: "text", text: `Error: ${e.message}` }], details: { path: filePath, error: e.message } };
+			if (e.code === "ENOENT")
+				return {
+					content: [{ type: "text", text: `Error: File not found: ${params.path}` }],
+					details: { path: filePath, notFound: true },
+				};
+			if (e.code === "EACCES")
+				return {
+					content: [{ type: "text", text: `Error: Permission denied: ${params.path}` }],
+					details: { path: filePath, permissionDenied: true },
+				};
+			return {
+				content: [{ type: "text", text: `Error: ${e.message}` }],
+				details: { path: filePath, error: e.message },
+			};
 		}
 	},
 	isReadOnly: () => true,
