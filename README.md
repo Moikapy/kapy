@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="./assets/capybara.webp" alt="Kapy — the agent-first CLI framework" width="256" />
+  <img src="./assets/capybara.webp" alt="Kapy — the extensible CLI framework" width="256" />
 </p>
 
 <h1 align="center">kapy 🐹</h1>
 
 <p align="center">
-  <strong>The agent-first CLI framework</strong><br/>
-  Build AI tools from the terminal. Commands, hooks, middleware, TUI — everything snaps together.
+  <strong>The extensible CLI framework</strong><br/>
+  Commands, hooks, middleware, extensions — everything snaps together.
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> · <a href="#quick-start">Quick Start</a> · <a href="#extensions">Extensions</a> · <a href="#tui">TUI</a> · <a href="#ai-agents">AI Agents</a>
+  <a href="#install">Install</a> · <a href="#quick-start">Quick Start</a> · <a href="#extensions">Extensions</a> · <a href="#config">Config</a> · <a href="#context-api">Context API</a>
 </p>
 
 ---
@@ -25,12 +25,11 @@ bun install -g kapy
 
 ### Standalone mode
 
-Run `kapy` directly. It ships with meta-commands — its CLI surface is empty until you install extensions:
+Run `kapy` directly. It ships with meta-commands — its CLI surface grows as you install extensions:
 
 ```bash
 kapy install npm:@foo/kapy-deploy
 kapy deploy:aws --region us-east-1
-kapy tui
 ```
 
 ### Embedded mode
@@ -38,7 +37,7 @@ kapy tui
 Build your own extensible CLI on top of kapy:
 
 ```ts
-import { kapy } from "kapy"
+import { kapy } from "@moikapy/kapy"
 
 kapy()
   .command("deploy", {
@@ -62,19 +61,19 @@ kapy()
 | `kapy list` | Show installed extensions |
 | `kapy update [name]` | Update all or a specific extension |
 | `kapy remove <name>` | Uninstall an extension |
-| `kapy upgrade [--pm <bun|npm|yarn|pnpm>]` | Upgrade kapy (auto-detects package manager) |
+| `kapy upgrade [--pm <bun\|npm\|yarn\|pnpm>]` | Upgrade kapy (auto-detects package manager) |
 | `kapy config` | View/edit configuration |
 | `kapy dev` | Run CLI in dev mode with hot reload |
 | `kapy commands` | List all registered commands |
 | `kapy inspect` | Dump full state (extensions, config, hooks) |
-| `kapy tui` | Launch interactive terminal UI |
+| `kapy help [command]` | Show help for a command |
 
 ## Extensions
 
-Extensions are TypeScript modules that export a `register` function:
+Extensions are npm packages with the `kapy-extension` keyword. They export a `register` function and a `meta` object:
 
 ```ts
-import type { KapyExtensionAPI } from "kapy"
+import type { KapyExtensionAPI } from "@moikapy/kapy"
 
 export async function register(api: KapyExtensionAPI) {
   api.addCommand("deploy:aws", {
@@ -93,13 +92,12 @@ export async function register(api: KapyExtensionAPI) {
     ctx.log(`Completed in ${Date.now() - start}ms`)
   })
 
-  api.addScreen({
-    name: "dashboard",
-    label: "Dashboard",
-    icon: "📊",
-    render(ctx) {
-      return { type: "Text", props: { content: "Project Dashboard" } }
-    },
+  api.declareConfig({
+    region: { type: "string", required: true, description: "AWS region" },
+  })
+
+  api.on("custom-event", async (data) => {
+    console.log("Event received:", data)
   })
 }
 
@@ -119,18 +117,16 @@ kapy install git:github.com/user/repo
 kapy install ./path/to/ext
 ```
 
-## `kapy tui`
+### Extension API
 
-Launch the interactive terminal UI:
-
-```bash
-kapy tui
-kapy tui --screen dashboard
-```
-
-Extensions register screens via `api.addScreen()`. The TUI provides sidebar navigation, screen switching, and a status bar.
-
-Built-in screens: Home 📊, Extensions 📦, Config 🔧, Terminal ⚡
+| Method | Purpose |
+|---|---|
+| `addCommand(def)` | Register a command |
+| `addHook(event, handler)` | Register a lifecycle hook |
+| `addMiddleware(mw)` | Register middleware |
+| `declareConfig(schema)` | Declare config schema (auto-namespaced) |
+| `emit(event, data?)` | Emit a custom event |
+| `on(event, handler)` | Listen for a custom event |
 
 ## Config
 
@@ -142,7 +138,7 @@ kapy defaults → kapy.config.ts → ~/.kapy/config.json → env vars → CLI fl
 
 ```ts
 // kapy.config.ts
-import { defineConfig } from "kapy"
+import { defineConfig } from "@moikapy/kapy"
 
 export default defineConfig({
   name: "my-cli",
@@ -159,9 +155,9 @@ KAPY_DEPLOY_AWS_REGION=us-west-2 kapy deploy:aws
 MY_CLI_DEPLOY_AWS_REGION=us-west-2 my-cli deploy:aws
 ```
 
-## AI Agent Support
+## Machine-Readable Output
 
-Kapy puts agents first. Every command supports `--json` and `--no-input` for machine-readable, non-interactive output:
+Every command supports `--json` and `--no-input` for scripts and automation:
 
 ```bash
 kapy commands --json
@@ -169,11 +165,7 @@ kapy deploy:aws --json --no-input
 kapy inspect --json
 ```
 
-Extensions declare `agentHints` — structured metadata that AI agents can parse to understand what a command does and how to call it. Structured exit codes give agents unambiguous signal: `0` success, `1` error, `2` invalid args, `3` extension error, `4` config error, `5` network error, `10` aborted by hook/middleware.
-
-Compose extensions into agent toolchains. Hooks and middleware let you inject auth, rate-limiting, logging, and retries without touching command logic.
-
-## Command Context API
+## Context API
 
 Every command handler receives a `ctx` object:
 
@@ -212,16 +204,9 @@ const result = await ctx.spawn(["tmux", "new-session", "-s", "dev"], {
 // result: { exitCode, stdout, stderr, aborted }
 ```
 
-## Packages
-
-| Package | Purpose |
-|---|---|
-| `@moikapy/kapy` | Runtime + CLI bin + TUI shell + agent support. Install this. |
-| `@moikapy/kapy-components` | UI components on @opentui/core (Banner, Box, Text, Input, Select, ScrollBox, Code, Diff, Spinner, Sidebar, StatusBar). Re-exported by `@moikapy/kapy`. |
-
 ## Tech Stack
 
-TypeScript · Bun · @opentui/core · picocolors · Biome
+TypeScript · Bun · picocolors · Biome
 
 ## Exit Codes
 

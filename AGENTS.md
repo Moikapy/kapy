@@ -2,22 +2,18 @@
 
 ## Project
 
-**Kapy** — the agent-first CLI framework. Build AI tools from the terminal. Commands, hooks, middleware, TUI — everything snaps together.
+**Kapy** — the extensible CLI framework. Commands, hooks, middleware, extensions — everything snaps together.
 
 ## Architecture
 
-Monorepo with three packages:
+Monorepo with one package:
 
 ```
 packages/
-├── kapy/                  # Runtime + CLI bin + TUI shell
-└── kapy-components/       # UI components on @opentui/core
+└── kapy/                  # Runtime + CLI bin
 ```
 
-- **kapy**: CLI entry point, command registry, hooks, middleware, extension loader, config, TUI shell, scaffolding (`kapy init`)
-- **kapy-components**: Reusable UI components (Box, Text, Input, Select, ScrollBox, Code, Diff, Spinner)
-
-Dependency flow: `kapy → kapy-components → @opentui/core`. Kapy re-exports kapy-components.
+- **kapy**: CLI entry point, command registry, hooks, middleware, extension loader, config, scaffolding (`kapy init`)
 
 ## Tech Stack
 
@@ -27,7 +23,6 @@ Dependency flow: `kapy → kapy-components → @opentui/core`. Kapy re-exports k
 - **Test**: Bun test runner (`bun test`)
 - **Lint**: Biome
 - **Color**: picocolors
-- **TUI**: @opentui/core (via kapy-components)
 - **Package manager**: Bun
 
 ## Key Design Decisions
@@ -37,7 +32,6 @@ Dependency flow: `kapy → kapy-components → @opentui/core`. Kapy re-exports k
 3. **Config hierarchy**: `kapy defaults → kapy.config.ts → ~/.kapy/config.json → env vars → CLI flags`
 4. **Extensions run in-process** — no sandboxing for MVP. Future: Bun sandboxing + permissions.
 5. **AI agent support** — all commands support `--json` and `--no-input`. Exit codes are structured. `agentHints` metadata on commands.
-6. **TUI via OpenTUI** — `kapy tui` launches interactive shell. Extensions register screens via `api.addScreen()`.
 
 ## Command System
 
@@ -67,7 +61,6 @@ KapyExtensionAPI:
   addHook(event, handler)
   addMiddleware(middleware)
   declareConfig(schema)
-  addScreen(screenDefinition)
   emit(event, data?)
   on(event, handler)
 ```
@@ -99,8 +92,8 @@ Extension structure: npm package with `kapy-extension` keyword, exports `registe
 | 5 | Network error |
 | 10 | Aborted by hook/middleware |
 
-## MVP Scope
+## Scope
 
-In scope: command registry, hooks, middleware, extension loader, config system, CLI bin, TUI shell, AI agent flags, exit codes, scaffolding, example extension.
+In scope: command registry, hooks, middleware, extension loader, config system, CLI bin, AI agent flags, exit codes, scaffolding, example extension.
 
-Out of scope: `kapy search`, custom themes, RPC/SDK modes, sandboxed extensions, permissions enforcement.
+Out of scope: AI agent loop, TUI, custom themes, RPC/SDK modes, sandboxed extensions, permissions enforcement.

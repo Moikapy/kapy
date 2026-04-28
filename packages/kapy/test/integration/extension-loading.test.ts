@@ -118,39 +118,6 @@ describe("Extension Loader", () => {
 		}
 	});
 
-	it("getScreens returns registered screens", async () => {
-		const extDir = join(tmpdir(), `kapy-test-screen-${Date.now()}`);
-		const extFile = join(extDir, "index.ts");
-		const extCode = `
-			export const meta = { name: "screen-ext", version: "1.0.0", dependencies: [] };
-			export async function register(api) {
-				api.addScreen({
-					name: "custom",
-					label: "Custom",
-					icon: "🎨",
-					render: () => "Custom screen content",
-				});
-			}
-		`;
-
-		await mkdir(extDir, { recursive: true });
-		await writeFile(extFile, extCode);
-
-		try {
-			const registry = new CommandRegistry();
-			const loader = new ExtensionLoader(registry);
-
-			await loader.load("screen-ext", extFile);
-
-			const screens = loader.getScreens();
-			expect(screens).toHaveLength(1);
-			expect(screens[0].name).toBe("custom");
-			expect(screens[0].label).toBe("Custom");
-		} finally {
-			await rm(extDir, { recursive: true, force: true });
-		}
-	});
-
 	it("getMiddlewares returns registered middleware", async () => {
 		const extDir = join(tmpdir(), `kapy-test-mw-${Date.now()}`);
 		const extFile = join(extDir, "index.ts");

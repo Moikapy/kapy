@@ -18,7 +18,6 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 								description: cmd.options.description,
 								args: cmd.options.args ?? [],
 								flags: cmd.options.flags ? Object.entries(cmd.options.flags).map(([k, v]) => ({ name: k, ...v })) : [],
-								agentHints: cmd.agentHints,
 							})),
 						},
 						null,
@@ -27,7 +26,7 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 				);
 			} else {
 				ctx.log("");
-				ctx.log("  🐹 kapy — the agent-first CLI framework");
+				ctx.log("  🐹 kapy — the extensible CLI framework");
 				ctx.log("");
 				ctx.log("Usage: kapy <command> [flags]");
 				ctx.log("");
@@ -48,8 +47,6 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 			ctx.abort(2);
 		}
 
-		// After abort, TypeScript still thinks cmd could be undefined.
-		// But abort() throws, so if we reach here, cmd is defined.
 		const command = cmd!;
 
 		const subs = registry.subcommands(commandName);
@@ -66,7 +63,6 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 							: [],
 						subcommands: subs.map((s) => s.name),
 						hidden: command.options.hidden ?? false,
-						agentHints: command.agentHints,
 					},
 					null,
 					2,
@@ -102,16 +98,6 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 				for (const sub of subs) {
 					ctx.log(`    ${sub.name.padEnd(20)} ${sub.options.description}`);
 				}
-				ctx.log("");
-			}
-
-			if (command.agentHints) {
-				ctx.log("  Agent hints:");
-				if (command.agentHints.purpose) ctx.log(`    Purpose:      ${command.agentHints.purpose}`);
-				if (command.agentHints.when) ctx.log(`    When:         ${command.agentHints.when}`);
-				if (command.agentHints.output) ctx.log(`    Output:       ${command.agentHints.output}`);
-				if (command.agentHints.sideEffects) ctx.log(`    Side effects: ${command.agentHints.sideEffects}`);
-				if (command.agentHints.requires) ctx.log(`    Requires:     ${command.agentHints.requires.join(", ")}`);
 				ctx.log("");
 			}
 		}

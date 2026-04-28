@@ -263,7 +263,7 @@ export class CommandContext {
 		if (this.json) {
 			process.stdout.write(`${JSON.stringify({ type: "event", event, data })}\n`);
 		}
-		// In non-json mode, events are consumed by the TUI (future: update message component)
+		// In non-json mode, events are consumed by extensions
 	}
 }
 

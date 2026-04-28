@@ -12,7 +12,6 @@
 	},
 	"files": [],
 	"references": [
-		{ "path": "./packages/kapy" },
-		{ "path": "./packages/kapy-components" }
+		{ "path": "./packages/kapy" }
 	]
 }

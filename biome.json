@@ -13,7 +13,7 @@
 	},
 	"assist": { "actions": { "source": { "organizeImports": "on" } } },
 	"files": {
-		"includes": ["**/*.ts", "**/*.js", "**/*.yml", "**/*.yaml"]
+		"includes": ["**/*.ts", "**/*.js", "**/*.yml", "**/*.yaml", "!!**/.agents", "!!**/.pi", "!!**/.codebase-wiki"]
 	},
 	"vcs": {
 		"enabled": true,

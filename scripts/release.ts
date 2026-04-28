@@ -23,9 +23,9 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
 
-const PACKAGES = ["@moikapy/kapy-components", "@moikapy/kapy"];
+const PACKAGES = ["@moikapy/kapy"];
 
-const PKG_DIRS = { "@moikapy/kapy-components": "kapy-components", "@moikapy/kapy": "kapy" };
+const PKG_DIRS = { "@moikapy/kapy": "kapy" };
 
 function getPkgDir(name: string): string {
 	const dir = PKG_DIRS[name as keyof typeof PKG_DIRS] ?? name;

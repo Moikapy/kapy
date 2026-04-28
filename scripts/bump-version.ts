@@ -20,7 +20,6 @@ const rootDir = resolve(__dirname, "..");
 
 // Scoped package names → directory names
 const PACKAGES = {
-	"@moikapy/kapy-components": "kapy-components",
 	"@moikapy/kapy": "kapy",
 };
 

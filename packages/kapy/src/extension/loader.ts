@@ -15,9 +15,8 @@ import { formatErrors, validateExtensionMeta } from "../config/validator.js";
 import { ExtensionEmitter } from "../hooks/emitter.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
-import { ToolRegistry } from "../tool/registry.js";
 import { ExtensionAPI } from "./api.js";
-import type { ExtensionMeta, ExtensionRegister, ProviderRegistration, ScreenDefinition } from "./types.js";
+import type { ExtensionMeta, ExtensionRegister } from "./types.js";
 
 interface LoadedExtension {
 	meta: ExtensionMeta;
@@ -30,7 +29,6 @@ async function resolveExtensionSource(source: string, extensionsDir: string): Pr
 	// npm: package — resolve from node_modules
 	if (source.startsWith("npm:")) {
 		const pkgName = source.slice(4);
-		// Try local node_modules first, then global
 		try {
 			const resolved = require.resolve(pkgName, { paths: [process.cwd()] });
 			return resolved;
@@ -42,7 +40,6 @@ async function resolveExtensionSource(source: string, extensionsDir: string): Pr
 	// git: repository — resolve from installed location in extensions dir
 	if (source.startsWith("git:")) {
 		const gitUrl = source.slice(4);
-		// Derive local directory from git URL
 		const repoName = gitUrl.split("/").pop()?.replace(".git", "") ?? gitUrl;
 		const localPath = join(extensionsDir, repoName);
 		try {
@@ -112,23 +109,17 @@ export class ExtensionLoader {
 	private registry: CommandRegistry;
 	private hooks: Map<string, HookHandler[]>;
 	private middlewares: Middleware[];
-	private screens: ScreenDefinition[];
 	private configSchemas: Map<string, ConfigSchema>;
 	private emitter: ExtensionEmitter;
 	private loaded: LoadedExtension[] = [];
 	private extensionsDir: string;
-	private tools: ToolRegistry;
-	private providers: Map<string, ProviderRegistration>;
 
 	constructor(registry: CommandRegistry, extensionsDir?: string) {
 		this.registry = registry;
 		this.hooks = new Map();
 		this.middlewares = [];
-		this.screens = [];
 		this.configSchemas = new Map();
 		this.emitter = new ExtensionEmitter();
-		this.tools = new ToolRegistry();
-		this.providers = new Map();
 		this.extensionsDir = extensionsDir ?? join(process.cwd(), ".kapy", "extensions");
 	}
 
@@ -165,13 +156,10 @@ export class ExtensionLoader {
 
 			const api = new ExtensionAPI({
 				registry: this.registry,
-				tools: this.tools,
 				hooks: this.hooks,
 				middlewares: this.middlewares,
-				screens: this.screens,
 				configSchemas: this.configSchemas,
 				emitter: this.emitter,
-				providers: this.providers,
 				extensionName: meta.name,
 			});
 
@@ -254,11 +242,6 @@ export class ExtensionLoader {
 	/** Get all registered middleware */
 	getMiddlewares(): Middleware[] {
 		return this.middlewares;
-	}
-
-	/** Get all registered screens */
-	getScreens(): ScreenDefinition[] {
-		return this.screens;
 	}
 
 	/** Get all config schemas */

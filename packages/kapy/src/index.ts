@@ -4,8 +4,6 @@
  * Public API: kapy() builder, defineConfig, types, and re-exports.
  */
 
-// Re-export kapy-components so extensions can import from either path
-export * from "@moikapy/kapy-components";
 // Built-in commands
 export {
 	configCommand,
@@ -27,7 +25,6 @@ export { AbortError, CommandContext } from "./command/context.js";
 // Command system
 export { CommandRegistry, parseArgs } from "./command/index.js";
 export type {
-	AgentHints,
 	ArgDefinition,
 	CommandDefinition,
 	CommandHandler,
@@ -59,8 +56,6 @@ export type {
 	ExtensionMeta,
 	ExtensionRegister,
 	KapyExtensionAPI,
-	ScreenContext,
-	ScreenDefinition,
 } from "./extension/index.js";
 // Extension system
 export { ExtensionAPI, ExtensionLoader } from "./extension/index.js";

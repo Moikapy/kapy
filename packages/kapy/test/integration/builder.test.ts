@@ -207,7 +207,6 @@ describe("Extension Loader", () => {
 		expect(loader).toBeDefined();
 		expect(loader.getHooks()).toBeInstanceOf(Map);
 		expect(loader.getMiddlewares()).toEqual([]);
-		expect(loader.getScreens()).toEqual([]);
 	});
 
 	it("disposeAll clears loaded extensions", async () => {

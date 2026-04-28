@@ -78,7 +78,6 @@ async function writePackageJson(dir: string, name: string): Promise<void> {
 		},
 		dependencies: {
 			"@moikapy/kapy": "^0.1.0",
-			"@moikapy/kapy-components": "^0.1.0",
 		},
 		devDependencies: {
 			typescript: "^5.7.0",

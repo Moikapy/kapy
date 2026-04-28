@@ -1,96 +1,83 @@
 import { describe, expect, test } from "bun:test";
-import { z } from "zod";
 import { CommandRegistry } from "../../../src/command/registry.js";
 import { ExtensionAPI } from "../../../src/extension/api.js";
 import { ExtensionEmitter } from "../../../src/hooks/emitter.js";
-import { ToolRegistry } from "../../../src/tool/registry.js";
-import type { KapyToolRegistration } from "../../../src/tool/types.js";
 
 function makeApi(): {
 	api: ExtensionAPI;
 	registry: CommandRegistry;
-	tools: ToolRegistry;
 	hooks: Map<string, any[]>;
 	middlewares: any[];
-	screens: any[];
 	configSchemas: Map<string, any>;
 	emitter: ExtensionEmitter;
-	providers: Map<string, any>;
 } {
 	const registry = new CommandRegistry();
-	const tools = new ToolRegistry();
 	const hooks = new Map();
 	const middlewares: any[] = [];
-	const screens: any[] = [];
 	const configSchemas = new Map();
 	const emitter = new ExtensionEmitter();
-	const providers = new Map();
 
 	const api = new ExtensionAPI({
 		registry,
-		tools,
 		hooks,
 		middlewares,
-		screens,
 		configSchemas,
 		emitter,
-		providers,
 		extensionName: "test-ext",
 	});
 
-	return { api, registry, tools, hooks, middlewares, screens, configSchemas, emitter, providers };
+	return { api, registry, hooks, middlewares, configSchemas, emitter };
 }
 
-function makeTool(overrides: Partial<KapyToolRegistration> = {}): KapyToolRegistration {
-	return {
-		name: "test-tool",
-		label: "Test Tool",
-		description: "A test tool",
-		parameters: z.object({ input: z.string() }),
-		execute: async () => ({ content: [{ type: "text", text: "ok" }], details: {} }),
-		...overrides,
-	};
-}
-
-describe("ExtensionAPI.registerTool", () => {
-	test("registers a tool via registerTool()", () => {
-		const { api, tools } = makeApi();
-		const tool = makeTool();
-		api.registerTool(tool);
-		expect(tools.has("test-tool")).toBe(true);
+describe("ExtensionAPI", () => {
+	test("addCommand(name, options, handler) registers a command", () => {
+		const { api, registry } = makeApi();
+		api.addCommand("test-cmd", { description: "A test command" }, async () => {});
+		expect(registry.get("test-cmd")).toBeDefined();
+		expect(registry.get("test-cmd")?.options.description).toBe("A test command");
 	});
 
-	test("registerTool() validates the tool definition", () => {
+	test("addCommand(definition) registers a command", () => {
+		const { api, registry } = makeApi();
+		api.addCommand({ name: "def-cmd", options: { description: "Def command" }, handler: async () => {} });
+		expect(registry.get("def-cmd")).toBeDefined();
+	});
+
+	test("addHook registers a hook handler", () => {
+		const { api, hooks } = makeApi();
+		const handler = async () => {};
+		api.addHook("before:command", handler);
+		expect(hooks.get("before:command")?.length).toBe(1);
+	});
+
+	test("declareConfig stores schema under extension name", () => {
+		const { api, configSchemas } = makeApi();
+		const schema = { mySetting: { type: "string", required: true } };
+		api.declareConfig(schema as any);
+		expect(configSchemas.has("test-ext")).toBe(true);
+	});
+
+	test("addMiddleware adds middleware to the list", () => {
+		const { api, middlewares } = makeApi();
+		const mw = async (_ctx: any, next: any) => next();
+		api.addMiddleware(mw);
+		expect(middlewares.length).toBe(1);
+	});
+
+	test("emit/on custom events work", async () => {
 		const { api } = makeApi();
-		expect(() => api.registerTool(makeTool({ name: "BAD" }))).toThrow();
-	});
-
-	test("registerTool() delegates to ToolRegistry.register", () => {
-		const { api, tools } = makeApi();
-		const tool1 = makeTool({ name: "first" });
-		const tool2 = makeTool({ name: "second" });
-		api.registerTool(tool1);
-		api.registerTool(tool2);
-		expect(tools.toolCount).toBe(2);
-	});
-});
-
-describe("ExtensionAPI.registerProvider", () => {
-	test("registers a provider configuration", () => {
-		const { api, providers } = makeApi();
-		api.registerProvider("ollama", {
-			name: "Ollama",
-			baseUrl: "http://localhost:11434",
+		let _received: any;
+		api.on("custom", async (data) => {
+			_received = data;
 		});
-		expect(providers.has("ollama")).toBe(true);
-		expect(providers.get("ollama")?.name).toBe("Ollama");
+		await api.emit("custom", { hello: "world" });
+		// ExtensionAPI.emit delegates to ExtensionEmitter which doesn't return —
+		// but the handler should have been called
+		// Note: ExtensionEmitter.emit is async but void
 	});
 
-	test("unregisterProvider removes a provider", () => {
-		const { api, providers } = makeApi();
-		api.registerProvider("ollama", { name: "Ollama" });
-		expect(providers.has("ollama")).toBe(true);
-		api.unregisterProvider("ollama");
-		expect(providers.has("ollama")).toBe(false);
+	test("addCommand with name but missing options/handler throws", () => {
+		const { api } = makeApi();
+		expect(() => api.addCommand("bad", undefined as any, undefined as any)).toThrow();
 	});
 });

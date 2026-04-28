@@ -6,10 +6,8 @@
 		"declaration": true,
 		"emitDeclarationOnly": true,
 		"declarationMap": false,
-		"composite": false,
-		"jsx": "preserve",
-		"jsxImportSource": "@opentui/solid"
+		"composite": false
 	},
 	"include": ["src"],
-	"exclude": ["node_modules", "dist", "test"]
+	"exclude": ["node_modules", "dist", "test", "bunfig.toml"]
 }

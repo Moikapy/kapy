@@ -20,7 +20,6 @@ import { AbortError, CommandContext } from "./command/context.js";
  * Usage:
  *   kapy                    Show help
  *   kapy <command>          Run a command
- *   kapy tui                Launch interactive TUI
  *   kapy init <name>        Scaffold a new project
  *   kapy install <pkg>      Install an extension
  *   kapy list               Show installed extensions
@@ -36,7 +35,6 @@ import { ExtensionLoader } from "./extension/index.js";
 import { errorHandler, KapyError } from "./middleware/error-handler.js";
 import type { Middleware } from "./middleware/pipeline.js";
 import { composeMiddleware } from "./middleware/pipeline.js";
-import { launchTUI } from "./tui/index.js";
 
 // ─── Builder API ───────────────────────────────────────────────
 
@@ -150,7 +148,7 @@ async function runCLI(
 		}
 	}
 
-	// Register built-in commands (with universal flags and agentHints)
+	// Register built-in commands (with universal flags)
 	registry.register({
 		name: "init",
 		options: withUniversalFlags({
@@ -159,12 +157,6 @@ async function runCLI(
 			flags: { template: { type: "boolean", alias: "t", description: "Include example commands and extension" } },
 		}),
 		handler: initCommand,
-		agentHints: {
-			purpose: "Scaffold a new kapy-powered CLI project",
-			when: "Starting a new kapy project",
-			output: "New project directory",
-			sideEffects: "Creates directory and files",
-		},
 	});
 	registry.register({
 		name: "install",
@@ -174,23 +166,11 @@ async function runCLI(
 			flags: { trust: { type: "boolean", description: "Skip trust prompt" } },
 		}),
 		handler: installCommand,
-		agentHints: {
-			purpose: "Install a kapy extension from npm, git, or local path",
-			when: "Adding new functionality to the CLI",
-			output: "Extension installed and registered",
-			sideEffects: "Modifies ~/.kapy/extensions.json and config.json",
-			requires: ["Valid source string"],
-		},
 	});
 	registry.register({
 		name: "list",
 		options: withUniversalFlags({ description: "Show installed extensions" }),
 		handler: listCommand,
-		agentHints: {
-			purpose: "Show all installed extensions",
-			when: "Checking what extensions are available",
-			output: "List of extension names, versions, sources",
-		},
 	});
 	registry.register({
 		name: "update",
@@ -199,12 +179,6 @@ async function runCLI(
 			args: [{ name: "name" }],
 		}),
 		handler: updateCommand,
-		agentHints: {
-			purpose: "Update all or a specific extension to latest version",
-			when: "Keeping extensions up to date",
-			output: "Updated extension versions",
-			sideEffects: "Modifies installed extension files",
-		},
 	});
 	registry.register({
 		name: "remove",
@@ -213,13 +187,6 @@ async function runCLI(
 			args: [{ name: "name", required: true }],
 		}),
 		handler: removeCommand,
-		agentHints: {
-			purpose: "Uninstall a kapy extension",
-			when: "Removing unwanted extensions",
-			output: "Extension removed from manifest",
-			sideEffects: "Deletes extension files and updates config",
-			requires: ["Extension name"],
-		},
 	});
 	registry.register({
 		name: "search",
@@ -228,11 +195,6 @@ async function runCLI(
 			args: [{ name: "query", description: "Search query" }],
 		}),
 		handler: searchCommand,
-		agentHints: {
-			purpose: "Search npm for kapy extensions (coming soon)",
-			when: "Looking for new extensions to install",
-			output: "Search results with extension names",
-		},
 	});
 	registry.register({
 		name: "upgrade",
@@ -243,12 +205,6 @@ async function runCLI(
 			},
 		}),
 		handler: upgradeCommand,
-		agentHints: {
-			purpose: "Upgrade kapy itself to the latest version",
-			when: "Updating the kapy runtime",
-			output: "Updated kapy version",
-			sideEffects: "Modifies global kapy installation",
-		},
 	});
 	registry.register({
 		name: "config",
@@ -258,11 +214,6 @@ async function runCLI(
 			flags: { global: { type: "boolean", alias: "g", description: "Edit global config" } },
 		}),
 		handler: configCommand,
-		agentHints: {
-			purpose: "View or edit kapy configuration",
-			when: "Reading or modifying config values",
-			output: "Config key-value pairs",
-		},
 	});
 	registry.register({
 		name: "dev",
@@ -271,12 +222,6 @@ async function runCLI(
 			flags: { debug: { type: "boolean", alias: "d", description: "Verbose logging" } },
 		}),
 		handler: devCommand,
-		agentHints: {
-			purpose: "Run CLI in dev mode with hot reload on file changes",
-			when: "Developing extensions locally",
-			output: "Running CLI process with auto-restart",
-			sideEffects: "Watches files and restarts process",
-		},
 	});
 	registry.register({
 		name: "commands",
@@ -284,11 +229,6 @@ async function runCLI(
 			description: "List all registered commands",
 		}),
 		handler: createCommandsCommand(registry),
-		agentHints: {
-			purpose: "List all registered commands with metadata",
-			when: "Discovering available commands",
-			output: "Structured list of commands with args, flags, descriptions",
-		},
 	});
 	registry.register({
 		name: "inspect",
@@ -301,27 +241,6 @@ async function runCLI(
 			extensionLoader.getHooks(),
 			extensionLoader.getConfigSchemas(),
 		),
-		agentHints: {
-			purpose: "Dump full kapy state including extensions, config, hooks, and middleware",
-			when: "Debugging or auditing the CLI state",
-			output: "Full state dump as JSON or styled text",
-		},
-	});
-	registry.register({
-		name: "tui",
-		options: withUniversalFlags({
-			description: "Launch interactive terminal UI",
-			flags: { screen: { type: "string", alias: "s", description: "Open directly to a specific screen" } },
-		}),
-		handler: async (ctx) => {
-			await launchTUI({ screens: extensionLoader.getScreens(), initialScreen: ctx.args.screen as string }, ctx);
-		},
-		agentHints: {
-			purpose: "Launch interactive terminal UI",
-			when: "Using kapy interactively",
-			output: "Interactive TUI session",
-			requires: ["Interactive terminal (TTY)"],
-		},
 	});
 	registry.register({
 		name: "help",
@@ -330,11 +249,6 @@ async function runCLI(
 			args: [{ name: "command", description: "Command to get help for" }],
 		}),
 		handler: createHelpCommand(registry),
-		agentHints: {
-			purpose: "Show detailed help for a specific command",
-			when: "Learning about a command or its flags",
-			output: "Command description, args, flags, and agent hints",
-		},
 	});
 
 	// Load user commands (from project config middleware)
@@ -344,14 +258,9 @@ async function runCLI(
 		}
 	}
 
-	// Register user commands from builder
-	// (already registered via .command() calls)
-
 	// Resolve command from argv
 	const resolved = registry.resolve(commandParts);
 	if (!resolved || commandParts.length === 0) {
-		// ADR-007: No command specified → agent-first default mode
-		// In JSON mode, still output the error structure
 		if (jsonMode) {
 			console.log(
 				JSON.stringify({
@@ -363,36 +272,8 @@ async function runCLI(
 			process.exit(0);
 		}
 
-		// No-input mode: can't launch TUI, show help instead
-		if (noInput) {
-			console.log("");
-			console.log("  🐹 kapy — the agent-first CLI framework");
-			console.log("");
-			console.log("Usage: kapy <command> [flags]");
-			console.log("");
-			console.log("Available commands:");
-			for (const cmd of registry.visible()) {
-				console.log(`  ${cmd.name.padEnd(20)} ${cmd.options.description}`);
-			}
-			process.exit(2);
-		}
-
-		// Agent-first: launch the chat TUI
-		if (process.stdout.isTTY) {
-			// ADR-007: kapy with no args → interactive agent TUI
-			// ADR-007: kapy with unknown text → single-shot agent (non-interactive)
-			if (commandParts.length === 0) {
-				const { launchChatTUI } = await import("./tui/app.js");
-				await launchChatTUI();
-				return;
-			}
-			// Single-shot: text that isn't a command → agent prompt
-			// For now, fall through to help. Full single-shot in Phase 9.
-		}
-
-		// Non-TTY fallback: show help
 		console.log("");
-		console.log("  🐹 kapy — the agent-first CLI framework");
+		console.log("  🐹 kapy — the extensible CLI framework");
 		console.log("");
 		console.log("Usage: kapy <command> [flags]");
 		console.log("");
@@ -400,6 +281,8 @@ async function runCLI(
 		for (const cmd of registry.visible()) {
 			console.log(`  ${cmd.name.padEnd(20)} ${cmd.options.description}`);
 		}
+		console.log("");
+		console.log("Use 'kapy help <command>' for more information.");
 		process.exit(2);
 	}
 

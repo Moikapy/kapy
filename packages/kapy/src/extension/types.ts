@@ -1,13 +1,10 @@
 /**
  * Extension types — meta, register, and API surface.
  */
-import type { AgentHints, CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
+import type { CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
 import type { ConfigSchema } from "../config/schema.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
-import type { KapyToolRegistration } from "../tool/types.js";
-
-export type { KapyToolRegistration } from "../tool/types.js";
 
 /** Extension metadata */
 export interface ExtensionMeta {
@@ -20,46 +17,7 @@ export interface ExtensionMeta {
 /** Extension register function */
 export type ExtensionRegister = (api: KapyExtensionAPI) => Promise<undefined | (() => void)>;
 
-/** Screen definition for TUI */
-export interface ScreenDefinition {
-	name: string;
-	label: string;
-	icon?: string;
-	render: (ctx: ScreenContext) => unknown | Promise<unknown>;
-	keyBindings?: Record<string, string>;
-}
-
-/** Screen context passed to render() — includes the OpenTUI renderer */
-export interface ScreenContext {
-	/** The OpenTUI renderer instance */
-	renderer?: unknown;
-	/** Current terminal width */
-	width?: number;
-	/** Current terminal height */
-	height?: number;
-	[key: string]: unknown;
-}
-
-/** Provider registration (pi pattern: pi.registerProvider) */
-export interface ProviderRegistration {
-	name: string;
-	baseUrl?: string;
-	apiKey?: string;
-	models?: ProviderModelConfig[];
-	[key: string]: unknown;
-}
-
-/** Provider model configuration */
-export interface ProviderModelConfig {
-	id: string;
-	label?: string;
-	contextLength?: number;
-	supportsVision?: boolean;
-	supportsReasoning?: boolean;
-	[key: string]: unknown;
-}
-
-/** The extension API surface (pi-aligned) */
+/** The extension API surface */
 export interface KapyExtensionAPI {
 	/** Register a command */
 	addCommand(definition: CommandDefinition): void;
@@ -75,23 +33,18 @@ export interface KapyExtensionAPI {
 	/** Declare config schema (auto-namespaced) */
 	declareConfig(schema: ConfigSchema): void;
 
-	/** Register a TUI screen */
-	addScreen(screen: ScreenDefinition): void;
-
 	/** Emit a custom event */
 	emit(event: string, data?: unknown): void;
 
 	/** Listen for a custom event */
 	on(event: string, handler: (data?: unknown) => Promise<void> | void): void;
+}
 
-	// === Pi-aligned additions ===
-
-	/** Register a tool callable by the LLM (pi.registerTool) */
-	registerTool(definition: KapyToolRegistration): void;
-
-	/** Register an LLM provider (pi.registerProvider) */
-	registerProvider(id: string, config: ProviderRegistration): void;
-
-	/** Unregister an LLM provider (pi.unregisterProvider) */
-	unregisterProvider(id: string): void;
+/** Agent-readable hints for AI compatibility */
+export interface AgentHints {
+	purpose?: string;
+	when?: string;
+	output?: string;
+	sideEffects?: string;
+	requires?: string[];
 }
