@@ -29,12 +29,9 @@ async function resolveExtensionSource(source: string, extensionsDir: string): Pr
 	// npm: package — resolve from node_modules
 	if (source.startsWith("npm:")) {
 		const pkgName = source.slice(4);
-		try {
-			const resolved = require.resolve(pkgName, { paths: [process.cwd()] });
-			return resolved;
-		} catch {
-			throw new Error(`Cannot resolve npm extension: ${pkgName}. Install it first with 'kapy install ${source}'`);
-		}
+		const resolved = tryResolvePackage(pkgName);
+		if (resolved) return resolved;
+		throw new Error(`Cannot resolve npm extension: ${pkgName}. Install it first with 'kapy install ${source}'`);
 	}
 
 	// git: repository — resolve from installed location in extensions dir
@@ -61,12 +58,53 @@ async function resolveExtensionSource(source: string, extensionsDir: string): Pr
 		}
 	}
 
-	// Bare package name — try to resolve from node_modules
-	try {
-		return require.resolve(source, { paths: [process.cwd()] });
-	} catch {
-		throw new Error(`Cannot resolve extension: ${source}`);
+	// Bare package name (e.g. @moikapy/kapy-script) — resolve from kapy's node_modules, then cwd
+	const resolved = tryResolvePackage(source);
+	if (resolved) return resolved;
+	throw new Error(`Cannot resolve extension: ${source}. Install it first with 'kapy install ${source}'`);
+}
+
+/** Try to resolve a package from kapy's node_modules, then cwd, then global */
+function tryResolvePackage(pkgName: string): string | null {
+	// Resolution order:
+	// 1. Kapy's own installation directory (where kapy CLI is installed)
+	// 2. Current working directory
+	// 3. Global node_modules
+	const kapyDir = findKapyRoot();
+	const searchPaths = [kapyDir, process.cwd(), "/usr/local/lib/node_modules", "/usr/lib/node_modules"].filter(
+		Boolean,
+	) as string[];
+
+	for (const dir of searchPaths) {
+		try {
+			return require.resolve(pkgName, { paths: [dir] });
+		} catch {
+			// try next path
+		}
 	}
+	return null;
+}
+
+/** Find kapy's installation root (the directory containing node_modules with @moikapy/kapy) */
+function findKapyRoot(): string | null {
+	// Walk up from this file's location to find a node_modules directory
+	// that actually contains packages (not just empty dirs from bun workspaces)
+	let dir = __dirname;
+	for (let i = 0; i < 10; i++) {
+		const nodeModules = join(dir, "node_modules");
+		try {
+			const { readdirSync } = require("node:fs");
+			const entries = readdirSync(nodeModules);
+			// Skip empty node_modules (bun workspace stubs)
+			if (entries.length > 0) return dir;
+		} catch {
+			// Not found, walk up
+		}
+		const parent = resolve(dir, "..");
+		if (parent === dir) break; // reached root
+		dir = parent;
+	}
+	return null;
 }
 
 /** Topological sort of extensions based on meta.dependencies */
