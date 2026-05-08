@@ -19,10 +19,15 @@ export interface SpawnOptions {
 	env?: Record<string, string>;
 	/** Working directory */
 	cwd?: string;
-	/** Auto-kill the process on ctx.abort() */
+	/** Kill the process on ctx.abort() and register teardown cleanup.
+	 * Formerly `abortOnError` — renamed to clarify it kills on abort, not on error. */
+	killOnAbort?: boolean;
+	/** @deprecated Use `killOnAbort` instead. Alias for `killOnAbort`. */
 	abortOnError?: boolean;
 	/** Suppress stdout/stderr output in --json mode */
 	suppressOutput?: boolean;
+	/** Timeout in milliseconds. Kill the process if it doesn't exit in time. */
+	timeout?: number;
 }
 
 /** Result of ctx.spawn() */
@@ -183,6 +188,7 @@ export class CommandContext {
 	/** Spawn a subprocess with TTY awareness, abort integration, and output control */
 	async spawn(cmd: string[], options?: SpawnOptions): Promise<SpawnResult> {
 		const opts = options ?? {};
+		const shouldKillOnAbort = opts.killOnAbort ?? opts.abortOnError ?? false;
 		const env = { ...process.env, ...(opts.env ?? {}) } as Record<string, string>;
 
 		// Set up abort controller for this spawn
@@ -197,8 +203,22 @@ export class CommandContext {
 			stdin: opts.tty ? "inherit" : "pipe",
 		});
 
+		// Set up timeout
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
+		let timedOut = false;
+		if (opts.timeout) {
+			timeoutId = setTimeout(() => {
+				timedOut = true;
+				try {
+					proc.kill();
+				} catch {
+					// Process may have already exited
+				}
+			}, opts.timeout);
+		}
+
 		// Register teardown to kill process on abort
-		if (opts.abortOnError) {
+		if (shouldKillOnAbort) {
 			this.teardown(() => {
 				try {
 					proc.kill();
@@ -221,32 +241,45 @@ export class CommandContext {
 			);
 		}
 
-		// Read stdout/stderr as streams (Bun returns ReadableStream)
-		const stdoutPromise = opts.tty ? Promise.resolve("") : new Response(proc.stdout).text();
-		const stderrPromise = opts.tty ? Promise.resolve("") : new Response(proc.stderr).text();
-
-		const exitCode = await proc.exited;
+		// For stream mode with TTY off, pipe output in real-time
+		// We still collect for the return value, but also write to terminal
+		if (opts.stream && !this.json && !opts.suppressOutput && !opts.tty) {
+			// Set up real-time streaming
+			proc.stdout?.pipeTo(
+				new WritableStream({
+					write(chunk) {
+						process.stdout.write(chunk);
+					},
+				}),
+			);
+			proc.stderr?.pipeTo(
+				new WritableStream({
+					write(chunk) {
+						process.stderr.write(chunk);
+					},
+				}),
+			);
+		}
 
 		let stdout = "";
 		let stderr = "";
 
 		if (!opts.tty) {
 			try {
-				stdout = await stdoutPromise;
+				stdout = await new Response(proc.stdout).text();
 			} catch {}
 			try {
-				stderr = await stderrPromise;
+				stderr = await new Response(proc.stderr).text();
 			} catch {}
 		}
 
-		// Stream output to terminal if requested (and not in json mode)
-		if (opts.stream && !this.json && !opts.suppressOutput && !opts.tty) {
-			if (stdout) process.stdout.write(stdout);
-			if (stderr) process.stderr.write(stderr);
-		}
+		const exitCode = await proc.exited;
+
+		// Clear timeout if process exited before timeout
+		if (timeoutId) clearTimeout(timeoutId);
 
 		return {
-			exitCode,
+			exitCode: timedOut ? 124 : exitCode,
 			stdout,
 			stderr,
 			aborted: abortController.signal.aborted,

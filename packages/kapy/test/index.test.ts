@@ -285,8 +285,10 @@ describe("parseHookEvent", () => {
 		expect(result).toEqual({ phase: HookPhase.After, command: "deploy:aws" });
 	});
 
-	it("parses generic hooks", () => {
+	it("parses before:command as a specific command hook", () => {
 		const result = parseHookEvent("before:command");
+		// Note: before:command is NOT a wildcard — it parses as targeting command named "command"
+		// Use before:command explicitly in the hook system, or check for both patterns
 		expect(result).toEqual({ phase: HookPhase.Before, command: "command" });
 	});
 

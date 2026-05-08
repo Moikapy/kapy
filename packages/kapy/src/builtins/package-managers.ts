@@ -29,9 +29,11 @@ export const PACKAGE_MANAGERS: PackageManager[] = [
 	},
 ];
 
-/** Detect which package managers are available on this system */
+/** Detect which package managers are available on this system (result is cached) */
+let _cachedPMs: string[] | undefined;
 export function detectPackageManagers(): string[] {
-	return PACKAGE_MANAGERS.filter((pm) => {
+	if (_cachedPMs) return _cachedPMs;
+	_cachedPMs = PACKAGE_MANAGERS.filter((pm) => {
 		try {
 			execSync(`${pm.name} --version`, { stdio: "pipe" });
 			return true;
@@ -39,6 +41,7 @@ export function detectPackageManagers(): string[] {
 			return false;
 		}
 	}).map((pm) => pm.name);
+	return _cachedPMs;
 }
 
 /** Get install args for a given package manager and package spec */

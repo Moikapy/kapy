@@ -6,8 +6,11 @@
  * a `meta` object.
  */
 
+import { readdirSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { CommandContext } from "../command/context.js";
 import type { CommandRegistry } from "../command/registry.js";
 import type { ConfigSchema } from "../config/schema.js";
@@ -77,7 +80,7 @@ function tryResolvePackage(pkgName: string): string | null {
 
 	for (const dir of searchPaths) {
 		try {
-			return require.resolve(pkgName, { paths: [dir] });
+			return _require.resolve(pkgName, { paths: [dir] });
 		} catch {
 			// try next path
 		}
@@ -85,15 +88,21 @@ function tryResolvePackage(pkgName: string): string | null {
 	return null;
 }
 
+// createRequire enables require.resolve() in ESM contexts
+const _require = typeof require === "function" ? require : createRequire(import.meta.url);
+
 /** Find kapy's installation root (the directory containing node_modules with @moikapy/kapy) */
 function findKapyRoot(): string | null {
+	// Use import.meta.dirname (Node 21+) with fallback to fileURLToPath
+	const thisDir =
+		typeof import.meta.dirname === "string" ? import.meta.dirname : dirname(fileURLToPath(import.meta.url));
+
 	// Walk up from this file's location to find a node_modules directory
 	// that actually contains packages (not just empty dirs from bun workspaces)
-	let dir = __dirname;
+	let dir = thisDir;
 	for (let i = 0; i < 10; i++) {
 		const nodeModules = join(dir, "node_modules");
 		try {
-			const { readdirSync } = require("node:fs");
 			const entries = readdirSync(nodeModules);
 			// Skip empty node_modules (bun workspace stubs)
 			if (entries.length > 0) return dir;

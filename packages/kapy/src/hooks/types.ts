@@ -20,7 +20,14 @@ export enum HookPhase {
 	After = "after",
 }
 
-/** Resolve a hook event name (e.g., "before:deploy") into phase and command */
+/** Resolve a hook event name into phase and target.
+ *
+ * Examples:
+ *   "before:deploy" => { phase: Before, command: "deploy" }
+ *   "after:deploy:aws" => { phase: After, command: "deploy:aws" }
+ *   "before:command" => { phase: Before, command: "command" } (generic wildcard)
+ *   "on:load" => null (lifecycle events, not command hooks)
+ */
 export function parseHookEvent(event: string): { phase: HookPhase; command?: string } | null {
 	if (event.startsWith("before:")) {
 		return { phase: HookPhase.Before, command: event.slice(7) };

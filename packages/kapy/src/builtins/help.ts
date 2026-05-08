@@ -45,9 +45,10 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 		if (!cmd) {
 			ctx.error(`Unknown command: ${commandName}`);
 			ctx.abort(2);
+			return; // unreachable — abort() throws
 		}
 
-		const command = cmd!;
+		const command = cmd;
 
 		const subs = registry.subcommands(commandName);
 

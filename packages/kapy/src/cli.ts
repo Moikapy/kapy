@@ -118,15 +118,18 @@ async function runCLI(
 	// Set up extension system
 	const extensionLoader = new ExtensionLoader(registry);
 
+	// Skip extension loading when KAPY_NO_EXTENSIONS is set (useful for testing / isolation)
+	const noExtensions = process.env.KAPY_NO_EXTENSIONS === "1";
+
 	// Load extensions from project config
-	if (effectiveProjectConfig.extensions?.length) {
+	if (!noExtensions && effectiveProjectConfig.extensions?.length) {
 		await extensionLoader.loadFromConfig(effectiveProjectConfig);
 	}
 
 	// Load extensions from global config
 	// mergedConfig._extensions is populated by loadConfig from ~/.kapy/config.json
 	const globalExtensions = (mergedConfig as Record<string, unknown>)._extensions as string[] | undefined;
-	if (globalExtensions?.length) {
+	if (!noExtensions && globalExtensions?.length) {
 		await extensionLoader.loadFromConfig({ extensions: globalExtensions });
 	}
 
@@ -193,6 +196,7 @@ async function runCLI(
 		options: withUniversalFlags({
 			description: "Search for extensions (coming soon)",
 			args: [{ name: "query", description: "Search query" }],
+			hidden: true,
 		}),
 		handler: searchCommand,
 	});
@@ -357,6 +361,8 @@ async function runCLI(
 
 		throw err;
 	}
+
+	// ─── Success path only (no error was thrown) ────────────
 
 	ctx._tick();
 

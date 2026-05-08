@@ -71,7 +71,7 @@ describe("Built-in Commands", () => {
 			expect(result.stdout).toContain("config");
 			expect(result.stdout).toContain("commands");
 			expect(result.stdout).toContain("inspect");
-			expect(result.stdout).toContain("search");
+			// search is hidden (stub) — not listed in visible commands
 		});
 
 		it("outputs commands as JSON with --json flag", async () => {

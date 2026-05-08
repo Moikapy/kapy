@@ -205,8 +205,8 @@ describe("ctx.spawn", () => {
 	it("returns aborted=true when process is killed via abort signal", async () => {
 		const ctx = new CommandContext({ command: "test" });
 
-		// Spawn a long-running process with abortOnError
-		const resultPromise = ctx.spawn(["sleep", "30"], { abortOnError: true });
+		// Spawn a long-running process with killOnAbort
+		const resultPromise = ctx.spawn(["sleep", "30"], { killOnAbort: true });
 
 		// Trigger abort after short delay
 		setTimeout(() => {

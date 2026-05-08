@@ -1,41 +1,26 @@
 /** kapy install — install an extension from npm, git, or local path */
 
-import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { CommandContext } from "../command/context.js";
 import { ensureKapyDirs } from "../config/defaults.js";
 import type { ExtensionMeta } from "../extension/types.js";
 import { detectPackageManagers, getInstallArgs } from "./package-managers.js";
+import { runCommand } from "./spawn-helper.js";
 
-/** Run a command safely without shell injection */
-async function runCommand(
-	command: string,
-	args: string[],
-	options?: { cwd?: string; stdio?: "pipe" | "inherit" },
-): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
-	return new Promise((resolve) => {
-		const proc = spawn(command, args, {
-			cwd: options?.cwd,
-			stdio: options?.stdio ?? "pipe",
-		});
-		let stdout = "";
-		let stderr = "";
-		proc.stdout?.on("data", (data: Buffer) => {
-			stdout += data.toString();
-		});
-		proc.stderr?.on("data", (data: Buffer) => {
-			stderr += data.toString();
-		});
-		proc.on("close", (code) => {
-			resolve({ stdout, stderr, exitCode: code });
-		});
-		proc.on("error", (err) => {
-			resolve({ stdout, stderr: stderr + err.message, exitCode: 1 });
-		});
-	});
+// ESM-safe require.resolve
+const _require = typeof require === "function" ? require : createRequire(import.meta.url);
+
+/** Resolve a package path from the current working directory (ESM-safe) */
+function resolvePackagePathFromCwd(pkgName: string): string | null {
+	try {
+		return _require.resolve(pkgName, { paths: [process.cwd()] });
+	} catch {
+		return null;
+	}
 }
 
 /** Try to inspect an extension's meta before installing */
@@ -198,8 +183,8 @@ export const installCommand = async (ctx: CommandContext): Promise<void> => {
 			let checkTarget: string | undefined;
 			if (source.startsWith("npm:")) {
 				try {
-					const resolved = require.resolve(pkgName, { paths: [process.cwd()] });
-					checkTarget = resolved;
+					const resolved = resolvePackagePathFromCwd(pkgName);
+					checkTarget = resolved ?? undefined;
 				} catch {}
 			} else if (source.startsWith("git:")) {
 				checkTarget = join(extensionsDir, pkgName);

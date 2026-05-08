@@ -16,14 +16,26 @@ export interface CLIResult {
 	exitCode: number | null;
 }
 
-/** Spawn the kapy CLI with given arguments */
-export function spawnCLI(args: string[], options?: { cwd?: string; env?: Record<string, string> }): Promise<CLIResult> {
+/** Spawn the kapy CLI with given arguments.
+ *
+ * By default, sets HOME to a temp directory and KAPY_NO_EXTENSIONS=1
+ * to avoid loading global extensions that would make tests environment-dependent.
+ */
+export function spawnCLI(
+	args: string[],
+	options?: { cwd?: string; env?: Record<string, string>; isolate?: boolean },
+): Promise<CLIResult> {
 	const cliPath = join(import.meta.dir, "..", "src", "cli.ts");
+	const isolate = options?.isolate ?? true;
 
 	return new Promise((resolve) => {
 		const proc = spawn("bun", ["run", cliPath, ...args], {
 			cwd: options?.cwd,
-			env: { ...process.env, ...options?.env },
+			env: {
+				...(isolate ? { HOME: join(tmpdir(), "kapy-test-home"), KAPY_NO_EXTENSIONS: "1" } : {}),
+				...process.env,
+				...options?.env,
+			},
 			stdio: ["pipe", "pipe", "pipe"],
 		});
 

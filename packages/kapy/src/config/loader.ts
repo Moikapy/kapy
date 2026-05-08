@@ -151,7 +151,10 @@ async function loadGlobalConfig(): Promise<GlobalConfig | null> {
 	try {
 		const content = await readFile(configPath, "utf-8");
 		return JSON.parse(content) as GlobalConfig;
-	} catch {
+	} catch (err) {
+		if (err instanceof SyntaxError) {
+			console.warn(`[kapy] Malformed global config at ${configPath}: ${err.message}. Ignoring.`);
+		}
 		return null;
 	}
 }
