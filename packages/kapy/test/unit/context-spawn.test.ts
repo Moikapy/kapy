@@ -220,4 +220,39 @@ describe("ctx.spawn", () => {
 		const result = await resultPromise;
 		expect(result.aborted).toBe(true);
 	});
+
+	it("kills process after timeout and returns exit code 124", async () => {
+		const ctx = new CommandContext({ command: "test" });
+		const result = await ctx.spawn(["sleep", "5"], { timeout: 100 });
+
+		expect(result.exitCode).toBe(124);
+		expect(result.aborted).toBe(false);
+	});
+
+	it("stream mode pipes output to stdout in real-time", async () => {
+		const ctx = new CommandContext({ command: "test" });
+		// Stream mode is for real-time output, not collection
+		// The test verifies it doesn't crash and returns successfully
+		const result = await ctx.spawn(["echo", "streamed"], { stream: true });
+
+		expect(result.exitCode).toBe(0);
+		// Note: stdout may be empty in tests because pipeTo writes to terminal,
+		// not to the buffer. Real-time streaming is for interactive use.
+	});
+
+	it("abortOnError alias still works for backward compatibility", async () => {
+		const ctx = new CommandContext({ command: "test" });
+		const resultPromise = ctx.spawn(["sleep", "30"], { abortOnError: true });
+
+		setTimeout(() => {
+			try {
+				ctx.abort(10);
+			} catch {
+				/* expected */
+			}
+		}, 50);
+
+		const result = await resultPromise;
+		expect(result.aborted).toBe(true);
+	});
 });

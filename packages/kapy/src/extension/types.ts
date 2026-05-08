@@ -6,7 +6,7 @@ import type { ConfigSchema } from "../config/schema.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
 
-/** Extension metadata */
+/** Extension metadata — package info, dependencies, and declared permissions */
 export interface ExtensionMeta {
 	name: string;
 	version: string;
@@ -14,10 +14,10 @@ export interface ExtensionMeta {
 	permissions?: string[];
 }
 
-/** Extension register function — returns undefined or a cleanup function */
+/** Extension register function — called on load, returns optional cleanup function */
 export type ExtensionRegister = (api: KapyExtensionAPI) => Promise<undefined | (() => void)>;
 
-/** The extension API surface */
+/** The extension API surface — methods extensions use to integrate with kapy */
 export interface KapyExtensionAPI {
 	/** Register a command */
 	addCommand(definition: CommandDefinition): void;

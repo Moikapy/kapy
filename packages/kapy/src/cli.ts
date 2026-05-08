@@ -380,22 +380,6 @@ async function runCLI(
 	}
 }
 
-/** Handle KapyError at the top level — exit with appropriate code */
-function handleKapyError(err: unknown, jsonMode: boolean): never {
-	if (err instanceof KapyError) {
-		if (jsonMode && err.jsonOutput) {
-			console.log(JSON.stringify(err.jsonOutput));
-			process.exit(err.exitCode);
-		}
-		console.error(err.message);
-		process.exit(err.exitCode);
-	}
-
-	// Unexpected errors
-	console.error(err instanceof Error ? err.message : String(err));
-	process.exit(1);
-}
-
 // Run CLI if this is the main entry point
 if (import.meta.main) {
 	kapy()
@@ -404,6 +388,18 @@ if (import.meta.main) {
 			if (err instanceof AbortError) {
 				process.exit(err.exitCode);
 			}
-			handleKapyError(err, process.argv.includes("--json"));
+			// Top-level error handler — format and exit
+			const jsonMode = process.argv.includes("--json");
+			if (err instanceof KapyError) {
+				if (jsonMode && err.jsonOutput) {
+					console.log(JSON.stringify(err.jsonOutput));
+					process.exit(err.exitCode);
+				}
+				console.error(err.message);
+				process.exit(err.exitCode);
+			}
+			// Unexpected errors
+			console.error(err instanceof Error ? err.message : String(err));
+			process.exit(1);
 		});
 }

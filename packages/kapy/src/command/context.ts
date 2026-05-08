@@ -9,7 +9,7 @@ import { createInterface } from "node:readline";
 import { spawn as bunSpawn } from "bun";
 import pc from "picocolors";
 
-/** Options for ctx.spawn() */
+/** Options for ctx.spawn() — subprocess execution with TTY, streaming, and abort support */
 export interface SpawnOptions {
 	/** Pass through TTY — critical for tmux attach, interactive shells */
 	tty?: boolean;
@@ -30,7 +30,7 @@ export interface SpawnOptions {
 	timeout?: number;
 }
 
-/** Result of ctx.spawn() */
+/** Result of ctx.spawn() — subprocess execution result */
 export interface SpawnResult {
 	/** Process exit code */
 	exitCode: number;
@@ -42,7 +42,7 @@ export interface SpawnResult {
 	aborted: boolean;
 }
 
-/** Teardown callback — sync or async */
+/** Teardown callback — sync or async cleanup function registered via ctx.teardown() */
 export type TeardownCallback = () => void | Promise<void>;
 
 /** Command context passed to every handler */

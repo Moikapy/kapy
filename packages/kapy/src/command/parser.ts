@@ -2,7 +2,7 @@
  * Command definitions and types.
  */
 
-/** Positional argument definition */
+/** Positional argument definition for command handlers */
 export interface ArgDefinition {
 	name: string;
 	description?: string;
@@ -11,7 +11,7 @@ export interface ArgDefinition {
 	variadic?: boolean;
 }
 
-/** Named flag definition */
+/** Named flag definition for command-line parsing */
 export interface FlagDefinition {
 	type: "string" | "boolean" | "number";
 	alias?: string;
@@ -20,10 +20,10 @@ export interface FlagDefinition {
 	required?: boolean;
 }
 
-/** Command handler function — uses import type to avoid circular deps */
+/** Command handler function — receives CommandContext with args, config, and utilities */
 export type CommandHandler = (ctx: import("./context.js").CommandContext) => Promise<void> | void;
 
-/** Command options */
+/** Command options — defines args, flags, and behavior for a command */
 export interface CommandOptions {
 	description: string;
 	args?: ArgDefinition[];
@@ -32,7 +32,7 @@ export interface CommandOptions {
 	middleware?: import("../middleware/pipeline.js").Middleware[];
 }
 
-/** Agent-readable hints for AI compatibility */
+/** Agent-readable hints for AI compatibility — documents command behavior for LLMs */
 export interface AgentHints {
 	purpose?: string;
 	when?: string;
@@ -66,7 +66,7 @@ export function validateHookEvent(event: string): string | null {
 	return null;
 }
 
-/** Full command definition with handler */
+/** Full command definition with handler and optional agent hints */
 export interface CommandDefinition {
 	name: string;
 	options: CommandOptions;

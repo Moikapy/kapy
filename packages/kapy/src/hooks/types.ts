@@ -4,10 +4,10 @@
 
 import type { CommandContext } from "../command/context.js";
 
-/** Hook handler function */
+/** Hook handler function — receives CommandContext for the current command */
 export type HookHandler = (ctx: CommandContext) => Promise<void> | void;
 
-/** Registered hook entry */
+/** Registered hook entry with event name and handler */
 export interface HookEntry {
 	event: string;
 	handler: HookHandler;
