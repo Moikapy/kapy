@@ -24,7 +24,12 @@ export const ConfigSourcePriority = ["defaults", "project", "global", "env", "fl
 
 export type ConfigSource = (typeof ConfigSourcePriority)[number];
 
-/** Project config (kapy.config.ts) */
+/** Project config (kapy.config.ts)
+ *
+ * The index signature is intentionally broad (string keys) because
+ * extensions declare their own config namespaces. Unknown keys are
+ * accepted but validated at load time against extension schemas.
+ */
 export interface ProjectConfig {
 	name?: string;
 	extensions?: string[];

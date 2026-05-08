@@ -12,12 +12,18 @@ import type {
 	CommandOptions,
 	FlagDefinition,
 } from "./parser.js";
+import { validateCommandName } from "./parser.js";
 
 export class CommandRegistry {
 	private commands = new Map<string, CommandDefinition>();
 
 	/** Register a command definition. User commands take priority over builtins. */
 	register(definition: CommandDefinition): void {
+		const nameError = validateCommandName(definition.name);
+		if (nameError) {
+			console.warn(`[kapy] ${nameError}. Skipping.`);
+			return;
+		}
 		const existing = this.commands.get(definition.name);
 		if (existing) {
 			return; // Already registered — first registration wins (user commands override builtins)

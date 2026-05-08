@@ -8,4 +8,5 @@ export type {
 	CommandOptions,
 	FlagDefinition,
 } from "./parser.js";
+export { COMMAND_NAME_PATTERN, validateCommandName, validateHookEvent } from "./parser.js";
 export { CommandRegistry, parseArgs } from "./registry.js";

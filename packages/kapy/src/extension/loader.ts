@@ -137,6 +137,10 @@ function resolveDependencyOrder(
 				const depExt = extensions.find((e) => e.name === dep || e.source === dep);
 				if (depExt) {
 					visit(depExt.name, depExt.source, depExt.meta?.dependencies);
+				} else {
+					console.warn(
+						`[kapy] Extension "${name}" depends on "${dep}" which is not installed. Load order may be incorrect.`,
+					);
 				}
 			}
 		}
@@ -192,6 +196,16 @@ export class ExtensionLoader {
 			const metaErrors = validateExtensionMeta(meta as unknown as Record<string, unknown>);
 			if (metaErrors.length > 0) {
 				console.warn(`[kapy] Extension "${name}" has invalid metadata:\n${formatErrors(metaErrors)}`);
+			}
+
+			// Validate extension name (no colons — colons are for command subcommands)
+			if (meta.name.includes(":")) {
+				console.warn(
+					`[kapy] Extension name "${meta.name}" contains a colon. Colons are reserved for command subcommands (e.g. deploy:aws).`,
+				);
+			}
+			if (!meta.name || meta.name.trim() !== meta.name) {
+				console.warn(`[kapy] Extension name "${meta.name}" is empty or has leading/trailing whitespace.`);
 			}
 
 			// Warn about declared permissions (documentation-only for MVP)

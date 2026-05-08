@@ -23,8 +23,15 @@ export { defineConfig, kapy } from "./cli.js";
 export type { SpawnOptions, SpawnResult, TeardownCallback } from "./command/context.js";
 export { AbortError, CommandContext } from "./command/context.js";
 // Command system
-export { CommandRegistry, parseArgs } from "./command/index.js";
+export {
+	COMMAND_NAME_PATTERN,
+	CommandRegistry,
+	parseArgs,
+	validateCommandName,
+	validateHookEvent,
+} from "./command/index.js";
 export type {
+	AgentHints,
 	ArgDefinition,
 	CommandDefinition,
 	CommandHandler,

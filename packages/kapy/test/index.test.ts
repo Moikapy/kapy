@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { AbortError, CommandContext } from "../src/command/context.js";
-import { CommandRegistry, parseArgs } from "../src/command/index.js";
+import { CommandRegistry, parseArgs, validateCommandName, validateHookEvent } from "../src/command/index.js";
 import { parseEnvConfig } from "../src/config/loader.js";
 import { deepMergeConfigs } from "../src/config/loader-merge.js";
 import { ExtensionEmitter } from "../src/hooks/emitter.js";
@@ -294,5 +294,75 @@ describe("parseHookEvent", () => {
 
 	it("returns null for unknown events", () => {
 		expect(parseHookEvent("unknown")).toBeNull();
+	});
+});
+
+// ─── Command Name Validation ───────────────────────────────────
+
+describe("validateCommandName", () => {
+	it("accepts valid command names", () => {
+		expect(validateCommandName("deploy")).toBeNull();
+		expect(validateCommandName("deploy:aws")).toBeNull();
+		expect(validateCommandName("my-command")).toBeNull();
+		expect(validateCommandName("a")).toBeNull();
+		expect(validateCommandName("cmd123")).toBeNull();
+	});
+
+	it("rejects empty names", () => {
+		expect(validateCommandName("")).toContain("cannot be empty");
+	});
+
+	it("rejects names with spaces", () => {
+		expect(validateCommandName("deploy aws")).toContain("cannot contain spaces");
+	});
+
+	it("rejects names with double colons", () => {
+		expect(validateCommandName("deploy::aws")).toContain("cannot contain double colons");
+	});
+
+	it("rejects names starting or ending with colon", () => {
+		expect(validateCommandName(":deploy")).toContain("cannot start or end with a colon");
+		expect(validateCommandName("deploy:")).toContain("cannot start or end with a colon");
+	});
+
+	it("rejects names with uppercase letters", () => {
+		expect(validateCommandName("Deploy")).toContain("must match");
+	});
+
+	it("rejects names with special characters", () => {
+		expect(validateCommandName("deploy!aws")).toContain("must match");
+		expect(validateCommandName("deploy@aws")).toContain("must match");
+	});
+
+	it("accepts multiple colon segments", () => {
+		expect(validateCommandName("deploy:aws:region")).toBeNull();
+	});
+});
+
+// ─── Hook Event Validation ────────────────────────────────────────
+
+describe("validateHookEvent", () => {
+	it("accepts valid hook events", () => {
+		expect(validateHookEvent("before:deploy")).toBeNull();
+		expect(validateHookEvent("after:deploy:aws")).toBeNull();
+		expect(validateHookEvent("on:load")).toBeNull();
+		expect(validateHookEvent("on:extension:loaded")).toBeNull();
+	});
+
+	it("rejects empty events", () => {
+		expect(validateHookEvent("")).toContain("cannot be empty");
+	});
+
+	it("rejects events without phase prefix", () => {
+		expect(validateHookEvent("deploy")).toContain("must follow pattern");
+		expect(validateHookEvent("bogus:event")).toContain("must follow pattern");
+	});
+
+	it("rejects events with uppercase", () => {
+		expect(validateHookEvent("before:Deploy")).toContain("must follow pattern");
+	});
+
+	it("rejects events with spaces", () => {
+		expect(validateHookEvent("before: deploy")).toContain("must follow pattern");
 	});
 });

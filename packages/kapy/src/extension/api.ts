@@ -3,7 +3,8 @@
  * middleware, config, and events.
  */
 
-import type { CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
+import type { AgentHints, CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
+import { validateHookEvent } from "../command/parser.js";
 import type { CommandRegistry } from "../command/registry.js";
 import type { ConfigSchema } from "../config/schema.js";
 import type { ExtensionEmitter } from "../hooks/emitter.js";
@@ -36,17 +37,26 @@ export class ExtensionAPI implements KapyExtensionAPI {
 	}
 
 	addCommand(definition: CommandDefinition): void;
-	addCommand(name: string, options: CommandOptions, handler: CommandHandler): void;
-	addCommand(nameOrDef: string | CommandDefinition, options?: CommandOptions, handler?: CommandHandler): void {
+	addCommand(name: string, options: CommandOptions & { agentHints?: AgentHints }, handler: CommandHandler): void;
+	addCommand(
+		nameOrDef: string | CommandDefinition,
+		options?: CommandOptions & { agentHints?: AgentHints },
+		handler?: CommandHandler,
+	): void {
 		if (typeof nameOrDef === "string") {
 			if (!options || !handler) throw new Error("Command name requires options and handler");
-			this.registry.register({ name: nameOrDef, options, handler });
+			const { agentHints, ...cmdOptions } = options;
+			this.registry.register({ name: nameOrDef, options: cmdOptions, handler, agentHints });
 		} else {
 			this.registry.register(nameOrDef);
 		}
 	}
 
 	addHook(event: string, handler: HookHandler): void {
+		const eventError = validateHookEvent(event);
+		if (eventError) {
+			console.warn(`[kapy] ${eventError}. Registering anyway.`);
+		}
 		if (!this.hooks.has(event)) {
 			this.hooks.set(event, []);
 		}

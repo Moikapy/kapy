@@ -1,7 +1,7 @@
 /**
  * Extension types — meta, register, and API surface.
  */
-import type { CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
+import type { AgentHints, CommandDefinition, CommandHandler, CommandOptions } from "../command/parser.js";
 import type { ConfigSchema } from "../config/schema.js";
 import type { HookHandler } from "../hooks/types.js";
 import type { Middleware } from "../middleware/pipeline.js";
@@ -14,17 +14,16 @@ export interface ExtensionMeta {
 	permissions?: string[];
 }
 
-/** Extension register function */
+/** Extension register function — returns undefined or a cleanup function */
 export type ExtensionRegister = (api: KapyExtensionAPI) => Promise<undefined | (() => void)>;
 
 /** The extension API surface */
 export interface KapyExtensionAPI {
 	/** Register a command */
 	addCommand(definition: CommandDefinition): void;
-	addCommand(name: string, options: CommandOptions, handler: CommandHandler): void;
 	addCommand(name: string, options: CommandOptions & { agentHints?: AgentHints }, handler: CommandHandler): void;
 
-	/** Register a hook */
+	/** Register a hook (event must follow before:*, after:*, on:* pattern) */
 	addHook(event: string, handler: HookHandler): void;
 
 	/** Register middleware */
@@ -38,13 +37,4 @@ export interface KapyExtensionAPI {
 
 	/** Listen for a custom event */
 	on(event: string, handler: (data?: unknown) => Promise<void> | void): void;
-}
-
-/** Agent-readable hints for AI compatibility */
-export interface AgentHints {
-	purpose?: string;
-	when?: string;
-	output?: string;
-	sideEffects?: string;
-	requires?: string[];
 }
