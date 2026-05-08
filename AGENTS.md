@@ -92,6 +92,21 @@ Extension structure: npm package with `kapy-extension` keyword, exports `registe
 | 5 | Network error |
 | 10 | Aborted by hook/middleware |
 
+## Codebase Wiki
+
+This project has an auto-maintained knowledge base at `.codebase-wiki/`.
+
+**Always consult the wiki first** before grepping source files for conceptual questions — architecture decisions, design patterns, module relationships, and evolution are already documented there.
+
+- **`wiki_query`** — search the wiki for any concept, decision, or module
+- **`wiki_ingest`** — update the wiki after making code changes (use `commits` for recent work, `smart` for richer enrichment)
+- **`wiki_lint`** — run periodically to find stale pages, broken links, and contradictions
+- **`wiki_entity`** — document a new module or service
+- **`wiki_decision`** — record an architecture decision (ADR)
+- **`wiki_concept`** — document a cross-cutting pattern
+
+After any meaningful code change (new feature, refactor, ADR-worthy decision), run `wiki_ingest` to keep the wiki current. The wiki is the shared memory between sessions — if it's not in the wiki, the next session starts blind.
+
 ## Scope
 
 In scope: command registry, hooks, middleware, extension loader, config system, CLI bin, AI agent flags, exit codes, scaffolding, example extension.
