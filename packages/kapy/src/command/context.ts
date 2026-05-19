@@ -286,9 +286,11 @@ export class CommandContext {
 		};
 	}
 
-	/** Update duration (called internally) */
+	/** Update duration (idempotent — only records the first call) */
 	_tick(): void {
-		this.duration = Date.now() - this._startTime;
+		if (this.duration === 0) {
+			this.duration = Date.now() - this._startTime;
+		}
 	}
 
 	/** Emit a structured event. In --json mode, writes NDJSON to stdout. */

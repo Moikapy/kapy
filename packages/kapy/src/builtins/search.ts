@@ -2,8 +2,10 @@
 import type { CommandContext } from "../command/context.js";
 
 export const searchCommand = async (ctx: CommandContext): Promise<void> => {
-	const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
-	const query = positionalArgs?.[0];
+	// Named args come from ArgDefinitions; fall back to rest for undeclared
+	const query =
+		((ctx.args as Record<string, unknown>).query as string | undefined) ??
+		((ctx.args as Record<string, unknown>).rest as string[] | undefined)?.[0];
 
 	if (ctx.json) {
 		console.log(

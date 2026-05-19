@@ -5,9 +5,12 @@ import { join } from "node:path";
 import type { CommandContext } from "../command/context.js";
 
 export const configCommand = async (ctx: CommandContext): Promise<void> => {
-	const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
-	const key = positionalArgs?.[0];
-	const value = positionalArgs?.[1];
+	const key =
+		((ctx.args as Record<string, unknown>).key as string | undefined) ??
+		((ctx.args as Record<string, unknown>).rest as string[] | undefined)?.[0];
+	const value =
+		((ctx.args as Record<string, unknown>).value as string | undefined) ??
+		((ctx.args as Record<string, unknown>).rest as string[] | undefined)?.[1];
 	const global = ctx.args.global as boolean;
 
 	if (key && value) {

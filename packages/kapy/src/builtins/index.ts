@@ -10,3 +10,6 @@ export { removeCommand } from "./remove.js";
 export { searchCommand } from "./search.js";
 export { updateCommand } from "./update.js";
 export { upgradeCommand } from "./upgrade.js";
+
+/** Current kapy version — used by --version flag and upgrade checks */
+export const VERSION = "0.4.0";

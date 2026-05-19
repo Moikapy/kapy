@@ -1,11 +1,14 @@
 /** kapy help — show detailed help for a specific command */
 import type { CommandHandler } from "../command/parser.js";
 import type { CommandRegistry } from "../command/registry.js";
+import { VERSION } from "./index.js";
 
 export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 	return async (ctx) => {
-		const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
-		const commandName = positionalArgs?.[0];
+		// Named args from ArgDefinitions; fall back to .rest for backward compat
+		const commandName =
+			((ctx.args as Record<string, unknown>).command as string | undefined) ??
+			((ctx.args as Record<string, unknown>).rest as string[] | undefined)?.[0];
 
 		if (!commandName) {
 			// Show general help
@@ -27,6 +30,7 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 			} else {
 				ctx.log("");
 				ctx.log("  🐹 kapy — the extensible CLI framework");
+				ctx.log(`  v${VERSION}`);
 				ctx.log("");
 				ctx.log("Usage: kapy <command> [flags]");
 				ctx.log("");
@@ -34,6 +38,11 @@ export function createHelpCommand(registry: CommandRegistry): CommandHandler {
 				for (const cmd of registry.visible()) {
 					ctx.log(`  ${cmd.name.padEnd(20)} ${cmd.options.description}`);
 				}
+				ctx.log("");
+				ctx.log("Flags:");
+				ctx.log("  --version, -v       Show version");
+				ctx.log("  --json              Output structured JSON");
+				ctx.log("  --no-input          Skip interactive prompts");
 				ctx.log("");
 				ctx.log("Use 'kapy help <command>' for more information about a command.");
 			}

@@ -14,8 +14,9 @@ interface ExtensionEntry {
 }
 
 export const removeCommand = async (ctx: CommandContext): Promise<void> => {
-	const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
-	const name = positionalArgs?.[0];
+	const name =
+		((ctx.args as Record<string, unknown>).name as string | undefined) ??
+		((ctx.args as Record<string, unknown>).rest as string[] | undefined)?.[0];
 
 	if (!name) {
 		ctx.error("Usage: kapy remove <extension-name>");

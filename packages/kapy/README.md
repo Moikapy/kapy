@@ -35,12 +35,42 @@ kapy()
     args: [{ name: "env", description: "Environment", default: "staging" }],
     flags: {
       verbose: { type: "boolean", alias: "v", description: "Verbose output" },
+      port: { type: "number", description: "Port number" },
     },
   }, async (ctx) => {
     ctx.log(`Deploying to ${ctx.args.env}...`)
   })
   .run()
 ```
+
+### Positional Arguments (v0.4.0+)
+
+Declared `args` are now mapped by name — no more `.rest` indexing:
+
+```ts
+kapy()
+  .command("greet", {
+    description: "Greet someone",
+    args: [
+      { name: "name", required: true, description: "Person to greet" },
+      { name: "occasion", description: "Occasion", default: "birthday" },
+    ],
+  }, async (ctx) => {
+    ctx.log(`Happy ${ctx.args.occasion}, ${ctx.args.name}!`)
+  })
+  .run()
+```
+
+Missing required args produce an error with usage hint and exit code 2.
+Variadic args are supported: `{ name: "files", variadic: true }` captures all remaining positionals.
+
+## Global Flags
+
+| Flag | Description |
+|---|---|
+| `--version`, `-v` | Show version (v0.4.0+) |
+| `--json` | Output structured JSON |
+| `--no-input` | Skip interactive prompts, use defaults |
 
 ## Built-in Commands
 
@@ -56,6 +86,7 @@ kapy()
 | `kapy dev` | Run CLI in dev mode with hot reload |
 | `kapy commands` | List all registered commands |
 | `kapy inspect` | Dump full state (extensions, config, hooks) |
+| `kapy help [command]` | Show help for a command |
 | `kapy tui` | Launch interactive terminal UI |
 
 ## AI Agent Support
@@ -194,12 +225,16 @@ export default defineConfig({
 ```
 
 ```bash
-# Environment variables
-KAPY_DEPLOY_AWS_REGION=us-west-2 kapy deploy:aws
+# Environment variables (type-coerced: booleans, numbers, strings)
+KAPY_DEPLOY_AWS_REGION=us-west-2 kapy deploy:aws  # string
+KAPY_DEBUG=true kapy deploy:aws                      # boolean
+KAPY_PORT=3000 kapy deploy:aws                      # number
 
 # Custom prefix (embedded mode)
 MY_CLI_DEPLOY_AWS_REGION=us-west-2 my-cli deploy:aws
 ```
+
+Env var values are automatically type-coerced: `true`/`1`/`yes` → boolean `true`, `false`/`0`/`no` → boolean `false`, numeric strings → numbers, everything else stays a string.
 
 ## Extension API
 

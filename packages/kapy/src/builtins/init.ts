@@ -5,8 +5,9 @@ import { join, resolve } from "node:path";
 import type { CommandContext } from "../command/context.js";
 
 export const initCommand = async (ctx: CommandContext): Promise<void> => {
-	const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
-	const projectName = positionalArgs?.[0];
+	const projectName =
+		((ctx.args as Record<string, unknown>).name as string | undefined) ??
+		((ctx.args as Record<string, unknown>).rest as string[] | undefined)?.[0];
 	const template = ctx.args.template as boolean;
 
 	if (!projectName) {

@@ -66,8 +66,9 @@ async function computeChecksum(targetPath: string): Promise<string> {
 }
 
 export const installCommand = async (ctx: CommandContext): Promise<void> => {
-	const positionalArgs = (ctx.args as Record<string, unknown>).rest as string[] | undefined;
-	const source = positionalArgs?.[0];
+	const source =
+		((ctx.args as Record<string, unknown>).source as string | undefined) ??
+		((ctx.args as Record<string, unknown>).rest as string[] | undefined)?.[0];
 	const trust = ctx.args.trust as boolean;
 
 	if (!source) {

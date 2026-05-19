@@ -72,17 +72,23 @@ export class CommandRegistry {
 	}
 }
 
-/** Parse CLI args and flags from argv */
+/** Parse CLI args and flags from argv.
+ *
+ * Positional arguments are mapped to declared `ArgDefinition` names in order.
+ * Any remaining positional args beyond the declared ones go into `rest`.
+ * Required arg validation is performed — missing required args produce errors in `args._errors`.
+ */
 export function parseArgs(
 	argv: string[],
 	flagDefs?: Record<string, FlagDefinition>,
+	argDefs?: ArgDefinition[],
 ): {
 	args: Record<string, unknown>;
 	rest: string[];
 } {
 	const args: Record<string, unknown> = {};
-	const rest: string[] = [];
-	const _argIndex = 0;
+	const positional: string[] = [];
+	const errors: string[] = [];
 
 	for (let i = 0; i < argv.length; i++) {
 		const token = argv[i];
@@ -94,7 +100,7 @@ export function parseArgs(
 				// --flag=value
 				const key = token.slice(2, eqIndex);
 				const value = token.slice(eqIndex + 1);
-				args[key] = value;
+				args[key] = coerceFlagValue(key, value, flagDefs);
 			} else if (token.startsWith("--no-")) {
 				// --no-flag => flag: false
 				args[token.slice(5)] = false;
@@ -108,8 +114,12 @@ export function parseArgs(
 				} else if (flagDef) {
 					// Known flag with a type — consume next arg as value
 					const nextToken = argv[i + 1];
-					args[key] = nextToken ?? flagDef.default;
-					if (nextToken) i++;
+					if (nextToken !== undefined && !nextToken.startsWith("-")) {
+						args[key] = coerceFlagValue(key, nextToken, flagDefs);
+						i++;
+					} else {
+						args[key] = flagDef.default;
+					}
 				} else {
 					// Unknown flag — treat as boolean
 					args[key] = true;
@@ -125,18 +135,78 @@ export function parseArgs(
 					args[key] = true;
 				} else {
 					const nextToken = argv[i + 1];
-					args[key] = nextToken ?? flagDef[1].default;
-					if (nextToken) i++;
+					if (nextToken !== undefined && !nextToken.startsWith("-")) {
+						args[key] = coerceFlagValue(key, nextToken, flagDefs);
+						i++;
+					} else {
+						args[key] = flagDef[1].default;
+					}
 				}
 			} else {
-				rest.push(token);
+				positional.push(token);
 			}
 		} else {
-			rest.push(token);
+			positional.push(token);
 		}
 	}
 
-	return { args, rest };
+	// Map positional args to declared ArgDefinitions
+	if (argDefs && argDefs.length > 0) {
+		let argIndex = 0;
+		for (const argDef of argDefs) {
+			if (argDef.variadic) {
+				// Variadic arg consumes all remaining positional args
+				args[argDef.name] = positional.slice(argIndex);
+				argIndex = positional.length;
+			} else if (argIndex < positional.length) {
+				args[argDef.name] = positional[argIndex];
+				argIndex++;
+			} else if (argDef.default !== undefined) {
+				args[argDef.name] = argDef.default;
+			} else if (argDef.required) {
+				errors.push(`Missing required argument: ${argDef.name}`);
+			}
+		}
+		// Remaining positional args go into rest
+		args.rest = positional.slice(argIndex);
+	} else {
+		args.rest = positional;
+	}
+
+	// Validate required args
+	if (argDefs) {
+		for (const argDef of argDefs) {
+			if (argDef.required && (args[argDef.name] === undefined || args[argDef.name] === null)) {
+				if (!errors.includes(`Missing required argument: ${argDef.name}`)) {
+					errors.push(`Missing required argument: ${argDef.name}`);
+				}
+			}
+		}
+	}
+
+	// Store validation errors for framework-level handling
+	if (errors.length > 0) {
+		args._errors = errors;
+	}
+
+	return { args, rest: (args.rest as string[]) ?? [] };
+}
+
+/** Coerce a string flag value to the declared type */
+function coerceFlagValue(key: string, value: string, flagDefs?: Record<string, FlagDefinition>): unknown {
+	const flagDef = flagDefs?.[key];
+	if (!flagDef) return value;
+
+	switch (flagDef.type) {
+		case "number": {
+			const num = Number(value);
+			return Number.isNaN(num) ? value : num;
+		}
+		case "boolean":
+			return value === "true" || value === "1" || value === "yes";
+		default:
+			return value;
+	}
 }
 
 export type { AgentHints, ArgDefinition, CommandDefinition, CommandHandler, CommandOptions, FlagDefinition };

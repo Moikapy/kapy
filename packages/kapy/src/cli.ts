@@ -12,6 +12,7 @@ import {
 	searchCommand,
 	updateCommand,
 	upgradeCommand,
+	VERSION,
 } from "./builtins/index.js";
 import { AbortError, CommandContext } from "./command/context.js";
 /**
@@ -26,6 +27,8 @@ import { AbortError, CommandContext } from "./command/context.js";
  *   kapy upgrade            Upgrade kapy itself
  *   kapy commands [--json]  List all commands
  *   kapy inspect [--json]   Dump full state
+ *   kapy --version          Show version
+ *   kapy -v                 Show version
  */
 import { CommandRegistry, parseArgs } from "./command/index.js";
 import type { CommandHandler, CommandOptions } from "./command/parser.js";
@@ -35,6 +38,7 @@ import { ExtensionLoader } from "./extension/index.js";
 import { errorHandler, KapyError } from "./middleware/error-handler.js";
 import type { Middleware } from "./middleware/pipeline.js";
 import { composeMiddleware } from "./middleware/pipeline.js";
+import { timing } from "./middleware/timing.js";
 
 // ─── Builder API ───────────────────────────────────────────────
 
@@ -99,6 +103,12 @@ async function runCLI(
 	projectConfig: ProjectConfig,
 ): Promise<void> {
 	const argv = process.argv.slice(2);
+
+	// Handle --version / -v flag early
+	if (argv.includes("--version") || argv.includes("-v")) {
+		console.log(`kapy v${VERSION}`);
+		process.exit(0);
+	}
 
 	// Parse global flags
 	const { args: globalArgs, rest: commandParts } = parseArgs(argv);
@@ -290,11 +300,28 @@ async function runCLI(
 		process.exit(2);
 	}
 
-	// Parse command-specific flags
-	const { args: cmdArgs, rest: cmdPositional } = parseArgs(commandParts.slice(1), resolved.command.options.flags);
+	// Parse command-specific flags and args
+	const { args: cmdArgs } = parseArgs(
+		commandParts.slice(1),
+		resolved.command.options.flags,
+		resolved.command.options.args,
+	);
+
+	// Validate required args
+	const errors = (cmdArgs as Record<string, unknown>)._errors as string[] | undefined;
+	if (errors && errors.length > 0) {
+		for (const err of errors) {
+			console.error(`Error: ${err}`);
+		}
+		console.error(
+			`\nUsage: kapy ${resolved.command.name} ${(resolved.command.options.args ?? []).map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")}`,
+		);
+		process.exit(2);
+	}
 
 	// Merge global args with command args, positional args in rest
-	const mergedArgs = { ...globalArgs, ...cmdArgs, rest: cmdPositional };
+	const mergedArgs = { ...globalArgs, ...cmdArgs };
+	delete (mergedArgs as Record<string, unknown>)._errors; // Remove internal validation field
 
 	// Build command context
 	const ctx = new CommandContext({
@@ -305,8 +332,8 @@ async function runCLI(
 		noInput: noInput,
 	});
 
-	// Compose middleware chain (error handler first, then user + extension middleware)
-	const allMiddlewares = [errorHandler, ...userMiddlewares];
+	// Compose middleware chain (error handler, timing, then user + extension middleware)
+	const allMiddlewares = [errorHandler, timing, ...userMiddlewares];
 	const pipeline = composeMiddleware(allMiddlewares);
 
 	// Execute middleware → hooks → command

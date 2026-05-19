@@ -69,22 +69,11 @@ export async function loadConfig(options?: {
 		}
 	}
 
-	// 4. Environment variables
+	// 4. Environment variables (already namespaced by parseEnvConfig)
 	const envConfig = parseEnvConfig(envPrefix);
 	if (Object.keys(envConfig).length > 0) {
-		const envMerged: MergedConfig = {};
-		for (const [key, value] of Object.entries(envConfig)) {
-			// KAPY_EXT_REGION => ext: { region: value }
-			const parts = key.split("_");
-			if (parts.length >= 2) {
-				const ns = parts[0].toLowerCase();
-				const field = parts.slice(1).join("_").toLowerCase();
-				if (!envMerged[ns]) envMerged[ns] = {};
-				(envMerged[ns] as Record<string, unknown>)[field] = value;
-			}
-		}
-		sources.set("env", envMerged);
-		config = deepMergeConfigs(config, envMerged);
+		sources.set("env", envConfig as unknown as MergedConfig);
+		config = deepMergeConfigs(config, envConfig as unknown as MergedConfig);
 	}
 
 	// 5. CLI flags
@@ -159,26 +148,51 @@ async function loadGlobalConfig(): Promise<GlobalConfig | null> {
 	}
 }
 
-/** Parse environment variables with the given prefix into namespaced config */
+/** Parse environment variables with the given prefix into namespaced config.
+ *
+ * Keys are consistently lowercased then split by `_` into namespace + field.
+ * Values are type-coerced: "true"/"1"/"yes" → true, "false"/"0"/"no" → false,
+ * numeric strings → number, everything else stays string.
+ */
 export function parseEnvConfig(prefix: string): Record<string, unknown> {
 	const config: Record<string, unknown> = {};
 	const prefixStr = `${prefix}_`;
 
-	for (const [key, value] of Object.entries(process.env)) {
-		if (value === undefined) continue;
+	for (const [key, rawValue] of Object.entries(process.env)) {
+		if (rawValue === undefined) continue;
 		if (!key.startsWith(prefixStr)) continue;
 
 		const configKey = key.slice(prefixStr.length);
-		// Deep merge dot-notation keys (KAPY_EXT_REGION => ext.region under ext namespace)
 		const parts = configKey.split("_");
+
+		// Type-coerce the value
+		const value = coerceEnvValue(rawValue);
+
 		if (parts.length >= 2) {
-			config[configKey] = value;
+			// Multi-segment: namespace_field — stored under lowercase namespace + lowercase field
+			const ns = parts[0].toLowerCase();
+			const field = parts.slice(1).join("_").toLowerCase();
+			if (!config[ns]) config[ns] = {};
+			(config[ns] as Record<string, unknown>)[field] = value;
 		} else {
+			// Single segment — stored as lowercase key
 			config[configKey.toLowerCase()] = value;
 		}
 	}
 
 	return config;
+}
+
+/** Coerce an env var string value to its appropriate type */
+function coerceEnvValue(value: string): unknown {
+	// Boolean coercion
+	if (value === "true" || value === "1" || value === "yes") return true;
+	if (value === "false" || value === "0" || value === "no") return false;
+	// Number coercion
+	const num = Number(value);
+	if (value !== "" && !Number.isNaN(num)) return num;
+	// String (default)
+	return value;
 }
 
 export { DEFAULT_ENV_PREFIX, deepMergeConfigs, getDefaultConfig };
