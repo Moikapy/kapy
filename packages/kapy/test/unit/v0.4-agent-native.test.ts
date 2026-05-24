@@ -135,3 +135,41 @@ describe("CommandContext v0.4", () => {
 		expect(ctx.compact).toBe(false);
 	});
 });
+
+// ─── compactEmitted / jsonEmitted guards ─────────────────────
+
+describe("emit guards", () => {
+	test("compactLine sets compactEmitted flag", () => {
+		const ctx = new CommandContext({ compact: true });
+		expect(ctx.compactEmitted).toBe(false);
+		ctx.compactLine("test");
+		expect(ctx.compactEmitted).toBe(true);
+	});
+
+	test("compactLine is no-op when not in compact mode (flag stays false)", () => {
+		const ctx = new CommandContext({ compact: false });
+		ctx.compactLine("test");
+		expect(ctx.compactEmitted).toBe(false);
+	});
+
+	test("markJsonEmitted sets jsonEmitted flag", () => {
+		const ctx = new CommandContext({ json: true });
+		expect(ctx.jsonEmitted).toBe(false);
+		ctx.markJsonEmitted();
+		expect(ctx.jsonEmitted).toBe(true);
+	});
+
+	test("setResult stores result for later retrieval", () => {
+		const ctx = new CommandContext({});
+		expect(ctx.result).toBeUndefined();
+		ctx.setResult({ items: [1, 2, 3] });
+		expect(ctx.result).toEqual({ items: [1, 2, 3] });
+	});
+
+	test("setResult can be called multiple times (last wins)", () => {
+		const ctx = new CommandContext({});
+		ctx.setResult({ a: 1 });
+		ctx.setResult({ b: 2 });
+		expect(ctx.result).toEqual({ b: 2 });
+	});
+});
