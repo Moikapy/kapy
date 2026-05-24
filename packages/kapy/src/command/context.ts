@@ -9,6 +9,46 @@ import { createInterface } from "node:readline";
 import { spawn as bunSpawn } from "bun";
 import pc from "picocolors";
 
+/** Strip ANSI escape sequences from a string */
+export function stripAnsi(str: string): string {
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences require \x1b
+	return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+}
+
+/** Format data as a compact single-line for agent consumption */
+export function formatCompact(data: unknown): string {
+	if (data === null || data === undefined) return "";
+	if (typeof data === "string") return stripAnsi(data);
+	if (typeof data === "number" || typeof data === "boolean") return String(data);
+	if (Array.isArray(data)) return `[${data.length} items]`;
+
+	// Objects: compact key:value|key:value format for flat objects,
+	// JSON for nested objects
+	const obj = data as Record<string, unknown>;
+	const entries = Object.entries(obj).filter(([_, v]) => v !== undefined && v !== null);
+
+	if (entries.length === 0) return "{}";
+
+	// Check if any value is nested (object or array with >3 items)
+	const hasNested = entries.some(
+		([_, v]) => (typeof v === "object" && v !== null && !Array.isArray(v)) || (Array.isArray(v) && v.length > 3),
+	);
+
+	if (hasNested) {
+		// Fall back to JSON for complex data
+		return JSON.stringify(obj);
+	}
+
+	// Flat compact: key:value|key:value
+	return entries
+		.map(([k, v]) => {
+			if (Array.isArray(v)) return `${k}:[${v.length}]`;
+			if (typeof v === "object" && v !== null) return `${k}:{${Object.keys(v).length}}`;
+			return `${k}:${v}`;
+		})
+		.join("|");
+}
+
 /** Options for ctx.spawn() — subprocess execution with TTY, streaming, and abort support */
 export interface SpawnOptions {
 	/** Pass through TTY — critical for tmux attach, interactive shells */
@@ -28,6 +68,10 @@ export interface SpawnOptions {
 	suppressOutput?: boolean;
 	/** Timeout in milliseconds. Kill the process if it doesn't exit in time. */
 	timeout?: number;
+	/** Compact mode: auto-parse JSON stdout and apply maxLines truncation */
+	compact?: boolean;
+	/** Maximum lines to keep from stdout/stderr when compact mode is active */
+	maxLines?: number;
 }
 
 /** Result of ctx.spawn() — subprocess execution result */
@@ -40,6 +84,8 @@ export interface SpawnResult {
 	stderr: string;
 	/** Whether the process was killed by ctx.abort() */
 	aborted: boolean;
+	/** Parsed JSON output (set when spawn detects JSON in stdout) */
+	parsed?: unknown;
 }
 
 /** Teardown callback — sync or async cleanup function registered via ctx.teardown() */
@@ -68,6 +114,9 @@ export class CommandContext {
 	/** Whether interactive prompts are disabled */
 	noInput: boolean;
 
+	/** Whether compact mode is active (agent-native output) */
+	compact: boolean;
+
 	private _startTime: number;
 	private _userExitCode: number | null = null;
 	private _abortExitCode: number = 0;
@@ -75,6 +124,9 @@ export class CommandContext {
 	private _spinner: Spinner | null = null;
 	private _teardownCallbacks: TeardownCallback[] = [];
 	private _abortController: AbortController | null = null;
+	private _result: unknown = undefined;
+	private _compactEmitted: boolean = false;
+	private _jsonEmitted: boolean = false;
 
 	constructor(options: {
 		args?: Record<string, unknown>;
@@ -82,6 +134,7 @@ export class CommandContext {
 		command?: string;
 		json?: boolean;
 		noInput?: boolean;
+		compact?: boolean;
 	}) {
 		this.args = options.args ?? {};
 		this.config = options.config ?? {};
@@ -89,19 +142,56 @@ export class CommandContext {
 		this.aborted = false;
 		this.json = options.json ?? false;
 		this.noInput = options.noInput ?? false;
+		this.compact = options.compact ?? false;
 		this._startTime = Date.now();
 		this.duration = 0;
+	}
+
+	/** Set the structured result data for agent consumption */
+	setResult(data: unknown): void {
+		this._result = data;
+	}
+
+	/** Get the structured result data */
+	get result(): unknown {
+		return this._result;
+	}
+
+	/** Emit a compact output line — only prints in compact mode, single line, no color.
+	 *  Marks that compact output was manually emitted, preventing auto-emit in the CLI runner. */
+	compactLine(msg: string): void {
+		if (this.compact) {
+			console.log(stripAnsi(msg));
+			this._compactEmitted = true;
+		}
+	}
+
+	/** Whether compact output was manually emitted via compactLine() */
+	get compactEmitted(): boolean {
+		return this._compactEmitted;
+	}
+
+	/** Whether JSON output was manually emitted (prevents auto-emit) */
+	get jsonEmitted(): boolean {
+		return this._jsonEmitted;
+	}
+
+	/** Mark that JSON output was manually emitted — prevents runner auto-emit */
+	markJsonEmitted(): void {
+		this._jsonEmitted = true;
 	}
 
 	/** Styled success output */
 	log(msg: string): void {
 		if (this.json) return;
+		if (this.compact) return;
 		console.log(pc.green(msg));
 	}
 
 	/** Styled warning output */
 	warn(msg: string): void {
 		if (this.json) return;
+		if (this.compact) return;
 		console.warn(pc.yellow(msg));
 	}
 
@@ -147,7 +237,7 @@ export class CommandContext {
 
 	/** Whether this is an interactive terminal session */
 	get isInteractive(): boolean {
-		return !this.noInput && !this.json && !!process.stdout.isTTY;
+		return !this.noInput && !this.json && !this.compact && !!process.stdout.isTTY;
 	}
 
 	/** Get the effective exit code. User-set takes priority, then abort code, then 0. */
@@ -278,11 +368,34 @@ export class CommandContext {
 		// Clear timeout if process exited before timeout
 		if (timeoutId) clearTimeout(timeoutId);
 
+		// Auto-parse JSON output when compact mode is active
+		let parsed: unknown;
+		if ((opts.compact && stdout.trim().startsWith("{")) || stdout.trim().startsWith("[")) {
+			try {
+				parsed = JSON.parse(stdout.trim());
+			} catch {
+				// Not valid JSON — leave parsed undefined
+			}
+		}
+
+		// Apply compact/maxLines transforms to stdout/stderr
+		if (opts.compact) {
+			const maxLines = opts.maxLines ?? 50;
+			const truncateLines = (text: string): string => {
+				const lines = text.split("\n");
+				if (lines.length <= maxLines) return text;
+				return `${lines.slice(0, maxLines).join("\n")}\n... (${lines.length - maxLines} more lines)`;
+			};
+			stdout = truncateLines(stdout);
+			stderr = truncateLines(stderr);
+		}
+
 		return {
 			exitCode: timedOut ? 124 : exitCode,
 			stdout,
 			stderr,
 			aborted: abortController.signal.aborted,
+			parsed,
 		};
 	}
 

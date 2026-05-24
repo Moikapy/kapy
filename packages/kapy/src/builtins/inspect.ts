@@ -27,8 +27,18 @@ export function createInspectCommand(
 			),
 		};
 
+		ctx.setResult(state);
+
 		if (ctx.json) {
+			ctx.markJsonEmitted();
 			console.log(JSON.stringify(state, null, 2));
+		} else if (ctx.compact) {
+			ctx.compactLine(
+				`commands:${state.commands.length}|middleware:${state.middlewareCount}|hooks:${Object.keys(state.hooks).length}`,
+			);
+			for (const cmd of state.commands) {
+				ctx.compactLine(`${cmd.name}\t${cmd.description}`);
+			}
 		} else {
 			ctx.log("kapy inspect:");
 			ctx.log(`  Commands: ${state.commands.length}`);

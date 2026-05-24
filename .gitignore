@@ -42,3 +42,4 @@ docs/
 .codebase-wiki/
 .wiki/
 rss
+.npmrc
