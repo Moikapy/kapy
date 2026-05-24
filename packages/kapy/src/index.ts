@@ -10,6 +10,7 @@ export {
 	createCommandsCommand,
 	createHelpCommand,
 	createInspectCommand,
+	createSkillsCommand,
 	devCommand,
 	initCommand,
 	installCommand,
@@ -21,7 +22,7 @@ export {
 export type { KapyBuilder } from "./cli.js";
 export { defineConfig, kapy } from "./cli.js";
 export type { SpawnOptions, SpawnResult, TeardownCallback } from "./command/context.js";
-export { AbortError, CommandContext } from "./command/context.js";
+export { AbortError, CommandContext, formatCompact } from "./command/context.js";
 // Command system
 export {
 	COMMAND_NAME_PATTERN,

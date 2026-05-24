@@ -187,6 +187,15 @@ async (ctx) => {
   ctx.spawn(cmd, opts?)       // Spawn subprocess (TTY passthrough, abort-safe)
   ctx.exitCode                // Writable exit code (propagated to process.exit)
   ctx.teardown(fn)            // Register cleanup callback (LIFO, async-safe)
+
+  // Agent-Native (v0.4.0+)
+  ctx.setResult(data)         // Store structured result for --json/--compact
+  ctx.result                  // Get stored result
+  ctx.compact                 // True when --compact flag is set
+  ctx.compactLine(msg)        // Output token-efficient one-liner
+  ctx.json                    // True when --json flag is set
+  ctx.noInput                 // True when --no-input flag is set
+  ctx.parsed                  // Raw parsed argv (before coercion)
 }
 ```
 
@@ -203,6 +212,85 @@ const result = await ctx.spawn(["tmux", "new-session", "-s", "dev"], {
 })
 // result: { exitCode, stdout, stderr, aborted }
 ```
+
+## Agent-Native Features (v0.4.0)
+
+Kapy is designed for AI agents first. Every kapy CLI automatically supports:
+
+### Universal Flags
+
+```
+--json       Machine-readable JSON output (no ANSI, no spinners)
+--compact    Token-efficient single-line output for agent context windows
+--no-input   Skip all prompts — never block waiting for user input
+--schema     Return JSON Schema for a command's args/flags/returns
+--agent      Return AgentHints manifest (purpose, when, output, sideEffects)
+```
+
+### `ctx.setResult()` — Structured Return Values
+
+Instead of scattering `console.log()` + `if (json)` blocks, call `setResult()` once:
+
+```ts
+async (ctx) => {
+  const data = await doTheThing(ctx.args)
+  ctx.setResult(data)   // stores for --json / --compact emission
+
+  if (ctx.compact) {    // compact: token-efficient one-liners
+    ctx.compactLine(formatCompact(data))
+    return
+  }
+  if (ctx.json) return  // setResult auto-emits JSON
+
+  // human-readable output below
+  console.log(`Done: ${data.name}`)
+}
+```
+
+### `ctx.compact` + `ctx.compactLine()`
+
+When `--compact` is passed, `ctx.compact` is `true`. Use `ctx.compactLine(msg)` to output token-efficient one-liners instead of multi-line human output.
+
+### `formatCompact(data)`
+
+Utility that collapses any value into a single line:
+- Objects → `key:value|key:value` (pipe-delimited)
+- Numbers/strings → raw value
+- null/undefined → empty string
+
+```ts
+import { formatCompact } from "@moikapy/kapy"
+
+formatCompact({ pages: 42, size: "12kb" })
+// "pages:42|size:12kb"
+```
+
+### `kapy commands --agent`
+
+Returns an AgentHints manifest for all registered commands — AI agents discover commands without reading docs:
+
+```json
+{
+  "name": "deploy",
+  "purpose": "Deploy your application",
+  "when": "When you need to push code to a server",
+  "output": "{ url, duration }",
+  "sideEffects": "Creates deployment on remote server",
+  "requires": ["config.deploy.target"]
+}
+```
+
+### `kapy <cmd> --schema`
+
+Returns the JSON Schema for any command's input/output. Agents validate args before calling.
+
+### Token Savings
+
+| Mode | Sample output | Tokens | Savings |
+|---|---|---|---|
+| Human (default) | 4-8 lines with emojis, tips | ~200 | — |
+| `--json` | Structured JSON | ~80 | 60% |
+| `--compact` | Single pipe-delimited line | ~25 | **87%** |
 
 ## Tech Stack
 

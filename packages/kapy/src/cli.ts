@@ -4,6 +4,7 @@ import {
 	createCommandsCommand,
 	createHelpCommand,
 	createInspectCommand,
+	createSkillsCommand,
 	devCommand,
 	initCommand,
 	installCommand,
@@ -13,7 +14,7 @@ import {
 	updateCommand,
 	upgradeCommand,
 } from "./builtins/index.js";
-import { AbortError, CommandContext } from "./command/context.js";
+import { AbortError, CommandContext, formatCompact } from "./command/context.js";
 /**
  * kapy — Extensible CLI framework.
  *
@@ -79,7 +80,7 @@ export function kapy(): KapyBuilder {
 
 // ─── Universal flags ───────────────────────────────────────────
 
-/** Auto-inject --json and --no-input flags into command options per spec §10 */
+/** Auto-inject --json, --no-input, --compact, --agent, and --schema flags into command options per spec §10 */
 function withUniversalFlags(options: CommandOptions): CommandOptions {
 	return {
 		...options,
@@ -87,6 +88,9 @@ function withUniversalFlags(options: CommandOptions): CommandOptions {
 			...options.flags,
 			json: { type: "boolean" as const, description: "Output structured JSON" },
 			"no-input": { type: "boolean" as const, description: "Skip interactive prompts, use defaults or fail" },
+			compact: { type: "boolean" as const, description: "Agent-native compact output" },
+			agent: { type: "boolean" as const, description: "Enable agent mode with structured output" },
+			schema: { type: "boolean" as const, description: "Output JSON Schema format (requires --agent)" },
 		},
 	};
 }
@@ -104,6 +108,9 @@ async function runCLI(
 	const { args: globalArgs, rest: commandParts } = parseArgs(argv);
 	const jsonMode = globalArgs.json === true;
 	const noInput = globalArgs["no-input"] === true;
+	const compactMode = globalArgs.compact === true;
+	// Agent and schema modes are handled in CommandContext
+	// They set ctx.parsed fields consumed by builtins
 
 	// Load config
 	const { config: mergedConfig, projectConfig: loadedProjectConfig } = await loadConfig({
@@ -247,6 +254,16 @@ async function runCLI(
 		),
 	});
 	registry.register({
+		name: "skills",
+		options: withUniversalFlags({
+			description: "Show agent-readable skill manifest (SKILL.md by default)",
+			flags: {
+				format: { type: "string" as const, description: "Output format: mcp or md (default: md)" },
+			},
+		}),
+		handler: createSkillsCommand(registry),
+	});
+	registry.register({
 		name: "help",
 		options: withUniversalFlags({
 			description: "Show help for a command",
@@ -303,6 +320,7 @@ async function runCLI(
 		command: resolved.command.name,
 		json: jsonMode,
 		noInput: noInput,
+		compact: compactMode,
 	});
 
 	// Compose middleware chain (error handler first, then user + extension middleware)
@@ -369,6 +387,11 @@ async function runCLI(
 	// JSON output for successful commands
 	if (jsonMode && !ctx.aborted) {
 		console.log(JSON.stringify({ status: "success", command: ctx.command, duration: ctx.duration }));
+	}
+
+	// Compact mode output: if ctx.result is set, output compact format
+	if (compactMode && !ctx.aborted && ctx.result !== undefined && ctx.result !== null) {
+		console.log(formatCompact(ctx.result));
 	}
 
 	// Run teardown callbacks (cleanup processes, temp files, etc.)

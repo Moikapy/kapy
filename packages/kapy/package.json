@@ -1,6 +1,6 @@
 {
 	"name": "@moikapy/kapy",
-	"version": "0.3.1",
+	"version": "0.4.0",
 	"type": "module",
 	"description": "The extensible CLI framework. Commands, hooks, middleware, extensions.",
 	"main": "./dist/index.js",
